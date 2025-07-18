@@ -1,14 +1,60 @@
 {
   "Forest": {
-    "background_color": [34, 139, 34],
-    "path_color": [139, 69, 19],
-    "obstacle_color": [85, 107, 47],
-    "buildable_color": [50, 205, 50]
+    "background_color": [20, 40, 25],
+    "tile_definitions": {
+      "BUILDABLE": {
+        "type": "BUILDABLE",
+        "color": [50, 120, 50]
+      },
+      "PATH": {
+        "type": "PATH",
+        "color": [139, 69, 19]
+      },
+      "TREE": {
+        "type": "OBSTACLE",
+        "color": [34, 80, 34]
+      },
+      "MOUNTAIN": {
+        "type": "OBSTACLE",
+        "color": [100, 100, 100]
+      },
+      "LAKE": {
+        "type": "OBSTACLE",
+        "color": [70, 80, 190]
+      },
+      "BORDER": {
+        "type": "OBSTACLE",
+        "color": [10, 20, 12]
+      }
+    }
   },
   "Rocky": {
-    "background_color": [105, 105, 105],
-    "path_color": [210, 180, 140],
-    "obstacle_color": [47, 79, 79],
-    "buildable_color": [119, 136, 153]
+    "background_color": [60, 60, 70],
+    "tile_definitions": {
+      "BUILDABLE": {
+        "type": "BUILDABLE",
+        "color": [119, 136, 153]
+      },
+      "PATH": {
+        "type": "PATH",
+        "color": [210, 180, 140]
+      },
+      "TREE": {
+        "type": "OBSTACLE",
+        "color": [47, 79, 79]
+      },
+      "MOUNTAIN": {
+        "type": "OBSTACLE",
+        "color": [40, 40, 50]
+      },
+      "LAKE": {
+        "type": "OBSTACLE",
+        "color": [90, 90, 150]
+      },
+      "BORDER": {
+        "type": "OBSTACLE",
+        "color": [5, 5, 10]
+      }
+    }
   }
 }
