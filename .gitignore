@@ -16,6 +16,7 @@ env/
 
 # --- pyenv ---
 # The local python version file
+.pyenv
 .python-version
 
 # --- IDE / Editor ---
