@@ -1,0 +1,9 @@
+{
+  "global_damage_boost_1": {
+    "name": "Sharpened Shells I",
+    "cost": 200,
+    "description": "Increases damage of all towers by 10%.",
+    "type": "global",
+    "effect": { "damage_multiplier": 1.1 }
+  }
+}

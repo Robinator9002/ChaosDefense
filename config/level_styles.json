@@ -1,0 +1,14 @@
+{
+  "Forest": {
+    "background_color": [34, 139, 34],
+    "path_color": [139, 69, 19],
+    "obstacle_color": [85, 107, 47],
+    "buildable_color": [50, 205, 50]
+  },
+  "Rocky": {
+    "background_color": [105, 105, 105],
+    "path_color": [210, 180, 140],
+    "obstacle_color": [47, 79, 79],
+    "buildable_color": [119, 136, 153]
+  }
+}

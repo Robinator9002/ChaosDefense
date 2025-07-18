@@ -1,0 +1,9 @@
+{
+  "turret": {
+    "name": "Basic Turret",
+    "cost": 50,
+    "damage": 10,
+    "range": 150,
+    "fire_rate": 0.5
+  }
+}

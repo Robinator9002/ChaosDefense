@@ -1,0 +1,8 @@
+{
+  "screen_width": 1280,
+  "screen_height": 720,
+  "screen_title": "ChaosDefense",
+  "grid_width": 40,
+  "grid_height": 22,
+  "tile_size": 32
+}
