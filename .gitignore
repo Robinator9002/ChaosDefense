@@ -1,4 +1,33 @@
-__pycache__
-assets
+# .gitignore
 
+# --- Python ---
+# Compiled Python files and cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment folder
+# Maybe relevant later on
+.venv/
+# Or other common names
+venv/
+env/
+
+# --- pyenv ---
+# The local python version file
 .python-version
+
+# --- IDE / Editor ---
+# VSCode
+.vscode/
+
+# --- Build / Distribution ---
+build/
+dist/
+*.egg-info/
+*.egg
+
+# --- Testing ---
+.pytest_cache/
+.coverage
