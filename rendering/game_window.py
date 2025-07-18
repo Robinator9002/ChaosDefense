@@ -94,7 +94,7 @@ class GameWindow(arcade.Window):
     def on_resize(self, width: int, height: int):
         """
         This function is called when the user resizes the window.
+        The super-class method handles the viewport resizing.
         """
         super().on_resize(width, height)
-        arcade.set_viewport(0, self.width, 0, self.height)
         logger.info(f"Window resized to: {width}x{height}")
