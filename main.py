@@ -10,6 +10,7 @@ from rendering.game_window import GameWindow
 # --- Constants ---
 PROJECT_ROOT = Path(__file__).parent
 CONFIG_PATH = PROJECT_ROOT / "config"
+ASSETS_PATH = PROJECT_ROOT / "assets"
 
 # --- Basic Logging Setup ---
 logging.basicConfig(
@@ -39,8 +40,7 @@ def main():
     logger.info("--- Loading Game Configurations ---")
     try:
         game_settings = load_config("game_settings.json")
-        # We can load the other configs here later if main needs them,
-        # or have other modules load them as needed.
+        level_styles = load_config("level_styles.json")
     except (FileNotFoundError, json.JSONDecodeError):
         logger.critical(
             "A required configuration file was missing or corrupt. Cannot start."
@@ -52,7 +52,15 @@ def main():
     screen_title = game_settings.get("screen_title", "ChaosDefense - Error")
 
     logger.info("--- Initializing Game Window ---")
-    window = GameWindow(screen_width, screen_height, screen_title)
+    # Pass all the necessary configuration and paths to the GameWindow.
+    window = GameWindow(
+        width=screen_width,
+        height=screen_height,
+        title=screen_title,
+        game_settings=game_settings,
+        level_styles=level_styles,
+        assets_path=ASSETS_PATH,
+    )
     window.setup()
 
     arcade.run()
