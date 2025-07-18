@@ -51,6 +51,8 @@ class GameWindow(arcade.Window):
         self.world_height = self.grid_height * self.tile_size
 
         self.camera = arcade.camera.Camera2D()
+        # Initialize the camera's viewport to the initial window size.
+        # This is critical for making sure the camera knows its own boundaries.
         self.camera.viewport_width = width
         self.camera.viewport_height = height
 
@@ -89,26 +91,7 @@ class GameWindow(arcade.Window):
             assets_path=self.assets_path,
         )
 
-        # --- Correctly position the camera after setup ---
-        # We will center the camera on the world by default.
-        self.center_camera_on_world()
-
-        logger.info(
-            "Game setup is complete. The world has been generated and camera positioned."
-        )
-
-    def center_camera_on_world(self):
-        """Calculates the correct position to center the camera's view on the world."""
-        # Calculate the center of the world
-        world_center_x = self.world_width / 2
-        world_center_y = self.world_height / 2
-
-        # Calculate the camera's bottom-left position to achieve this centering
-        camera_x = world_center_x - (self.camera.viewport_width / 2)
-        camera_y = world_center_y - (self.camera.viewport_height / 2)
-
-        self.camera.position = (camera_x, camera_y)
-        self._clamp_camera()
+        logger.info("Game setup is complete. The world has been generated.")
 
     def on_draw(self):
         """
@@ -136,6 +119,7 @@ class GameWindow(arcade.Window):
         """
         Game logic and movement calculations.
         """
+        # Update camera position based on keyboard state
         self._update_camera_position()
 
         if self.game_state and self.game_state.game_over:
@@ -143,6 +127,7 @@ class GameWindow(arcade.Window):
 
     def _update_camera_position(self):
         """Moves the camera based on which keys are currently held down."""
+        # Calculate movement vector
         cam_dx = 0
         cam_dy = 0
         if self.up_pressed and not self.down_pressed:
@@ -154,6 +139,7 @@ class GameWindow(arcade.Window):
         elif self.right_pressed and not self.left_pressed:
             cam_dx = 1
 
+        # Only move and clamp if there is movement
         if cam_dx != 0 or cam_dy != 0:
             new_pos = (
                 self.camera.position[0] + cam_dx * CAMERA_SPEED,
@@ -223,6 +209,7 @@ class GameWindow(arcade.Window):
         This function is called when the user resizes the window.
         """
         super().on_resize(width, height)
+        # Update the camera's viewport to the new window dimensions
         self.camera.viewport_width = width
         self.camera.viewport_height = height
         self._clamp_camera()
