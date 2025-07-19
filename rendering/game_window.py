@@ -54,17 +54,14 @@ class GameWindow(arcade.Window):
         self.world_height = self.grid_height * self.tile_size
 
         # --- Camera and Scaling Setup ---
-        # FIX #1: Initialize cameras with NO arguments to prevent the crash.
         self.camera = arcade.camera.Camera2D()
         self.ui_camera = arcade.camera.Camera2D()
 
-        # Now, set the viewport properties manually.
         self.camera.viewport_width = width
         self.camera.viewport_height = height
         self.ui_camera.viewport_width = width
         self.ui_camera.viewport_height = height
 
-        # Zoom is handled by scaling the world sprites.
         self.world_scale = 1.0
 
         # --- Keyboard State for Camera Movement ---
@@ -94,7 +91,12 @@ class GameWindow(arcade.Window):
             style_definitions=current_style.get("tile_definitions", {}),
             assets_path=self.assets_path,
         )
-        self._center_camera_on_map()
+
+        # --- FIX #1: Force an initial resize/clamp event ---
+        # This ensures the camera is correctly centered and clamped after everything
+        # is loaded, fixing the initial misplacement issue.
+        self.on_resize(self.width, self.height)
+
         logger.info("Game setup is complete. The world has been generated.")
 
     def _center_camera_on_map(self):
@@ -106,7 +108,6 @@ class GameWindow(arcade.Window):
         center_y = (scaled_world_height - self.height) / 2
 
         self.camera.position = (center_x, center_y)
-        self._clamp_camera()
 
     def on_draw(self):
         """Render the screen."""
@@ -159,16 +160,22 @@ class GameWindow(arcade.Window):
 
     def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int):
         """Handle mouse scroll for zooming in and out by scaling the world."""
-        # FIX #2: Correct mathematical formula for zooming to the cursor.
         old_scale = self.world_scale
+
+        # Calculate the potential new scale
+        new_scale = self.world_scale + scroll_y * SCROLL_INCREMENT
+
+        # Clamp the new scale to the defined min/max
+        self.world_scale = max(MIN_SCALE, min(new_scale, MAX_SCALE))
+
+        # --- FIX #2: Prevent camera drift at zoom limits ---
+        # If the scale is at a limit and hasn't changed, do nothing further.
+        if self.world_scale == old_scale:
+            return
 
         # Get the world coordinates under the mouse before scaling
         world_x = (self.camera.position[0] + x) / old_scale
         world_y = (self.camera.position[1] + y) / old_scale
-
-        # Determine the new scale and clamp it
-        self.world_scale += scroll_y * SCROLL_INCREMENT
-        self.world_scale = max(MIN_SCALE, min(self.world_scale, MAX_SCALE))
 
         # Apply the new scale to the sprite list
         if self.sprite_renderer:
@@ -186,6 +193,8 @@ class GameWindow(arcade.Window):
         scaled_world_width = self.world_width * self.world_scale
         scaled_world_height = self.world_height * self.world_scale
 
+        # The camera's position is its bottom-left corner. It cannot be negative.
+        # It also cannot be so far that the right/top edge of the view is outside the world.
         max_x = max(0, scaled_world_width - self.width)
         max_y = max(0, scaled_world_height - self.height)
 
@@ -224,4 +233,7 @@ class GameWindow(arcade.Window):
         self.camera.viewport_height = height
         self.ui_camera.viewport_width = width
         self.ui_camera.viewport_height = height
+
+        # After resizing, we must re-center and re-clamp the camera.
+        self._center_camera_on_map()
         self._clamp_camera()
