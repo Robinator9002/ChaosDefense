@@ -15,24 +15,3 @@ Key Features
     Minimalist Aesthetics: Focus on clean, functional, and clear geometric visuals over high-fidelity art.
 
     Clean Architecture: A strict separation between game logic (headless) and rendering (Arcade).
-
-Project Structure
-
-.
-├── assets/
-│   ├── fonts/
-│   ├── sounds/
-│   └── sprites/
-├── config/
-│   ├── enemy_types.json
-│   ├── game_settings.json
-│   ├── level_styles.json
-│   ├── tower_types.json
-│   └── upgrade_definitions.json
-├── game_ai/
-├── game_logic/
-│   ├── entities/
-│   └── pathfinding/
-├── level_generation/
-├── rendering/
-└── main.py
