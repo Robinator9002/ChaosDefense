@@ -3,6 +3,8 @@ from __future__ import annotations
 import arcade
 import logging
 from pathlib import Path
+
+# Correctly import only the necessary classes from arcade.
 from arcade.camera import Camera2D
 from arcade.math import Vec2
 
@@ -62,9 +64,14 @@ class GameWindow(arcade.Window):
 
         # --- Camera Setup ---
         # A camera for the game world (map, towers, enemies). This is moved and zoomed.
-        self.scene_camera = Camera2D(viewport=(0, 0, width, height))
+        self.scene_camera = Camera2D()
         # A static camera for the user interface (HUD). This remains stationary.
-        self.gui_camera = Camera2D(viewport=(0, 0, width, height))
+        self.gui_camera = Camera2D()
+
+        # Set the camera viewports immediately after creation.
+        # The .viewport property setter correctly handles the (left, bottom, width, height) tuple.
+        self.scene_camera.viewport = (0, 0, width, height)
+        self.gui_camera.viewport = (0, 0, width, height)
 
         # --- Input Control State ---
         self.is_panning = False
@@ -213,7 +220,7 @@ class GameWindow(arcade.Window):
     def on_resize(self, width: int, height: int):
         """Called when the window is resized."""
         super().on_resize(width, height)
-        # Adjust the cameras' viewports to the new window size.
+        # The viewport property setter correctly handles a tuple.
         self.scene_camera.viewport = (0, 0, width, height)
         self.gui_camera.viewport = (0, 0, width, height)
         logger.info(f"Window resized to: {width}x{height}")
