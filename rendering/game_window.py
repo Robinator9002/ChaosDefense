@@ -1,28 +1,30 @@
 # rendering/game_window.py
+from __future__ import annotations
 import arcade
 import logging
 from pathlib import Path
 
-# Import all the necessary components for our world
+# Importiert die notwendigen Klassen aus deinen anderen Projektdateien.
+# Diese Struktur sorgt für eine saubere Trennung der Zuständigkeiten.
 from game_logic.game_state import GameState
 from level_generation.grid import Grid
 from level_generation.generator import LevelGenerator
-from .sprite_renderer import SpriteRenderer
+from rendering.sprite_renderer import SpriteRenderer
 
 logger = logging.getLogger(__name__)
 
-# --- Constants for Camera Control ---
-CAMERA_SPEED = 10
-MIN_SCALE = 0.5  # Zoomed out
-MAX_SCALE = 3.0  # Zoomed in
-SCROLL_INCREMENT = 0.1
+# Konstanten für die Steuerung
+SCROLL_SPEED = 1.0  # Beeinflusst, wie schnell die Karte mit der Maus verschoben wird
+MIN_ZOOM = 0.3  # Wie weit man herauszoomen kann
+MAX_ZOOM = 2.5  # Wie weit man hineinzoomen kann
+ZOOM_INCREMENT = 0.1  # Wie stark eine einzelne Mausrad-Bewegung den Zoom ändert
 
 
 class GameWindow(arcade.Window):
     """
-    The main window for the ChaosDefense game.
-    It handles drawing, user input, and camera controls. This version uses
-    SpriteList scaling for zoom, which is more stable with older Arcade APIs.
+    Das Hauptfenster des Spiels. Diese Klasse ist der Dreh- und Angelpunkt für
+    das Rendering, die Annahme von Benutzereingaben und die Orchestrierung
+    der Haupt-Spielelemente.
     """
 
     def __init__(
@@ -34,206 +36,187 @@ class GameWindow(arcade.Window):
         level_styles: dict,
         assets_path: Path,
     ):
+        """
+        Initialisiert das Fenster und bereitet die Spiel-Subsysteme vor.
+
+        Args:
+            width (int): Fensterbreite
+            height (int): Fensterhöhe
+            title (str): Fenstertitel
+            game_settings (dict): Geladene Konfiguration aus game_settings.json
+            level_styles (dict): Geladene Konfiguration aus level_styles.json
+            assets_path (Path): Pfad zum 'assets'-Verzeichnis
+        """
         super().__init__(width, height, title, resizable=True)
 
-        # --- Store configuration and paths ---
+        # Speichert die Konfigurationen und Pfade für späteren Gebrauch
         self.game_settings = game_settings
         self.level_styles = level_styles
         self.assets_path = assets_path
 
-        # --- Core Game Components ---
+        # Initialisiert die Hauptkomponenten des Spiels.
+        # Diese werden in der setup()-Methode mit konkreten Objekten befüllt.
         self.game_state: GameState | None = None
+        self.grid: Grid | None = None
         self.sprite_renderer: SpriteRenderer | None = None
 
-        # --- World Dimensions ---
-        self.tile_size = self.game_settings.get("tile_size", 32)
-        self.grid_width = self.game_settings.get("grid_width", 50)
-        self.grid_height = self.game_settings.get("grid_height", 50)
+        # --- Kamera-Setup ---
+        # Wir verwenden zwei Kameras:
+        # 1. scene_camera: Für die Spielwelt (Karte, Türme, Gegner). Diese wird bewegt und gezoomt.
+        # 2. gui_camera: Für die Benutzeroberfläche (HUD). Diese bleibt immer statisch.
+        self.scene_camera = arcade.Camera(width, height)
+        self.gui_camera = arcade.Camera(width, height)
 
-        self.world_width = self.grid_width * self.tile_size
-        self.world_height = self.grid_height * self.tile_size
-
-        # --- Camera and Scaling Setup ---
-        self.camera = arcade.camera.Camera2D()
-        self.ui_camera = arcade.camera.Camera2D()
-
-        self.camera.viewport_width = width
-        self.camera.viewport_height = height
-        self.ui_camera.viewport_width = width
-        self.ui_camera.viewport_height = height
-
-        self.world_scale = 1.0
-
-        # --- Keyboard State for Camera Movement ---
-        self.up_pressed = False
-        self.down_pressed = False
-        self.left_pressed = False
-        self.right_pressed = False
-
-        logger.info("GameWindow initialized and ready for setup.")
+        # --- Steuerungs-Variablen ---
+        # Für das Verschieben der Karte mit der Maus
+        self.is_panning = False
+        self.pan_start_x = 0
+        self.pan_start_y = 0
+        self.camera_start_x = 0
+        self.camera_start_y = 0
 
     def setup(self):
-        """Set up all game resources."""
-        logger.info("GameWindow setup() called.")
-        self.game_state = GameState()
-        current_style_key = "Forest"
-        current_style = self.level_styles.get(current_style_key)
-        if not current_style:
-            raise ValueError(
-                f"Level style '{current_style_key}' not found in configuration."
-            )
-        arcade.set_background_color(current_style.get("background_color", (0, 0, 0)))
-        grid = Grid(self.grid_width, self.grid_height)
-        self.game_state.level_grid = LevelGenerator.generate(grid)
+        """
+        Setzt das Spiel auf. Wird einmal zu Beginn aufgerufen, um alle
+        notwendigen Objekte zu erstellen und zu initialisieren.
+        """
+        logger.info("--- Starting Game Setup ---")
+
+        # 1. Spielzustand initialisieren
+        self.game_state = GameState(gold=150, base_hp=20)
+
+        # 2. Logisches Grid für die Karte erstellen
+        grid_width = self.game_settings.get("grid_width", 40)
+        grid_height = self.game_settings.get("grid_height", 22)
+        self.grid = Grid(grid_width, grid_height)
+
+        # 3. Level prozedural generieren
+        # LevelGenerator modifiziert das Grid-Objekt direkt.
+        LevelGenerator.generate(self.grid)
+        self.game_state.level_grid = self.grid  # Den Grid im GameState speichern
+
+        # 4. Level-Stil auswählen und Hintergrund setzen
+        # Hier wird "Forest" fest einprogrammiert, könnte aber später wählbar sein.
+        current_style = self.level_styles.get("Forest", {})
+        style_definitions = current_style.get("tile_definitions", {})
+        bg_color = current_style.get("background_color", (0, 0, 0))
+        self.background_color = bg_color
+
+        # 5. SpriteRenderer erstellen, der das Grid in Sprites umwandelt
+        tile_size = self.game_settings.get("tile_size", 32)
         self.sprite_renderer = SpriteRenderer(
-            grid=self.game_state.level_grid,
-            tile_size=self.tile_size,
-            style_definitions=current_style.get("tile_definitions", {}),
+            grid=self.grid,
+            tile_size=tile_size,
+            style_definitions=style_definitions,
             assets_path=self.assets_path,
         )
 
-        # --- FIX #1: Force an initial resize/clamp event ---
-        # This ensures the camera is correctly centered and clamped after everything
-        # is loaded, fixing the initial misplacement issue.
-        self.on_resize(self.width, self.height)
+        # Zentriert die Kamera initial auf der Mitte der Karte
+        map_center_x = self.grid.width * tile_size / 2
+        map_center_y = self.grid.height * tile_size / 2
+        self.center_camera_on_point(map_center_x, map_center_y)
 
-        logger.info("Game setup is complete. The world has been generated.")
-
-    def _center_camera_on_map(self):
-        """Instantly move the camera to the center of the world."""
-        scaled_world_width = self.world_width * self.world_scale
-        scaled_world_height = self.world_height * self.world_scale
-
-        center_x = (scaled_world_width - self.width) / 2
-        center_y = (scaled_world_height - self.height) / 2
-
-        self.camera.position = (center_x, center_y)
+        logger.info("--- Game Setup Complete ---")
 
     def on_draw(self):
-        """Render the screen."""
+        """
+        Die Haupt-Zeichenroutine. Wird von Arcade kontinuierlich aufgerufen.
+        """
         self.clear()
-        self.camera.use()
+
+        # --- Spielwelt zeichnen ---
+        # Aktiviert die Kamera für die Szene. Alle nachfolgenden Zeichenbefehle
+        # werden durch diese Kamera transformiert (verschoben, gezoomt).
+        self.scene_camera.use()
         if self.sprite_renderer:
-            self.sprite_renderer.tile_sprite_list.draw(pixelated=True)
+            self.sprite_renderer.draw()
+        # Hier würden später auch Türme, Gegner, Projektile etc. gezeichnet.
 
-        self.ui_camera.use()
-        if self.game_state:
-            ui_text = (
-                f"Gold: {self.game_state.gold} | Base HP: {self.game_state.base_hp}"
-            )
-            arcade.draw_text(
-                ui_text, 10, self.height - 25, arcade.color.WHITE_SMOKE, font_size=16
-            )
+        # --- GUI / HUD zeichnen ---
+        # Aktiviert die Kamera für die Benutzeroberfläche. Diese ist statisch.
+        self.gui_camera.use()
+        self.draw_gui()
 
-    def on_update(self, delta_time: float):
-        self._update_camera_position()
-
-    def _update_camera_position(self):
-        """Moves the camera based on which keys are currently held down."""
-        cam_dx, cam_dy = 0, 0
-        if self.up_pressed and not self.down_pressed:
-            cam_dy = 1
-        elif self.down_pressed and not self.up_pressed:
-            cam_dy = -1
-        if self.left_pressed and not self.right_pressed:
-            cam_dx = -1
-        elif self.right_pressed and not self.left_pressed:
-            cam_dx = 1
-
-        if cam_dx != 0 or cam_dy != 0:
-            self.camera.position = (
-                self.camera.position[0] + cam_dx * CAMERA_SPEED,
-                self.camera.position[1] + cam_dy * CAMERA_SPEED,
-            )
-            self._clamp_camera()
-
-    def on_mouse_drag(
-        self, x: int, y: int, dx: int, dy: int, buttons: int, modifiers: int
-    ):
-        """Handle mouse drag events for camera panning."""
-        if buttons & arcade.MOUSE_BUTTON_MIDDLE:
-            self.camera.position = (
-                self.camera.position[0] - dx,
-                self.camera.position[1] - dy,
-            )
-            self._clamp_camera()
-
-    def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int):
-        """Handle mouse scroll for zooming in and out by scaling the world."""
-        old_scale = self.world_scale
-
-        # Calculate the potential new scale
-        new_scale = self.world_scale + scroll_y * SCROLL_INCREMENT
-
-        # Clamp the new scale to the defined min/max
-        self.world_scale = max(MIN_SCALE, min(new_scale, MAX_SCALE))
-
-        # --- FIX #2: Prevent camera drift at zoom limits ---
-        # If the scale is at a limit and hasn't changed, do nothing further.
-        if self.world_scale == old_scale:
+    def draw_gui(self):
+        """Zeichnet alle Elemente der Benutzeroberfläche."""
+        if not self.game_state:
             return
 
-        # Get the world coordinates under the mouse before scaling
-        world_x = (self.camera.position[0] + x) / old_scale
-        world_y = (self.camera.position[1] + y) / old_scale
+        # Zeichnet einen halbtransparenten Kasten als Hintergrund für den Text,
+        # damit er immer gut lesbar ist.
+        arcade.draw_rectangle_filled(
+            center_x=120,
+            center_y=self.height - 40,
+            width=220,
+            height=70,
+            color=(0, 0, 0, 150),  # Schwarz mit 150/255 Deckkraft
+        )
 
-        # Apply the new scale to the sprite list
-        if self.sprite_renderer:
-            self.sprite_renderer.tile_sprite_list.scale = self.world_scale
+        # Holt die aktuellen Werte aus dem GameState und zeigt sie an.
+        gold_text = f"Gold: {self.game_state.gold}"
+        hp_text = f"Base HP: {self.game_state.base_hp}"
+        wave_text = f"Wave: {self.game_state.current_wave_number}"
 
-        # Calculate the new camera position to keep the world point under the mouse
-        new_cam_x = (world_x * self.world_scale) - x
-        new_cam_y = (world_y * self.world_scale) - y
+        arcade.draw_text(gold_text, 15, self.height - 30, arcade.color.GOLD, 16)
+        arcade.draw_text(hp_text, 15, self.height - 55, arcade.color.RED, 16)
+        arcade.draw_text(wave_text, 15, self.height - 80, arcade.color.CYAN, 16)
 
-        self.camera.position = (new_cam_x, new_cam_y)
-        self._clamp_camera()
+    def center_camera_on_point(self, x, y):
+        """Zentriert die scene_camera auf einen bestimmten Punkt in der Spielwelt."""
+        self.scene_camera.move_to((x - self.width / 2, y - self.height / 2))
 
-    def _clamp_camera(self):
-        """Prevents the camera from scrolling past the edges of the scaled world."""
-        scaled_world_width = self.world_width * self.world_scale
-        scaled_world_height = self.world_height * self.world_scale
+    def on_mouse_press(self, x: int, y: int, button: int, modifiers: int):
+        """Wird aufgerufen, wenn eine Maustaste gedrückt wird."""
+        # Mittlere Maustaste für das Verschieben der Karte (Panning)
+        if button == arcade.MOUSE_BUTTON_MIDDLE:
+            self.is_panning = True
+            self.pan_start_x = x
+            self.pan_start_y = y
+            # Speichert die Kameraposition beim Start des Verschiebens
+            self.camera_start_x, self.camera_start_y = self.scene_camera.position
 
-        # The camera's position is its bottom-left corner. It cannot be negative.
-        # It also cannot be so far that the right/top edge of the view is outside the world.
-        max_x = max(0, scaled_world_width - self.width)
-        max_y = max(0, scaled_world_height - self.height)
+    def on_mouse_release(self, x: int, y: int, button: int, modifiers: int):
+        """Wird aufgerufen, wenn eine Maustaste losgelassen wird."""
+        if button == arcade.MOUSE_BUTTON_MIDDLE:
+            self.is_panning = False
 
-        clamped_x = max(0, min(self.camera.position[0], max_x))
-        clamped_y = max(0, min(self.camera.position[1], max_y))
+    def on_mouse_motion(self, x: int, y: int, dx: int, dy: int):
+        """Wird aufgerufen, wenn die Maus bewegt wird."""
+        if self.is_panning:
+            # Berechnet die Verschiebung der Maus seit dem Klick
+            delta_x = x - self.pan_start_x
+            delta_y = y - self.pan_start_y
 
-        self.camera.position = (clamped_x, clamped_y)
+            # Die Verschiebung muss durch den Zoomfaktor geteilt werden,
+            # damit die Karte sich "natürlich" unter dem Mauszeiger bewegt.
+            # Die Bewegung wird invertiert (-delta), da die Kamera in die
+            # entgegengesetzte Richtung der Mausbewegung ziehen muss.
+            cam_x = self.camera_start_x - delta_x / self.scene_camera.zoom
+            cam_y = self.camera_start_y - delta_y / self.scene_camera.zoom
 
-    def on_key_press(self, key: int, modifiers: int):
-        if key in (arcade.key.UP, arcade.key.W):
-            self.up_pressed = True
-        elif key in (arcade.key.DOWN, arcade.key.S):
-            self.down_pressed = True
-        elif key in (arcade.key.LEFT, arcade.key.A):
-            self.left_pressed = True
-        elif key in (arcade.key.RIGHT, arcade.key.D):
-            self.right_pressed = True
-        elif key == arcade.key.ESCAPE:
-            self.close()
+            self.scene_camera.move_to((cam_x, cam_y))
 
-    def on_key_release(self, key: int, modifiers: int):
-        if key in (arcade.key.UP, arcade.key.W):
-            self.up_pressed = False
-        elif key in (arcade.key.DOWN, arcade.key.S):
-            self.down_pressed = False
-        elif key in (arcade.key.LEFT, arcade.key.A):
-            self.left_pressed = False
-        elif key in (arcade.key.RIGHT, arcade.key.D):
-            self.right_pressed = False
+    def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int):
+        """Wird aufgerufen, wenn das Mausrad gescrollt wird, um zu zoomen."""
+        # Berechnet den neuen Zoom-Faktor
+        zoom_amount = 1 + (scroll_y * ZOOM_INCREMENT)
+        new_zoom = self.scene_camera.zoom * zoom_amount
+
+        # Begrenzt den Zoom auf die definierten Min/Max-Werte
+        self.scene_camera.zoom = max(MIN_ZOOM, min(new_zoom, MAX_ZOOM))
+
+    def on_update(self, delta_time: float):
+        """
+        Wird für jeden Frame aufgerufen. Hier findet die Spiellogik statt.
+        (z.B. Gegner bewegen, Türme schießen lassen)
+        """
+        # Momentan leer, wird aber für die zukünftige Logik benötigt.
+        pass
 
     def on_resize(self, width: int, height: int):
-        """This is called when the user resizes the window."""
+        """Wird aufgerufen, wenn die Fenstergröße geändert wird."""
         super().on_resize(width, height)
-        # Resize both cameras to match the new window dimensions
-        self.camera.viewport_width = width
-        self.camera.viewport_height = height
-        self.ui_camera.viewport_width = width
-        self.ui_camera.viewport_height = height
-
-        # After resizing, we must re-center and re-clamp the camera.
-        self._center_camera_on_map()
-        self._clamp_camera()
+        # Passt die Kameras an die neue Fenstergröße an
+        self.scene_camera.resize(width, height)
+        self.gui_camera.resize(width, height)
+        logger.info(f"Window resized to: {width}x{height}")
