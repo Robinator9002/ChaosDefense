@@ -64,8 +64,8 @@ class GameWindow(arcade.Window):
         # Wir verwenden zwei Kameras:
         # 1. scene_camera: Für die Spielwelt (Karte, Türme, Gegner). Diese wird bewegt und gezoomt.
         # 2. gui_camera: Für die Benutzeroberfläche (HUD). Diese bleibt immer statisch.
-        self.scene_camera = arcade.Camera(width, height)
-        self.gui_camera = arcade.Camera(width, height)
+        self.scene_camera = arcade.camera.Camera2D(width, height)
+        self.gui_camera = arcade.camera.Camera2D(width, height)
 
         # --- Steuerungs-Variablen ---
         # Für das Verschieben der Karte mit der Maus
