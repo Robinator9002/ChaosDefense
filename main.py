@@ -1,14 +1,16 @@
 # main.py
-import arcade
+import pygame
 import json
 import logging
+import sys
 from pathlib import Path
 
-# Now we import our own classes from their respective files
-from rendering.game_window import GameWindow
+# Import the main Game class.
+from rendering.game_window import Game
 
 # --- Constants ---
 PROJECT_ROOT = Path(__file__).parent
+# Assume a 'config' directory exists at the project root.
 CONFIG_PATH = PROJECT_ROOT / "config"
 ASSETS_PATH = PROJECT_ROOT / "assets"
 
@@ -47,24 +49,19 @@ def main():
         )
         return  # Exit the program if essential configs fail
 
-    screen_width = game_settings.get("screen_width", 1280)
-    screen_height = game_settings.get("screen_height", 720)
-    screen_title = game_settings.get("screen_title", "ChaosDefense - Error")
+    logger.info("--- Initializing Game ---")
+    try:
+        game = Game(
+            game_settings=game_settings,
+            level_styles=level_styles,
+            assets_path=ASSETS_PATH,
+        )
+        game.run()
+    except Exception as e:
+        logger.critical(f"An unexpected error occurred: {e}", exc_info=True)
 
-    logger.info("--- Initializing Game Window ---")
-    # Pass all the necessary configuration and paths to the GameWindow.
-    window = GameWindow(
-        width=screen_width,
-        height=screen_height,
-        title=screen_title,
-        game_settings=game_settings,
-        level_styles=level_styles,
-        assets_path=ASSETS_PATH,
-    )
-    window.setup()
-
-    arcade.run()
     logger.info("--- Game Closed ---")
+    sys.exit()
 
 
 if __name__ == "__main__":
