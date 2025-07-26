@@ -1,9 +1,9 @@
 # rendering/sprite_renderer.py
-import arcade
+import pygame
 import logging
 from pathlib import Path
 
-# Import the Grid class for type hinting
+# Import the Grid class for type hinting.
 from level_generation.grid import Grid
 
 logger = logging.getLogger(__name__)
@@ -11,24 +11,24 @@ logger = logging.getLogger(__name__)
 
 class SpriteRenderer:
     """
-    Renders the game's logical grid using sprites.
+    Renders the game's logical grid using Pygame surfaces.
 
-    This class is responsible for translating the logical Grid object into
-    a visible representation on the screen. It loads textures for each tile
-    type based on the current level style, with a built-in fallback to simple
-    colored squares if a texture is missing.
+    This class is responsible for translating the logical Grid object into a
+    visible representation. It pre-renders the entire static map onto a single
+    large surface for efficient drawing. It also handles camera transformations
+    like zooming and panning when drawing this surface to the screen.
     """
 
     def __init__(
         self, grid: Grid, tile_size: int, style_definitions: dict, assets_path: Path
     ):
         """
-        Initializes the renderer.
+        Initializes the renderer and pre-renders the map.
 
         Args:
             grid (Grid): The logical grid object to be rendered.
             tile_size (int): The size of each tile in pixels.
-            style_definitions (dict): The 'tile_definitions' part of a style from the config.
+            style_definitions (dict): The 'tile_definitions' part of a style config.
             assets_path (Path): The Path object pointing to the main 'assets' directory.
         """
         self.grid = grid
@@ -36,19 +36,60 @@ class SpriteRenderer:
         self.style_definitions = style_definitions
         self.assets_path = assets_path
 
-        # Using a SpriteList is highly efficient for drawing many static objects.
-        self.tile_sprite_list = arcade.SpriteList(use_spatial_hash=True)
-        self._create_sprite_list()
+        # This surface will hold the entire rendered map.
+        self.map_surface = self._create_map_surface()
 
-    def _create_sprite_list(self):
+    def _load_tile_image(self, tile_def: dict, tile_key: str) -> pygame.Surface:
         """
-        Populates the sprite list based on the logical grid.
+        Creates a single tile surface, loading its texture or falling back to a color.
 
-        This method iterates through every tile in the grid, determines the
-        correct sprite or color, creates a sprite object, and adds it to the
-        master sprite list for efficient drawing.
+        Args:
+            tile_def (dict): The definition dictionary for this tile type.
+            tile_key (str): The key of the tile (e.g., "MOUNTAIN").
+
+        Returns:
+            pygame.Surface: A new surface for the tile, correctly sized.
         """
-        logger.info("Creating sprite list for level rendering...")
+        try:
+            sprite_path_str = tile_def.get("sprite")
+            if not sprite_path_str:
+                raise KeyError("Sprite path not defined in config.")
+
+            sprite_path = self.assets_path / "sprites" / sprite_path_str
+            if not sprite_path.is_file():
+                raise FileNotFoundError(f"Sprite file not found at {sprite_path}")
+
+            # Load the image and scale it to the correct tile size.
+            image = pygame.image.load(sprite_path).convert_alpha()
+            return pygame.transform.scale(image, (self.tile_size, self.tile_size))
+
+        except (KeyError, FileNotFoundError, pygame.error) as e:
+            # Fallback: create a colored square if the image fails to load.
+            logger.warning(
+                f"Could not load sprite for '{tile_key}' ({e}). Creating color fallback."
+            )
+            color = tile_def.get("color", (255, 0, 255))  # Default to magenta
+            surface = pygame.Surface((self.tile_size, self.tile_size))
+            surface.fill(color)
+            return surface
+
+    def _create_map_surface(self) -> pygame.Surface:
+        """
+        Creates a single, large surface with the entire static map pre-drawn.
+
+        This is highly efficient for static backgrounds, as it avoids re-drawing
+        thousands of individual tiles every frame.
+
+        Returns:
+            pygame.Surface: A surface containing the complete rendered map.
+        """
+        map_width_px = self.grid.width * self.tile_size
+        map_height_px = self.grid.height * self.tile_size
+        logger.info(f"Creating {map_width_px}x{map_height_px} map surface...")
+
+        # Use SRCALPHA to support transparent parts of sprites (if any).
+        map_surface = pygame.Surface((map_width_px, map_height_px), pygame.SRCALPHA)
+
         for y in range(self.grid.height):
             for x in range(self.grid.width):
                 tile = self.grid.get_tile(x, y)
@@ -58,62 +99,40 @@ class SpriteRenderer:
                 tile_def = self.style_definitions.get(tile.tile_key)
                 if not tile_def:
                     logger.warning(
-                        f"No style definition found for tile key: '{tile.tile_key}'. Skipping."
+                        f"No style definition for tile key: '{tile.tile_key}'. Skipping."
                     )
                     continue
 
-                # Calculate the sprite's on-screen position from its grid coordinates.
-                center_x = (x * self.tile_size) + (self.tile_size / 2)
-                center_y = (y * self.tile_size) + (self.tile_size / 2)
+                # Get the visual representation for this tile.
+                tile_surface = self._load_tile_image(tile_def, tile.tile_key)
 
-                sprite = self._create_tile_sprite(tile_def, tile.tile_key)
-                sprite.center_x = center_x
-                sprite.center_y = center_y
-                self.tile_sprite_list.append(sprite)
+                # Blit the tile onto the main map surface at the correct pixel position.
+                px_position = (x * self.tile_size, y * self.tile_size)
+                map_surface.blit(tile_surface, px_position)
 
-        logger.info(f"Created sprite list with {len(self.tile_sprite_list)} tiles.")
+        logger.info("Map surface created successfully.")
+        return map_surface
 
-    def _create_tile_sprite(self, tile_def: dict, tile_key: str) -> arcade.Sprite:
+    def draw(self, screen: pygame.Surface, camera_offset: pygame.Vector2, zoom: float):
         """
-        Creates a single sprite, attempting to load its texture and falling back to color.
+        Draws the map to the screen, applying camera zoom and offset.
 
         Args:
-            tile_def (dict): The definition dictionary for this tile type.
-            tile_key (str): The key of the tile (e.g., "MOUNTAIN").
-
-        Returns:
-            arcade.Sprite: A new sprite, either with a texture or a solid color.
+            screen (pygame.Surface): The main display surface to draw on.
+            camera_offset (pygame.Vector2): The top-left position of the camera view.
+            zoom (float): The current zoom level.
         """
-        try:
-            # Construct the full path to the sprite asset.
-            sprite_path_str = tile_def.get("sprite")
-            if not sprite_path_str:
-                raise KeyError("Sprite path not defined in config.")
-
-            sprite_path = self.assets_path / "sprites" / sprite_path_str
-
-            if not sprite_path.is_file():
-                raise FileNotFoundError(f"Sprite file not found at {sprite_path}")
-
-            # If the file exists, create a sprite with that texture.
-            return arcade.Sprite(sprite_path, scale=1)
-
-        except (KeyError, FileNotFoundError) as e:
-            # This is our fallback mechanism. If anything goes wrong with finding
-            # or loading the sprite, we create a colored square instead.
-            logger.warning(
-                f"Could not load sprite for '{tile_key}' ({e}). Creating color fallback."
+        if zoom == 1.0:
+            # If no zoom, blit directly for max performance.
+            scaled_surface = self.map_surface
+        else:
+            # If zoomed, scale the pre-rendered map surface.
+            new_size = (
+                int(self.map_surface.get_width() * zoom),
+                int(self.map_surface.get_height() * zoom),
             )
-            color = tile_def.get(
-                "color", (255, 0, 255)
-            )  # Default to magenta if no color is defined
-            texture = arcade.make_soft_square_texture(
-                self.tile_size, color, outer_alpha=255
-            )
-            return arcade.Sprite(texture)
+            # smoothscale provides better quality than scale, but is slower.
+            # For a static map, this is usually acceptable.
+            scaled_surface = pygame.transform.smoothscale(self.map_surface, new_size)
 
-    def draw(self):
-        """
-        Draws all the tile sprites to the screen in a single, efficient batch.
-        """
-        self.tile_sprite_list.draw()
+        screen.blit(scaled_surface, camera_offset)
