@@ -1,6 +1,7 @@
 # level_generation/generator.py
 import random
 import logging
+from typing import Tuple
 from .grid import Grid
 
 logger = logging.getLogger(__name__)
@@ -21,21 +22,34 @@ class LevelGenerator:
 
         Args:
             grid (Grid): The Grid instance to be populated.
-            params (dict): A dictionary containing generation parameters,
-                           typically from a level style preset.
+            params (dict): A dictionary containing generation parameters.
 
         Returns:
             Grid: The same Grid instance, now populated with a level.
         """
-        logger.info("Starting procedural level generation with provided parameters...")
+        logger.info("Starting procedural level generation...")
 
+        # --- Generation Sequence ---
+        # The order of these operations is critical.
+
+        # 1. Create an impassable border.
         LevelGenerator._create_border(grid)
-        LevelGenerator._create_path(grid)
 
+        # 2. Place the base zone, which serves as the target for all paths.
+        target_pos = LevelGenerator._place_base_zone(grid, size=4)
+
+        # 3. Define the starting points for the paths.
+        start_points = LevelGenerator._define_start_points(grid)
+
+        # 4. (Phase 2) Generate paths from start points to the target.
+        #    The old _create_path is removed. This logic will be replaced by A*.
+        #    paths = LevelGenerator._create_paths(grid, start_points, target_pos)
+        logger.info(
+            f"Defined {len(start_points)} start points and target at {target_pos}."
+        )
+
+        # 5. Place terrain features around the established paths and base.
         features_params = params.get("features", {})
-
-        # Define the features to be placed and their corresponding placement functions.
-        # This makes it easy to add new feature types in the future.
         feature_map = {
             "mountains": LevelGenerator._place_cluster,
             "lakes": LevelGenerator._place_blob,
@@ -44,19 +58,13 @@ class LevelGenerator:
 
         for feature_key, placement_func in feature_map.items():
             feature_config = features_params.get(feature_key)
-
             if feature_config and isinstance(feature_config, dict):
                 min_count = feature_config.get("min", 0)
                 max_count = feature_config.get("max", 0)
-
-                # Derive the tile key (e.g., "mountains" -> "MOUNTAIN")
                 tile_key = feature_key.rstrip("s").upper()
-
                 LevelGenerator._place_terrain_feature(
                     grid, tile_key, min_count, max_count, placement_func
                 )
-            else:
-                logger.debug(f"No valid config for feature '{feature_key}', skipping.")
 
         logger.info("Level generation complete.")
         return grid
@@ -72,52 +80,55 @@ class LevelGenerator:
             grid.set_tile_type(grid.width - 1, y, "BORDER")
 
     @staticmethod
-    def _create_path(grid: Grid):
+    def _place_base_zone(grid: Grid, size: int) -> Tuple[int, int]:
         """
-        Generates a guaranteed path from the left to the right side of the grid.
+        Places a square 'BASE_ZONE' on the right edge of the map.
+
+        Args:
+            grid (Grid): The grid to modify.
+            size (int): The width and height of the base zone.
+
+        Returns:
+            Tuple[int, int]: The central coordinate of the base zone.
         """
-        start_y = grid.height // 2 + random.randint(-grid.height // 6, grid.height // 6)
-        pos = (1, start_y)
-        path_coords = []
+        # Ensure base is not placed in the very corners.
+        min_y = size
+        max_y = grid.height - size - 1
 
-        while pos[0] < grid.width - 1:
-            path_coords.append(pos)
-            grid.set_tile_type(pos[0], pos[1], "PATH")
+        start_y = random.randint(min_y, max_y)
+        start_x = grid.width - 1 - size
 
-            potential_moves = {
-                "right": ((pos[0] + 1, pos[1]), 10),
-                "up": ((pos[0], pos[1] - 1), 1),
-                "down": ((pos[0], pos[1] + 1), 1),
-            }
+        for y in range(start_y, start_y + size):
+            for x in range(start_x, start_x + size):
+                if grid.is_valid_coord(x, y):
+                    grid.set_tile_type(x, y, "BASE_ZONE")
 
-            valid_moves = []
-            weights = []
-            for move, (coord, weight) in potential_moves.items():
-                if (
-                    grid.is_valid_coord(coord[0], coord[1])
-                    and grid.get_tile(coord[0], coord[1]).tile_key != "BORDER"
-                    and coord not in path_coords
-                ):
-                    valid_moves.append(coord)
-                    weights.append(weight)
+        # Return the center point of the entrance to the base
+        center_x = start_x
+        center_y = start_y + size // 2
+        return (center_x, center_y)
 
-            if not valid_moves:
-                logger.warning("Path generation got stuck. Path may be incomplete.")
-                break
+    @staticmethod
+    def _define_start_points(grid: Grid) -> list[Tuple[int, int]]:
+        """
+        Defines three path starting points on the left edge of the map.
 
-            pos = random.choices(valid_moves, weights=weights, k=1)[0]
+        Returns:
+            list[Tuple[int, int]]: A list of (x, y) coordinates for the start points.
+        """
+        # Place start points at 1/4, 1/2, and 3/4 of the map's height.
+        y_top = grid.height // 4
+        y_mid = grid.height // 2
+        y_bot = grid.height * 3 // 4
+
+        return [(1, y_top), (1, y_mid), (1, y_bot)]
 
     @staticmethod
     def _place_terrain_feature(
         grid: Grid, tile_key: str, min_count: int, max_count: int, placement_func
     ):
-        """
-        A generic method to place a number of features on the grid.
-        """
+        """A generic method to place a number of features on the grid."""
         if min_count > max_count:
-            logger.warning(
-                f"For '{tile_key}', min_count ({min_count}) > max_count ({max_count}). Skipping."
-            )
             return
 
         count = random.randint(min_count, max_count)
@@ -126,7 +137,7 @@ class LevelGenerator:
 
     @staticmethod
     def _place_cluster(grid: Grid, tile_key: str):
-        """Places a rectangular cluster of tiles (e.g., for mountains)."""
+        """Places a rectangular cluster of tiles."""
         cluster_width = random.randint(2, 4)
         cluster_height = random.randint(2, 4)
 
@@ -137,7 +148,10 @@ class LevelGenerator:
             is_valid_spot = True
             for y in range(start_y, start_y + cluster_height):
                 for x in range(start_x, start_x + cluster_width):
-                    if grid.get_tile(x, y).tile_key != "BUILDABLE":
+                    if (
+                        not grid.is_valid_coord(x, y)
+                        or grid.get_tile(x, y).tile_key != "BUILDABLE"
+                    ):
                         is_valid_spot = False
                         break
                 if not is_valid_spot:
@@ -151,7 +165,7 @@ class LevelGenerator:
 
     @staticmethod
     def _place_blob(grid: Grid, tile_key: str):
-        """Places a randomly shaped blob of tiles (e.g., for lakes)."""
+        """Places a randomly shaped blob of tiles."""
         blob_size = random.randint(5, 12)
 
         for _ in range(10):
@@ -183,7 +197,7 @@ class LevelGenerator:
 
     @staticmethod
     def _place_scatter(grid: Grid, tile_key: str):
-        """Places a single tile in a random buildable location (e.g., for trees)."""
+        """Places a single tile in a random buildable location."""
         for _ in range(20):
             x = random.randint(1, grid.width - 2)
             y = random.randint(1, grid.height - 2)

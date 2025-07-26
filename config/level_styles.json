@@ -21,6 +21,11 @@
         "color": [139, 69, 19],
         "sprite": "environment/dirt_path.png"
       },
+      "BASE_ZONE": {
+        "type": "OBSTACLE",
+        "color": [184, 134, 11],
+        "sprite": "environment/base_foundation.png"
+      },
       "TREE": {
         "type": "OBSTACLE",
         "color": [34, 80, 34],
@@ -64,6 +69,11 @@
         "type": "PATH",
         "color": [210, 180, 140],
         "sprite": "environment/gravel_path.png"
+      },
+      "BASE_ZONE": {
+        "type": "OBSTACLE",
+        "color": [112, 128, 144],
+        "sprite": "environment/base_foundation_rock.png"
       },
       "TREE": {
         "type": "OBSTACLE",
