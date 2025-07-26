@@ -80,13 +80,13 @@ class LevelGenerator:
         num_paths: int,
     ) -> List[List[Tuple[int, int]]]:
         """
-        Requests a configurable number of paths from the Pathfinder.
-        - 1 Path: A single wandering path to the center-left of the base.
-        - 2 Paths: Two elbow paths to the top and bottom of the base.
-        - 3 Paths: One wandering to the center, two elbows to top and bottom.
+        Requests a configurable number of paths from the Pathfinder sequentially,
+        ensuring that each path generation step is aware of all previous paths to prevent overlaps.
         """
-        if not all_targets:
-            logger.error("No valid target points on base provided.")
+        if not all_targets or len(all_targets) < num_paths:
+            logger.error(
+                "Not enough valid target points on base provided for the requested number of paths."
+            )
             return []
 
         all_paths: List[List[Tuple[int, int]]] = []
@@ -95,60 +95,93 @@ class LevelGenerator:
         turn_x_range_short = (int(grid.width * 0.3), int(grid.width * 0.45))
         turn_x_range_long = (int(grid.width * 0.55), int(grid.width * 0.7))
 
-        # The base provides targets in [top, left, bottom] order.
-        target_top = all_targets[0] if len(all_targets) > 0 else None
-        target_left = all_targets[1] if len(all_targets) > 1 else None
-        target_bottom = all_targets[2] if len(all_targets) > 2 else None
+        target_top, target_left, target_bottom = (
+            all_targets[0],
+            all_targets[1],
+            all_targets[2],
+        )
 
+        # --- Define the sequence of path requests as a list of "jobs" ---
+        requests = []
         if num_paths == 1:
-            logger.info("Requesting 1 wandering path to the left target...")
-            path = Pathfinder.create_wandering_path(
-                grid, start_points[0], target_left, occupied_coords
+            # For 1 path, it's a wandering path to the left entrance.
+            requests.append(
+                {
+                    "start": start_points[0],
+                    "target": target_left,
+                    "type": "wandering",
+                    "args": None,
+                }
             )
+        elif num_paths == 2:
+            # For 2 paths, they are both elbows to the top and bottom.
+            requests.append(
+                {
+                    "start": start_points[0],
+                    "target": target_top,
+                    "type": "elbow",
+                    "args": turn_x_range_short,
+                }
+            )
+            requests.append(
+                {
+                    "start": start_points[1],
+                    "target": target_bottom,
+                    "type": "elbow",
+                    "args": turn_x_range_long,
+                }
+            )
+        elif num_paths == 3:
+            # For 3 paths, generate the middle one first as it's the most constrained.
+            requests.append(
+                {
+                    "start": start_points[1],
+                    "target": target_left,
+                    "type": "wandering",
+                    "args": None,
+                }
+            )
+            requests.append(
+                {
+                    "start": start_points[0],
+                    "target": target_top,
+                    "type": "elbow",
+                    "args": turn_x_range_short,
+                }
+            )
+            requests.append(
+                {
+                    "start": start_points[2],
+                    "target": target_bottom,
+                    "type": "elbow",
+                    "args": turn_x_range_long,
+                }
+            )
+
+        # --- Execute the requests sequentially ---
+        for i, job in enumerate(requests):
+            path = None
+            logger.info(
+                f"Requesting path #{i+1} (type: {job['type']}) from {job['start']} to {job['target']}"
+            )
+
+            if job["type"] == "wandering":
+                path = Pathfinder.create_wandering_path(
+                    grid, job["start"], job["target"], occupied_coords
+                )
+            elif job["type"] == "elbow":
+                path = Pathfinder.create_elbow_path(
+                    grid, job["start"], job["target"], job["args"], occupied_coords
+                )
+
             if path:
                 all_paths.append(path)
-
-        elif num_paths == 2:
-            logger.info("Requesting 2 elbow paths to top and bottom targets...")
-            top_path = Pathfinder.create_elbow_path(
-                grid, start_points[0], target_top, turn_x_range_short, occupied_coords
-            )
-            if top_path:
-                all_paths.append(top_path)
-                occupied_coords.update(top_path)
-
-            bottom_path = Pathfinder.create_elbow_path(
-                grid, start_points[1], target_bottom, turn_x_range_long, occupied_coords
-            )
-            if bottom_path:
-                all_paths.append(bottom_path)
-
-        elif num_paths == 3:
-            logger.info("Requesting 3 paths (wandering middle, two elbows)...")
-            middle_path = Pathfinder.create_wandering_path(
-                grid, start_points[1], target_left, occupied_coords
-            )
-            if middle_path:
-                all_paths.append(middle_path)
-                occupied_coords.update(middle_path)
+                occupied_coords.update(path)  # CRITICAL: Update state for the next job.
             else:
-                logger.critical(
-                    "Could not generate essential middle path for 3-path layout."
+                logger.error(
+                    f"FATAL: Pathfinder failed to create path #{i+1}. Aborting generation."
                 )
-                return []  # Fail fast
-
-            top_path = Pathfinder.create_elbow_path(
-                grid, start_points[0], target_top, turn_x_range_short, occupied_coords
-            )
-            if top_path:
-                all_paths.append(top_path)
-                occupied_coords.update(top_path)
-
-            bottom_path = Pathfinder.create_elbow_path(
-                grid, start_points[2], target_bottom, turn_x_range_long, occupied_coords
-            )
-            if bottom_path:
-                all_paths.append(bottom_path)
+                return []  # Fail fast to avoid a broken map.
 
         return all_paths
 
