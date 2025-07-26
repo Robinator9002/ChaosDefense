@@ -3,6 +3,7 @@ import random
 import logging
 import math
 from typing import Tuple, List, Callable, Set
+import pygame
 
 # The generator now only needs to know about the Pathfinder, not its inner workings.
 from ..pathfinding.pathfinder import Pathfinder
@@ -41,6 +42,9 @@ class LevelGenerator:
         target_pos = LevelGenerator._place_base_zone(grid, size=4)
 
         num_paths = max(1, min(params.get("num_paths", 3), 5))
+        print(f"Num Paths: {num_paths}")
+        pygame.time.wait(5000)
+
         logger.info(f"Requesting {num_paths} paths from the Pathfinder.")
         start_points = LevelGenerator._define_start_points(grid, num_paths)
 
