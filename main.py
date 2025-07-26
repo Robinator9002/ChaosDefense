@@ -1,5 +1,4 @@
 # main.py
-import pygame
 import json
 import logging
 import sys

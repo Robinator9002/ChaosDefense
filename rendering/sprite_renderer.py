@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 # Import the Grid class for type hinting.
-from level_generation.grid import Grid
+from game_logic.level_generation.grid import Grid
 
 logger = logging.getLogger(__name__)
 

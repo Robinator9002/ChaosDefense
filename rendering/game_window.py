@@ -10,7 +10,7 @@ from game_logic.game_state import GameState
 from game_logic.levels.level_manager import LevelManager
 
 # Import the missing Grid class
-from level_generation.grid import Grid
+from game_logic.level_generation.grid import Grid
 from rendering.sprite_renderer import SpriteRenderer
 
 logger = logging.getLogger(__name__)
