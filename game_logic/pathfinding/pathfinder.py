@@ -13,11 +13,47 @@ logger = logging.getLogger(__name__)
 class Pathfinder:
     """
     A utility class providing pathfinding algorithms and path creation strategies.
-
-    This class contains both a low-level A* implementation (`find_path`) and
-    high-level methods for generating specific, stylized paths like straight
-    routes or meandering "elbow" paths (`create_wandering_path`, `create_elbow_path`).
+    This version specializes in creating paths that are both organic and maintain
+    a specified distance from one another.
     """
+
+    @staticmethod
+    def _create_buffered_cost_func(
+        occupied: Set[Tuple[int, int]], buffer: int = 2
+    ) -> Callable[[Tuple[int, int]], float]:
+        """
+        A factory function that creates a cost function for A*.
+        This cost function penalizes proximity to already occupied coordinates,
+        creating a buffer zone around existing paths.
+
+        Args:
+            occupied (Set[Tuple[int, int]]): A set of coordinates already used by other paths.
+            buffer (int): The minimum distance to keep from occupied cells.
+
+        Returns:
+            A callable cost function for use in the A* algorithm.
+        """
+        # Pre-calculate the buffer zone for efficiency.
+        # A tile is in the buffer zone if it's within the buffer distance of any occupied tile.
+        buffer_zone = set()
+        if buffer > 0:
+            for ox, oy in occupied:
+                for dx in range(-buffer, buffer + 1):
+                    for dy in range(-buffer, buffer + 1):
+                        if dx == 0 and dy == 0:
+                            continue
+                        buffer_zone.add((ox + dx, oy + dy))
+
+        def cost_func(pos: Tuple[int, int]) -> float:
+            """The actual cost function returned by the factory."""
+            if pos in occupied:
+                return float("inf")  # Absolutely impassable
+            if pos in buffer_zone:
+                return 50.0  # High cost to strongly discourage entering the buffer
+            # Add a small amount of randomness to make paths less predictable.
+            return random.uniform(1.0, 1.5)
+
+        return cost_func
 
     @staticmethod
     def create_wandering_path(
@@ -27,10 +63,7 @@ class Pathfinder:
         occupied: Set[Tuple[int, int]],
     ) -> List[Tuple[int, int]] | None:
         """
-        Creates a relatively direct but slightly randomized path.
-
-        This is ideal for the 'straight' middle path to give it a more
-        natural, less-perfectly-linear appearance.
+        Creates a relatively direct but slightly randomized path that respects buffer zones.
 
         Args:
             grid (Grid): The grid to search on.
@@ -42,45 +75,37 @@ class Pathfinder:
             The found path as a list of coordinates, or None if it fails.
         """
         logger.info(f"Creating wandering path from {start} to {end}.")
-
-        def cost_func(pos: Tuple[int, int]) -> float:
-            """A cost function that adds slight randomness."""
-            if pos in occupied:
-                return 1000.0  # Very high cost to avoid existing paths
-            return random.uniform(1.0, 1.5)  # Encourage slight deviations
-
-        return Pathfinder.find_path(grid, start, end, cost_func, occupied)
+        cost_function = Pathfinder._create_buffered_cost_func(occupied, buffer=2)
+        return Pathfinder.find_path(grid, start, end, cost_function)
 
     @staticmethod
     def create_elbow_path(
         grid: Grid,
         start: Tuple[int, int],
         end: Tuple[int, int],
-        turn_x: int,
+        turn_x_range: Tuple[int, int],
         occupied: Set[Tuple[int, int]],
     ) -> List[Tuple[int, int]] | None:
         """
-        Creates a path with a distinct "elbow" shape that meanders.
-
-        This path is generated in two stages:
-        1. A wandering path from the start to a random point near the 'turn_x' column.
-        2. Another wandering path from that turn point to the final destination.
-        This creates a much more organic and unpredictable "owl elbow" shape.
+        Creates an organic, meandering path with a distinct "elbow" shape.
+        The path is generated in two wandering segments.
 
         Args:
             grid (Grid): The grid to search on.
             start (Tuple[int, int]): The starting coordinate.
             end (Tuple[int, int]): The ending coordinate.
-            turn_x (int): The approximate x-coordinate where the path should turn.
+            turn_x_range (Tuple[int, int]): A (min, max) range for the random turn column.
             occupied (Set[Tuple[int, int]]): A set of coordinates already used by other paths.
 
         Returns:
             The combined path as a list of coordinates, or None if it fails.
         """
-        logger.info(f"Creating elbow path from {start} to {end} via x={turn_x}.")
+        logger.info(
+            f"Creating elbow path from {start} to {end} via x-range {turn_x_range}."
+        )
 
-        # --- 1. Find a random turn point in the target column ---
-        # Find a valid, unoccupied y-coordinate in the turn column.
+        turn_x = random.randint(turn_x_range[0], turn_x_range[1])
+
         possible_turn_ys = [
             y for y in range(1, grid.height - 1) if (turn_x, y) not in occupied
         ]
@@ -90,46 +115,26 @@ class Pathfinder:
         turn_y = random.choice(possible_turn_ys)
         turn_point = (turn_x, turn_y)
 
-        # --- 2. Create the first segment of the elbow ---
-        def cost_func_segment1(pos: Tuple[int, int]) -> float:
-            """Cost function for the first leg of the journey."""
-            if pos in occupied:
-                return 1000.0
-            # Add a bit of randomness to make the path meander.
-            return random.uniform(1.0, 2.0)
-
-        segment1 = Pathfinder.find_path(
-            grid, start, turn_point, cost_func_segment1, occupied
-        )
+        # --- Create the first segment ---
+        cost_func_seg1 = Pathfinder._create_buffered_cost_func(occupied, buffer=2)
+        segment1 = Pathfinder.find_path(grid, start, turn_point, cost_func_seg1)
         if not segment1:
             logger.warning(
                 f"Elbow path failed: Could not find path from {start} to turn point {turn_point}."
             )
             return None
 
-        # The coordinates of the first segment are now also occupied for the second search.
+        # --- Create the second segment ---
         newly_occupied = occupied.union(segment1)
-
-        # --- 3. Create the second segment of the elbow ---
-        def cost_func_segment2(pos: Tuple[int, int]) -> float:
-            """Cost function for the second leg of the journey."""
-            if pos in newly_occupied:
-                return 1000.0
-            # A different random factor can make the segments look distinct.
-            return random.uniform(1.0, 1.8)
-
-        segment2 = Pathfinder.find_path(
-            grid, turn_point, end, cost_func_segment2, newly_occupied
-        )
+        cost_func_seg2 = Pathfinder._create_buffered_cost_func(newly_occupied, buffer=2)
+        segment2 = Pathfinder.find_path(grid, turn_point, end, cost_func_seg2)
         if not segment2:
             logger.warning(
                 f"Elbow path failed: Could not find path from turn point {turn_point} to {end}."
             )
             return None
 
-        # Combine the paths, removing the duplicate turn_point.
-        full_path = list(dict.fromkeys(segment1 + segment2))
-        return full_path
+        return list(dict.fromkeys(segment1 + segment2))
 
     @staticmethod
     def find_path(
@@ -137,26 +142,10 @@ class Pathfinder:
         start: Tuple[int, int],
         end: Tuple[int, int],
         cost_func: Callable[[Tuple[int, int]], float],
-        occupied: Set[Tuple[int, int]],
     ) -> List[Tuple[int, int]] | None:
-        """
-        Finds the shortest path between two points using the A* algorithm.
-        This is the low-level pathfinding workhorse.
-
-        Args:
-            grid (Grid): The grid to search on.
-            start (Tuple[int, int]): The (x, y) starting coordinate.
-            end (Tuple[int, int]): The (x, y) ending coordinate.
-            cost_func (Callable): A function that takes a position (x, y) tuple
-                                 and returns the cost of moving onto that tile.
-            occupied (Set[Tuple[int, int]]): A set of coordinates that are impassable.
-
-        Returns:
-            The found path as a list of coordinates, or None if no path is found.
-        """
+        """Finds a path between two points using the A* algorithm."""
 
         def heuristic(a: Tuple[int, int], b: Tuple[int, int]) -> float:
-            """Calculates the Manhattan distance heuristic for A*."""
             return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
         open_set = [(0, start)]
@@ -189,11 +178,7 @@ class Pathfinder:
                     continue
 
                 tile = grid.get_tile(neighbor[0], neighbor[1])
-                # Paths cannot cross borders, mountains, or other paths.
-                # The end node itself is always a valid target.
-                if (
-                    tile.tile_key in ["BORDER", "MOUNTAIN"] or neighbor in occupied
-                ) and neighbor != end:
+                if tile.tile_key in ["BORDER", "MOUNTAIN"] and neighbor != end:
                     continue
 
                 tentative_g_score = g_score[current] + cost_func(neighbor)
