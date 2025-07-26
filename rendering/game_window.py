@@ -12,8 +12,7 @@ from rendering.sprite_renderer import SpriteRenderer
 logger = logging.getLogger(__name__)
 
 # --- Control Constants ---
-MIN_ZOOM = 0.3
-MAX_ZOOM = 2.5
+MAX_ZOOM = 3.0
 ZOOM_INCREMENT = 0.07
 
 
@@ -56,10 +55,12 @@ class Game:
         self.grid: Grid | None = None
         self.sprite_renderer: SpriteRenderer | None = None
         self.background_color = (0, 0, 0)
-        self.gui_font = pygame.font.SysFont("segoeui", 24)
+        self.gui_font = pygame.font.SysFont("segoeui", 22, bold=True)
+        self.tile_size = self.game_settings.get("tile_size", 32)
 
         # --- Camera & Input State ---
         self.zoom = 1.0
+        self.min_zoom = 0.1  # Will be calculated in _setup_game
         self.camera_offset = pygame.Vector2(0, 0)
         self.is_panning = False
         self.pan_start_mouse_pos = pygame.Vector2(0, 0)
@@ -85,13 +86,24 @@ class Game:
         style_definitions = current_style.get("tile_definitions", {})
         self.background_color = current_style.get("background_color", (0, 0, 0))
 
-        tile_size = self.game_settings.get("tile_size", 32)
         self.sprite_renderer = SpriteRenderer(
             grid=self.grid,
-            tile_size=tile_size,
+            tile_size=self.tile_size,
             style_definitions=style_definitions,
             assets_path=self.assets_path,
         )
+
+        # Calculate the dynamic minimum zoom level
+        self._calculate_min_zoom()
+        # Center the camera initially
+        self.camera_offset.x = (
+            self.screen_width - self.grid.width * self.tile_size
+        ) / 2
+        self.camera_offset.y = (
+            self.screen_height - self.grid.height * self.tile_size
+        ) / 2
+        self._clamp_camera_offset()
+
         logger.info("--- Game Setup Complete ---")
 
     def run(self):
@@ -115,25 +127,82 @@ class Game:
                 self.screen = pygame.display.set_mode(
                     (event.w, event.h), pygame.RESIZABLE
                 )
+                # Recalculate zoom and clamp camera on resize
+                self._calculate_min_zoom()
+                self._clamp_zoom()
+                self._clamp_camera_offset()
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 2:  # Middle mouse button
+                # Allow panning with middle (2) or right (3) mouse button
+                if event.button == 2 or event.button == 3:
                     self.is_panning = True
                     self.pan_start_mouse_pos = pygame.Vector2(event.pos)
                     self.pan_start_camera_offset = self.camera_offset.copy()
                 elif event.button == 4:  # Scroll up
-                    self.zoom = min(MAX_ZOOM, self.zoom + ZOOM_INCREMENT)
+                    self.zoom += ZOOM_INCREMENT
+                    self._clamp_zoom()
+                    self._clamp_camera_offset()
                 elif event.button == 5:  # Scroll down
-                    self.zoom = max(MIN_ZOOM, self.zoom - ZOOM_INCREMENT)
+                    self.zoom -= ZOOM_INCREMENT
+                    self._clamp_zoom()
+                    self._clamp_camera_offset()
 
             elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 2:
+                if event.button == 2 or event.button == 3:
                     self.is_panning = False
 
             elif event.type == pygame.MOUSEMOTION:
                 if self.is_panning:
                     mouse_delta = pygame.Vector2(event.pos) - self.pan_start_mouse_pos
                     self.camera_offset = self.pan_start_camera_offset + mouse_delta
+                    self._clamp_camera_offset()
+
+    def _calculate_min_zoom(self):
+        """Calculates the minimum zoom to ensure the entire map is visible."""
+        if not self.sprite_renderer:
+            return
+        map_width_px = self.sprite_renderer.map_surface.get_width()
+        map_height_px = self.sprite_renderer.map_surface.get_height()
+
+        if map_width_px == 0 or map_height_px == 0:
+            return
+
+        # Calculate zoom level to fit width and height respectively
+        zoom_fit_x = self.screen_width / map_width_px
+        zoom_fit_y = self.screen_height / map_height_px
+
+        # The minimum zoom is the SMALLER of the two, to ensure the whole map fits.
+        # This guarantees that neither dimension is cropped.
+        self.min_zoom = min(zoom_fit_x, zoom_fit_y)
+
+    def _clamp_zoom(self):
+        """Clamps the zoom level within the defined min/max boundaries."""
+        self.zoom = max(self.min_zoom, min(self.zoom, MAX_ZOOM))
+
+    def _clamp_camera_offset(self):
+        """Prevents the camera from moving outside the map boundaries."""
+        if not self.sprite_renderer:
+            return
+
+        map_w = self.sprite_renderer.map_surface.get_width() * self.zoom
+        map_h = self.sprite_renderer.map_surface.get_height() * self.zoom
+
+        # Calculate max and min camera offsets
+        max_x = 0
+        min_x = self.screen_width - map_w
+        max_y = 0
+        min_y = self.screen_height - map_h
+
+        # If map is smaller than screen, center it
+        if map_w < self.screen_width:
+            self.camera_offset.x = (self.screen_width - map_w) / 2
+        else:
+            self.camera_offset.x = max(min_x, min(self.camera_offset.x, max_x))
+
+        if map_h < self.screen_height:
+            self.camera_offset.y = (self.screen_height - map_h) / 2
+        else:
+            self.camera_offset.y = max(min_y, min(self.camera_offset.y, max_y))
 
     def _update(self, dt: float):
         """
@@ -155,29 +224,41 @@ class Game:
         pygame.display.flip()
 
     def _draw_gui(self):
-        """Draws the static user interface elements."""
+        """Draws the static user interface elements in a horizontal row."""
         if not self.game_state:
             return
 
-        # Define colors for text
         colors = {"gold": (255, 215, 0), "hp": (220, 20, 60), "wave": (0, 191, 255)}
+        padding = 20
+        y_pos = 15
 
-        # Create text surfaces
-        gold_text = f"Gold: {self.game_state.gold}"
-        hp_text = f"Base HP: {self.game_state.base_hp}"
-        wave_text = f"Wave: {self.game_state.current_wave_number}"
+        # --- Render Text Surfaces ---
+        gold_surf = self.gui_font.render(
+            f"Gold: {self.game_state.gold}", True, colors["gold"]
+        )
+        hp_surf = self.gui_font.render(
+            f"Base HP: {self.game_state.base_hp}", True, colors["hp"]
+        )
+        wave_surf = self.gui_font.render(
+            f"Wave: {self.game_state.current_wave_number}", True, colors["wave"]
+        )
 
-        gold_surf = self.gui_font.render(gold_text, True, colors["gold"])
-        hp_surf = self.gui_font.render(hp_text, True, colors["hp"])
-        wave_surf = self.gui_font.render(wave_text, True, colors["wave"])
+        surfaces = [gold_surf, hp_surf, wave_surf]
 
-        # Draw a background panel for readability
-        panel_rect = pygame.Rect(5, 5, 220, 100)
+        # --- Calculate Panel Size ---
+        total_text_width = sum(s.get_width() for s in surfaces)
+        total_padding = padding * (len(surfaces) + 1)
+        panel_width = total_text_width + total_padding
+        panel_height = max(s.get_height() for s in surfaces) + (padding / 2)
+
+        # --- Draw Background Panel ---
+        panel_rect = pygame.Rect(5, 5, panel_width, panel_height)
         panel_surf = pygame.Surface(panel_rect.size, pygame.SRCALPHA)
         panel_surf.fill((0, 0, 0, 150))
         self.screen.blit(panel_surf, panel_rect.topleft)
 
-        # Blit text onto the screen
-        self.screen.blit(gold_surf, (15, 15))
-        self.screen.blit(hp_surf, (15, 45))
-        self.screen.blit(wave_surf, (15, 75))
+        # --- Draw Text ---
+        current_x = panel_rect.left + padding
+        for surf in surfaces:
+            self.screen.blit(surf, (current_x, y_pos))
+            current_x += surf.get_width() + padding
