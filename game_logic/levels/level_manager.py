@@ -3,8 +3,8 @@ import logging
 from pathlib import Path
 
 # Project-specific imports
-from level_generation.grid import Grid
-from level_generation.generator import LevelGenerator
+from game_logic.level_generation.grid import Grid
+from game_logic.level_generation.generator import LevelGenerator
 
 logger = logging.getLogger(__name__)
 

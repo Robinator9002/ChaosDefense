@@ -4,7 +4,7 @@ import logging
 from typing import List, Tuple, Callable
 
 # Import Grid for type hinting
-from level_generation.grid import Grid
+from game_logic.level_generation.grid import Grid
 
 logger = logging.getLogger(__name__)
 
