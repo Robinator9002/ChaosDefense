@@ -4,6 +4,7 @@
     "generation_params": {
       "grid_width": 40,
       "grid_height": 22,
+      "num_paths": 3,
       "features": {
         "mountains": { "min": 3, "max": 5 },
         "lakes": { "min": 2, "max": 4 },
@@ -53,6 +54,7 @@
     "generation_params": {
       "grid_width": 80,
       "grid_height": 50,
+      "num_paths": 3,
       "features": {
         "mountains": { "min": 10, "max": 15 },
         "lakes": { "min": 1, "max": 3 },
@@ -98,4 +100,3 @@
     }
   }
 }
- 

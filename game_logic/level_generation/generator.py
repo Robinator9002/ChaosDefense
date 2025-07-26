@@ -16,9 +16,8 @@ class LevelGenerator:
     """
     A static class responsible for procedural level generation.
 
-    This class orchestrates the creation of playable maps by requesting
-    a fixed set of three paths from the Pathfinder, each leading to a
-    different side of the player's base.
+    This class orchestrates the creation of playable maps by requesting a
+    configurable number of paths (1-3) from the Pathfinder.
     """
 
     @staticmethod
@@ -26,23 +25,22 @@ class LevelGenerator:
         """
         Orchestrates the entire level generation process.
         """
-        logger.info(
-            "Starting procedural level generation with multi-target base and buffered paths."
-        )
+        logger.info("Starting procedural level generation with configurable paths.")
 
         # --- Generation Sequence ---
         LevelGenerator._create_border(grid)
-        # This function now returns a list of target points.
         target_points = LevelGenerator._place_base_zone(grid, size=4)
-        if len(target_points) < 3:
-            logger.critical(
-                "Base placement failed to generate enough target points. Aborting."
-            )
-            return grid, []
 
-        start_points = LevelGenerator._define_start_points(grid, 3)
+        # Read num_paths from config, clamp it to a valid range (1-3).
+        num_paths = params.get("num_paths", 3)
+        num_paths = max(1, min(num_paths, 3))
+        logger.info(f"Configuration requests {num_paths} path(s).")
 
-        paths = LevelGenerator._request_three_paths(grid, start_points, target_points)
+        start_points = LevelGenerator._define_start_points(grid, num_paths)
+
+        paths = LevelGenerator._request_paths(
+            grid, start_points, target_points, num_paths
+        )
         if not paths:
             logger.error("Pathfinder failed to generate the required paths. Aborting.")
             return grid, []
@@ -75,66 +73,82 @@ class LevelGenerator:
         return grid, paths
 
     @staticmethod
-    def _request_three_paths(
+    def _request_paths(
         grid: Grid,
         start_points: List[Tuple[int, int]],
-        target_points: List[Tuple[int, int]],
+        all_targets: List[Tuple[int, int]],
+        num_paths: int,
     ) -> List[List[Tuple[int, int]]]:
         """
-        Requests exactly three paths from the Pathfinder, each to a unique target.
+        Requests a configurable number of paths from the Pathfinder.
+        - 1 Path: A single wandering path to the center-left of the base.
+        - 2 Paths: Two elbow paths to the top and bottom of the base.
+        - 3 Paths: One wandering to the center, two elbows to top and bottom.
         """
-        if len(start_points) != 3 or len(target_points) != 3:
-            logger.error("Incorrect number of start or target points provided.")
+        if not all_targets:
+            logger.error("No valid target points on base provided.")
             return []
 
         all_paths: List[List[Tuple[int, int]]] = []
         occupied_coords: Set[Tuple[int, int]] = set()
 
-        # Define turn ranges for more variety in elbow paths.
         turn_x_range_short = (int(grid.width * 0.3), int(grid.width * 0.45))
         turn_x_range_long = (int(grid.width * 0.55), int(grid.width * 0.7))
 
-        top_start, middle_start, bottom_start = start_points
-        target_top, target_left, target_bottom = target_points
+        # The base provides targets in [top, left, bottom] order.
+        target_top = all_targets[0] if len(all_targets) > 0 else None
+        target_left = all_targets[1] if len(all_targets) > 1 else None
+        target_bottom = all_targets[2] if len(all_targets) > 2 else None
 
-        # 1. Middle Path to Left Target
-        logger.info(
-            f"Requesting wandering path from {middle_start} to left target {target_left}..."
-        )
-        middle_path = Pathfinder.create_wandering_path(
-            grid, middle_start, target_left, occupied_coords
-        )
-        if middle_path:
-            all_paths.append(middle_path)
-            occupied_coords.update(middle_path)
-        else:
-            logger.critical("Pathfinder FAILED to create the essential middle path.")
-            return []
+        if num_paths == 1:
+            logger.info("Requesting 1 wandering path to the left target...")
+            path = Pathfinder.create_wandering_path(
+                grid, start_points[0], target_left, occupied_coords
+            )
+            if path:
+                all_paths.append(path)
 
-        # 2. Top Path to Top Target
-        logger.info(
-            f"Requesting elbow path from {top_start} to top target {target_top}..."
-        )
-        top_path = Pathfinder.create_elbow_path(
-            grid, top_start, target_top, turn_x_range_short, occupied_coords
-        )
-        if top_path:
-            all_paths.append(top_path)
-            occupied_coords.update(top_path)
-        else:
-            logger.warning(f"Pathfinder failed to create top elbow path.")
+        elif num_paths == 2:
+            logger.info("Requesting 2 elbow paths to top and bottom targets...")
+            top_path = Pathfinder.create_elbow_path(
+                grid, start_points[0], target_top, turn_x_range_short, occupied_coords
+            )
+            if top_path:
+                all_paths.append(top_path)
+                occupied_coords.update(top_path)
 
-        # 3. Bottom Path to Bottom Target
-        logger.info(
-            f"Requesting elbow path from {bottom_start} to bottom target {target_bottom}..."
-        )
-        bottom_path = Pathfinder.create_elbow_path(
-            grid, bottom_start, target_bottom, turn_x_range_long, occupied_coords
-        )
-        if bottom_path:
-            all_paths.append(bottom_path)
-        else:
-            logger.warning(f"Pathfinder failed to create bottom elbow path.")
+            bottom_path = Pathfinder.create_elbow_path(
+                grid, start_points[1], target_bottom, turn_x_range_long, occupied_coords
+            )
+            if bottom_path:
+                all_paths.append(bottom_path)
+
+        elif num_paths == 3:
+            logger.info("Requesting 3 paths (wandering middle, two elbows)...")
+            middle_path = Pathfinder.create_wandering_path(
+                grid, start_points[1], target_left, occupied_coords
+            )
+            if middle_path:
+                all_paths.append(middle_path)
+                occupied_coords.update(middle_path)
+            else:
+                logger.critical(
+                    "Could not generate essential middle path for 3-path layout."
+                )
+                return []  # Fail fast
+
+            top_path = Pathfinder.create_elbow_path(
+                grid, start_points[0], target_top, turn_x_range_short, occupied_coords
+            )
+            if top_path:
+                all_paths.append(top_path)
+                occupied_coords.update(top_path)
+
+            bottom_path = Pathfinder.create_elbow_path(
+                grid, start_points[2], target_bottom, turn_x_range_long, occupied_coords
+            )
+            if bottom_path:
+                all_paths.append(bottom_path)
 
         return all_paths
 
@@ -161,7 +175,7 @@ class LevelGenerator:
                 if grid.is_valid_coord(x, y):
                     grid.set_tile_type(x, y, "BASE_ZONE")
 
-        # Define three entry points for the paths.
+        # Define three entry points for the paths in a consistent order.
         target_top = (start_x + size // 2, start_y - 1)
         target_left = (start_x - 1, start_y + size // 2)
         target_bottom = (start_x + size // 2, start_y + size)
@@ -180,10 +194,21 @@ class LevelGenerator:
         if num_paths <= 0:
             return []
 
-        y_top = grid.height // 4
-        y_mid = grid.height // 2
-        y_bot = grid.height * 3 // 4
-        return [(1, y_top), (1, y_mid), (1, y_bot)]
+        points = []
+        # For 1 path, start in the middle.
+        if num_paths == 1:
+            points.append((1, grid.height // 2))
+        # For 2 paths, use top and bottom quarters.
+        elif num_paths == 2:
+            points.append((1, grid.height // 4))
+            points.append((1, grid.height * 3 // 4))
+        # For 3 paths, use top, middle, bottom.
+        elif num_paths == 3:
+            points.append((1, grid.height // 4))
+            points.append((1, grid.height // 2))
+            points.append((1, grid.height * 3 // 4))
+
+        return sorted(points, key=lambda p: p[1])
 
     @staticmethod
     def _place_terrain_feature(
