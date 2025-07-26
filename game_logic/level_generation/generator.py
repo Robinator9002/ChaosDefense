@@ -1,10 +1,13 @@
-# level_generation/generator.py
+# game_logic/level_generation/generator.py
 import random
 import logging
-from typing import Tuple, List, Callable
+import math
+from typing import Tuple, List, Callable, Set
 
+# The generator now only needs to know about the Pathfinder, not its inner workings.
+from ..pathfinding.pathfinder import Pathfinder
 from .grid import Grid
-from game_logic.pathfinding.pathfinder import Pathfinder
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +16,9 @@ class LevelGenerator:
     """
     A static class responsible for procedural level generation.
 
-    This class acts as a "dungeon master" for creating levels. It uses a
-    Pathfinder utility to create multiple, distinct enemy paths and then
-    populates the grid with terrain features based on parameters from a
-    level style configuration.
+    This class orchestrates the creation of playable maps by requesting
+    different types of paths from the Pathfinder and then placing
+    environmental features.
     """
 
     @staticmethod
@@ -24,41 +26,39 @@ class LevelGenerator:
         """
         Orchestrates the entire level generation process.
 
-        The generation follows a strict sequence to ensure logical and playable maps:
-        1. Border Creation: Seals the map edges.
-        2. Base & Start Placement: Defines the objective and spawn points.
-        3. Path Generation: Creates routes between spawns and the base. This is
-           done *before* placing obstacles to guarantee paths are always possible.
-        4. Path Carving: Makes the calculated paths visually distinct on the grid.
-        5. Feature Placement: Scatters obstacles like mountains and trees around
-           the established paths.
-
         Args:
             grid (Grid): The Grid instance to be populated.
-            params (dict): A dictionary containing generation parameters.
+            params (dict): A dictionary containing generation parameters,
+                           including the configurable `num_paths`.
 
         Returns:
             A tuple containing the populated Grid and a list of the generated enemy paths.
         """
-        logger.info("Starting procedural level generation with A* pathfinding...")
+        logger.info("Starting procedural level generation...")
 
         # --- Generation Sequence ---
         LevelGenerator._create_border(grid)
         target_pos = LevelGenerator._place_base_zone(grid, size=4)
-        start_points = LevelGenerator._define_start_points(grid)
 
-        paths = LevelGenerator._create_paths(grid, start_points, target_pos)
+        num_paths = max(1, min(params.get("num_paths", 3), 5))
+        logger.info(f"Requesting {num_paths} paths from the Pathfinder.")
+        start_points = LevelGenerator._define_start_points(grid, num_paths)
+
+        # The core logic now delegates path creation to the Pathfinder.
+        paths = LevelGenerator._request_paths_from_pathfinder(
+            grid, start_points, target_pos, num_paths
+        )
         if not paths:
-            logger.error(
-                "Failed to generate any valid paths. Aborting feature placement."
-            )
+            logger.error("Pathfinder failed to generate any valid paths. Aborting.")
             return grid, []
 
+        # Carve the final, successful paths onto the grid.
         for path in paths:
             for x, y in path:
                 if grid.get_tile(x, y).tile_key != "BASE_ZONE":
                     grid.set_tile_type(x, y, "PATH")
 
+        # Place environmental features.
         features_params = params.get("features", {})
         feature_map = {
             "mountains": LevelGenerator._place_cluster,
@@ -76,70 +76,95 @@ class LevelGenerator:
                     grid, tile_key, min_count, max_count, placement_func
                 )
 
-        logger.info("Level generation complete.")
+        logger.info(f"Level generation complete. Created {len(paths)} paths.")
         return grid, paths
 
     @staticmethod
-    def _create_paths(
-        grid: Grid, starts: list, target: tuple
+    def _request_paths_from_pathfinder(
+        grid: Grid,
+        start_points: List[Tuple[int, int]],
+        target: Tuple[int, int],
+        num_paths: int,
     ) -> List[List[Tuple[int, int]]]:
         """
-        Creates three distinct paths using different A* cost functions.
+        Requests and orchestrates the creation of all paths from the Pathfinder.
 
-        This method generates each path sequentially. After a path is found, its
-        tiles are temporarily marked as "TEMP_PATH". This allows subsequent
-        pathfinding runs to "see" the existing path and be heavily penalized
-        for crossing or following it, forcing them to find unique routes.
+        This method determines the *type* of path to request based on the
+        configuration (e.g., straight, long elbow) and then calls the
+        appropriate Pathfinder method to do the actual work.
         """
-        all_paths = []
+        all_paths: List[List[Tuple[int, int]]] = []
+        occupied_coords: Set[Tuple[int, int]] = set()
 
-        # --- Path 1: The Direct Route (Middle) ---
-        # This path uses the default cost, resulting in the most direct A* route.
-        path1 = Pathfinder.find_path(grid, starts[1], target)
-        if path1:
-            all_paths.append(path1)
-            for x, y in path1:
-                grid.get_tile(x, y).tile_key = "TEMP_PATH"
+        long_turn_x = int(grid.width * 0.4)
+        super_long_turn_x = int(grid.width * 0.7)
 
-        # --- Path 2: The Wandering Route (Top) ---
-        # This cost function introduces randomness, making the path less direct.
-        def wandering_cost(pos: Tuple[int, int]) -> float:
-            """Assigns a high cost to existing paths and a random cost otherwise."""
-            tile = grid.get_tile(pos[0], pos[1])
-            if tile.tile_key == "TEMP_PATH":
-                return 100.0  # High cost makes the algorithm avoid this tile.
-            return random.uniform(1.0, 3.0)  # Random cost encourages zig-zagging.
+        # Handle the straight middle path if num_paths is odd
+        mid_index = len(start_points) // 2
+        if num_paths % 2 != 0:
+            logger.info("Requesting a wandering (straight) path for the middle lane.")
+            middle_start = start_points.pop(mid_index)
+            # Request the path from the Pathfinder
+            path = Pathfinder.create_wandering_path(
+                grid, middle_start, target, occupied_coords
+            )
+            if path:
+                all_paths.append(path)
+                occupied_coords.update(path)
+            else:
+                logger.warning("Pathfinder failed to create the middle path.")
 
-        path2 = Pathfinder.find_path(grid, starts[0], target, wandering_cost)
-        if path2:
-            all_paths.append(path2)
-            for x, y in path2:
-                grid.get_tile(x, y).tile_key = "TEMP_PATH"
+        # Group remaining start points for elbow paths
+        elbow_starts = sorted(start_points, key=lambda p: p[1])
+        path_configs = [("long", long_turn_x), ("super-duper long", super_long_turn_x)]
 
-        # --- Path 3: The Side-Hugging Route (Bottom) ---
-        # This cost function is weighted by the tile's position on the grid.
-        def side_hugging_cost(pos: Tuple[int, int]) -> float:
-            """Prefers staying low on the map for the first half of the journey."""
-            tile = grid.get_tile(pos[0], pos[1])
-            if tile.tile_key == "TEMP_PATH":
-                return 100.0  # High cost to avoid other paths.
+        pair_index = 0
+        while len(elbow_starts) >= 2:
+            if pair_index >= len(path_configs):
+                break
 
-            # For the first 60% of the map's width, make higher tiles more "expensive".
-            # This incentivizes the pathfinder to stay near the bottom edge.
-            if pos[0] < grid.width * 0.6:
-                return 1.0 + (pos[1] / 4.0)  # Cost increases with y-coordinate.
-            return 1.0  # Normal cost for the final stretch to the base.
+            path_type, turn_x = path_configs[pair_index]
+            logger.info(f"Requesting a pair of '{path_type}' elbow paths.")
 
-        path3 = Pathfinder.find_path(grid, starts[2], target, side_hugging_cost)
-        if path3:
-            all_paths.append(path3)
+            top_start = elbow_starts.pop(0)
+            bottom_start = elbow_starts.pop(-1)
 
-        # --- Cleanup ---
-        # After all paths are found, reset the temporary markers back to buildable.
-        for y in range(grid.height):
-            for x in range(grid.width):
-                if grid.get_tile(x, y).tile_key == "TEMP_PATH":
-                    grid.set_tile_type(x, y, "BUILDABLE")
+            # Request top path
+            top_path = Pathfinder.create_elbow_path(
+                grid, top_start, target, turn_x, occupied_coords
+            )
+            if top_path:
+                all_paths.append(top_path)
+                occupied_coords.update(top_path)
+            else:
+                logger.warning(f"Pathfinder failed to create top '{path_type}' path.")
+
+            # Request bottom path
+            bottom_path = Pathfinder.create_elbow_path(
+                grid, bottom_start, target, turn_x, occupied_coords
+            )
+            if bottom_path:
+                all_paths.append(bottom_path)
+                occupied_coords.update(bottom_path)
+            else:
+                logger.warning(
+                    f"Pathfinder failed to create bottom '{path_type}' path."
+                )
+
+            pair_index += 1
+
+        # Handle leftover path for even numbers
+        if elbow_starts:
+            path_type, turn_x = path_configs[pair_index]
+            logger.info(f"Requesting a single '{path_type}' elbow path.")
+            last_start = elbow_starts.pop(0)
+            last_path = Pathfinder.create_elbow_path(
+                grid, last_start, target, turn_x, occupied_coords
+            )
+            if last_path:
+                all_paths.append(last_path)
+            else:
+                logger.warning(f"Pathfinder failed to create final '{path_type}' path.")
 
         return all_paths
 
@@ -156,28 +181,36 @@ class LevelGenerator:
     @staticmethod
     def _place_base_zone(grid: Grid, size: int) -> Tuple[int, int]:
         """Places a square 'BASE_ZONE' on the right edge of the map."""
-        min_y, max_y = size, grid.height - size - 1
-        start_y = random.randint(min_y, max_y)
+        start_y = grid.height // 2 - size // 2
         start_x = grid.width - 1 - size
         for y in range(start_y, start_y + size):
             for x in range(start_x, start_x + size):
                 if grid.is_valid_coord(x, y):
                     grid.set_tile_type(x, y, "BASE_ZONE")
-        # The target for pathfinding is the entrance, not the center of the base.
         return (start_x, start_y + size // 2)
 
     @staticmethod
-    def _define_start_points(grid: Grid) -> list[Tuple[int, int]]:
-        """Defines three path starting points on the left edge of the map."""
-        y_top, y_mid, y_bot = grid.height // 4, grid.height // 2, grid.height * 3 // 4
-        return [(1, y_top), (1, y_mid), (1, y_bot)]
+    def _define_start_points(grid: Grid, num_paths: int) -> List[Tuple[int, int]]:
+        """Defines evenly distributed starting points on the left edge of the map."""
+        if num_paths == 0:
+            return []
+        points = []
+        for i in range(num_paths):
+            y = math.ceil(((i + 1) * grid.height) / (num_paths + 1))
+            y = max(1, min(y, grid.height - 2))
+            points.append((1, y))
+        return sorted(points, key=lambda p: p[1])
 
     @staticmethod
     def _place_terrain_feature(
-        grid: Grid, tile_key: str, min_count: int, max_count: int, placement_func
+        grid: Grid,
+        tile_key: str,
+        min_count: int,
+        max_count: int,
+        placement_func: Callable,
     ):
         """A generic method to place a number of features on the grid."""
-        if min_count > max_count:
+        if min_count > max_count or min_count < 0:
             return
         count = random.randint(min_count, max_count)
         for _ in range(count):
@@ -187,11 +220,10 @@ class LevelGenerator:
     def _place_cluster(grid: Grid, tile_key: str):
         """Places a rectangular cluster of tiles, avoiding existing paths."""
         cluster_w, cluster_h = random.randint(2, 4), random.randint(2, 4)
-        for _ in range(10):  # Attempt to place 10 times before giving up.
+        for _ in range(10):
             start_x, start_y = random.randint(
                 1, grid.width - cluster_w - 1
             ), random.randint(1, grid.height - cluster_h - 1)
-            # Check if the entire area is buildable before placing.
             if all(
                 grid.is_valid_coord(x, y)
                 and grid.get_tile(x, y).tile_key == "BUILDABLE"
@@ -225,8 +257,8 @@ class LevelGenerator:
                     for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                         if random.random() > 0.4:
                             q.append((x + dx, y + dy))
-                for x, y in blob_coords:
-                    grid.set_tile_type(x, y, tile_key)
+                for x_coord, y_coord in blob_coords:
+                    grid.set_tile_type(x_coord, y_coord, tile_key)
                 return
 
     @staticmethod
