@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 
 # Using absolute import path from the project's root source folder
-from game_logic.entities.enemy import Enemy
+from game_logic.entities.enemies.enemy import Enemy
 
 logger = logging.getLogger(__name__)
 

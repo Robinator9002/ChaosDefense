@@ -1,6 +1,7 @@
 # game_logic/effects/status_effect.py
 import logging
-from typing import Dict, Any
+import uuid
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +11,9 @@ class StatusEffect:
     Represents an active status effect applied to an entity.
 
     This class manages its own duration and holds the parameters of the
-    effect, such as a damage-over-time value or a stat multiplier.
+    effect. It has been updated to include an optional source_entity_id
+    to track which entity created the effect, which is crucial for abilities
+    that trigger on an enemy's death (e.g., explosions).
     """
 
     def __init__(
@@ -19,19 +22,23 @@ class StatusEffect:
         effect_data: Dict[str, Any],
         duration: float,
         potency: float,
+        source_entity_id: Optional[uuid.UUID] = None,  # NEW: Added source entity ID
     ):
         """
         Initializes a new instance of a status effect.
 
         Args:
             effect_id (str): The unique identifier for the effect (e.g., "slow").
-            effect_data (Dict[str, Any]): The definition of the effect from the config file.
+            effect_data (Dict[str, Any]): The definition of the effect from the config.
             duration (float): The total duration of this effect instance in seconds.
             potency (float): The strength of this effect (e.g., 0.4 for a 40% slow).
+            source_entity_id (Optional[uuid.UUID]): The unique ID of the entity that
+                                                   created this effect.
         """
         self.effect_id = effect_id
         self.effect_type = effect_data.get("type")
         self.stacking_logic = effect_data.get("stacking", "refresh")
+        self.source_entity_id = source_entity_id  # NEW: Store the source ID
 
         # Store effect-specific parameters
         self.params = effect_data.get("params", {})

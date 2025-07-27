@@ -8,7 +8,7 @@ from .game_state import GameState
 from .levels.level_manager import LevelManager
 from .level_generation.grid import Grid
 from .waves.wave_manager import WaveManager
-from .entities.enemy import Enemy
+from .entities.enemies.enemy import Enemy
 from .entities.tower import Tower
 from .entities.projectile import Projectile
 from .upgrades.upgrade_manager import UpgradeManager  # NEW: Import UpgradeManager

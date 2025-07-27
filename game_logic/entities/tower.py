@@ -9,7 +9,7 @@ from ..effects.status_effect import StatusEffect
 
 # Use TYPE_CHECKING to avoid circular imports at runtime.
 if TYPE_CHECKING:
-    from .enemy import Enemy
+    from .enemies.enemy import Enemy
     from game_logic.game_state import GameState
 
 logger = logging.getLogger(__name__)

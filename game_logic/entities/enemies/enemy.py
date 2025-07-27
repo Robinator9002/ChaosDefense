@@ -3,7 +3,7 @@ import pygame
 import logging
 from typing import List, Tuple, TYPE_CHECKING, Dict, Any
 
-from .entity import Entity
+from ..entity import Entity
 
 # Use TYPE_CHECKING to avoid circular imports at runtime.
 if TYPE_CHECKING:
