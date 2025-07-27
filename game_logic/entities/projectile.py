@@ -10,7 +10,7 @@ from ..effects.status_effect import StatusEffect
 # Use TYPE_CHECKING to avoid circular imports at runtime.
 if TYPE_CHECKING:
     from .enemies.enemy import Enemy
-    from game_logic.game_state import GameState
+    from ..game_state import GameState
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +19,10 @@ class Projectile(Entity):
     """
     Represents a projectile fired from a tower.
 
-    This class has been significantly upgraded to handle advanced behaviors like
-    piercing, splash damage (blast radius), and applying multiple status effects.
-    It now tracks which enemies it has already hit to manage its lifecycle,
-    especially for piercing shots.
+    This class has been significantly reworked to handle complex damage
+    calculation (execute thresholds, on-apply damage bonuses) and to pass
+    special properties like armor shred to the target upon impact. It is the
+    primary vehicle for delivering a tower's upgraded abilities.
     """
 
     def __init__(
@@ -36,55 +36,41 @@ class Projectile(Entity):
         blast_radius: float,
         on_blast_effects_data: List[Dict[str, Any]],
         status_effects_config: Dict[str, Any],
+        # NEW: Added parameters to carry all upgrade effects
+        armor_shred: int,
+        execute_threshold: Optional[Dict[str, float]],
+        on_apply_damage: int,
     ):
         """
-        Initializes a new Projectile.
-
-        Args:
-            x (float): The starting x-coordinate.
-            y (float): The starting y-coordinate.
-            damage (int): The base damage the projectile deals on impact.
-            target (Enemy): The initial enemy entity the projectile will track.
-            effects_to_apply (List[StatusEffect]): A list of status effect instances
-                                                   to apply on direct impact.
-            pierce_count (int): How many additional enemies the projectile can hit.
-            blast_radius (float): The radius for splash damage on impact.
-            on_blast_effects_data (List[Dict]): Data for effects to apply to enemies
-                                                hit by splash damage.
-            status_effects_config (Dict): The global status effects configuration,
-                                          needed for creating blast effects.
+        Initializes a new, more complex Projectile.
         """
-        # --- Core Projectile Properties ---
+        super().__init__(x, y, max_hp=1)
         self.damage = damage
         self.target = target
-        self.speed = 450  # Increased speed for a better feel
+        self.speed = 450
         self.effects_to_apply = effects_to_apply
         self.pierce_count = pierce_count
         self.blast_radius = blast_radius
         self.on_blast_effects_data = on_blast_effects_data
         self.status_effects_config = status_effects_config
+        self.armor_shred = armor_shred
+        self.execute_threshold = execute_threshold
+        self.on_apply_damage = on_apply_damage
 
-        # --- State Tracking ---
-        # Keep track of enemies already hit to avoid double-hitting with pierce.
+        # State tracking for piercing shots
         self.enemies_hit: List[uuid.UUID] = []
 
         # --- Create Sprite ---
-        # The sprite's appearance can be customized based on its properties.
         color = (255, 255, 0)  # Default yellow
         if self.blast_radius > 0:
-            color = (255, 165, 0)  # Orange for explosive
+            color = (255, 165, 0)
         elif self.pierce_count > 0:
-            color = (255, 255, 255)  # White for piercing
+            color = (255, 255, 255)
         elif any(e.effect_id == "slow" for e in self.effects_to_apply):
-            color = (173, 216, 230)  # Light blue for slow
-
-        projectile_sprite = pygame.Surface((8, 8), pygame.SRCALPHA)
-        pygame.draw.circle(projectile_sprite, color, (4, 4), 4)
-
-        super().__init__(x, y, max_hp=1, sprite=projectile_sprite)
-        logger.debug(
-            f"Projectile {self.entity_id} created, targeting {target.entity_id}."
-        )
+            color = (173, 216, 230)
+        self.sprite = pygame.Surface((8, 8), pygame.SRCALPHA)
+        pygame.draw.circle(self.sprite, color, (4, 4), 4)
+        self.rect = self.sprite.get_rect(center=(x, y))
 
     def update(self, dt: float, game_state: "GameState", all_enemies: List["Enemy"]):
         """
@@ -92,23 +78,19 @@ class Projectile(Entity):
         """
         if not self.is_alive:
             return
-
-        # If the current target is dead, try to find a new one.
         if not self.target or not self.target.is_alive:
-            self.kill()  # If original target is gone, projectile fizzles.
+            self.kill()
             return
 
-        # --- Movement ---
         direction = self.target.pos - self.pos
         distance_to_target = direction.length()
 
-        # --- Impact Check ---
+        # Check for impact
         if distance_to_target < self.speed * dt:
-            # If we are closer than one frame of movement, we hit the target.
             self._on_impact(self.target, game_state, all_enemies)
             return
 
-        # Move towards the target.
+        # Move towards the target
         self.pos += direction.normalize() * self.speed * dt
         super().update(dt, game_state)
 
@@ -116,33 +98,46 @@ class Projectile(Entity):
         self, hit_enemy: "Enemy", game_state: "GameState", all_enemies: List["Enemy"]
     ):
         """
-        Handles all logic for when the projectile hits an enemy.
-        This includes dealing damage, applying effects, handling splash, and piercing.
+        Handles all logic for when the projectile hits an enemy. This is the
+        core of the effect delivery system.
         """
         if not hit_enemy.is_alive or hit_enemy.entity_id in self.enemies_hit:
-            return  # Don't hit dead enemies or enemies we've already hit.
+            return
 
-        # 1. Deal direct damage and apply effects to the primary target.
-        hit_enemy.take_damage(self.damage)
+        # --- 1. Calculate Final Damage ---
+        # Start with base damage and add any on-apply bonuses.
+        final_damage = self.damage + self.on_apply_damage
+
+        # Check for execute threshold upgrade.
+        if self.execute_threshold:
+            hp_percent = hit_enemy.current_hp / hit_enemy.max_hp
+            if hp_percent <= self.execute_threshold["percentage"]:
+                final_damage = int(
+                    final_damage * self.execute_threshold["damage_multiplier"]
+                )
+                logger.debug(f"Executioner bonus applied! Damage: {final_damage}")
+
+        # --- 2. Deal Damage and Apply Effects ---
+        # The enemy's take_damage method now handles armor calculation.
+        hit_enemy.take_damage(final_damage, armor_shred=self.armor_shred)
         for effect in self.effects_to_apply:
             hit_enemy.apply_status_effect(effect)
         self.enemies_hit.append(hit_enemy.entity_id)
 
-        # 2. Handle Splash Damage (Blast Radius)
+        # --- 3. Handle Splash Damage ---
         if self.blast_radius > 0:
             self._handle_splash_damage(self.pos, game_state, all_enemies)
 
-        # 3. Handle Piercing
+        # --- 4. Handle Piercing ---
         if self.pierce_count > 0:
             self.pierce_count -= 1
             new_target = self._find_next_pierce_target(all_enemies)
             if new_target:
-                self.target = new_target  # Re-target and continue moving.
-                return  # IMPORTANT: Do not kill the projectile yet.
-            else:
-                self.kill()  # No more targets to pierce, so it's done.
-        else:
-            self.kill()  # No piercing ability, so it's done.
+                self.target = new_target
+                return  # Stay alive and re-target.
+
+        # If not piercing or no new target found, the projectile is destroyed.
+        self.kill()
 
     def _handle_splash_damage(
         self,
@@ -151,13 +146,17 @@ class Projectile(Entity):
         all_enemies: List["Enemy"],
     ):
         """Applies damage and effects to all enemies within the blast radius."""
-        splash_damage = int(self.damage * 0.5)  # Splash damage is 50% of base damage.
+        # Splash damage is typically a percentage of the projectile's base damage.
+        splash_damage = int(self.damage * 0.5)
 
         for enemy in all_enemies:
-            if enemy.entity_id not in self.enemies_hit:
+            # Ensure we don't hit the primary target again or other dead enemies.
+            if enemy.is_alive and enemy.entity_id not in self.enemies_hit:
                 if impact_pos.distance_to(enemy.pos) <= self.blast_radius:
+                    # Splash damage does not typically shred armor.
                     enemy.take_damage(splash_damage)
-                    # Apply any on-blast effects
+
+                    # Apply any on-blast effects (e.g., from Artillery's Shrapnel Shells).
                     for effect_data in self.on_blast_effects_data:
                         effect_id = effect_data["id"]
                         if effect_id in self.status_effects_config:
@@ -171,7 +170,8 @@ class Projectile(Entity):
                             enemy.apply_status_effect(effect_instance)
 
     def _find_next_pierce_target(self, all_enemies: List["Enemy"]) -> Optional["Enemy"]:
-        """Finds the next valid target for a piercing shot."""
+        """Finds the next valid target for a piercing shot, which is the
+        closest enemy that has not yet been hit by this projectile."""
         closest_enemy: Optional["Enemy"] = None
         min_distance = float("inf")
 
@@ -181,5 +181,4 @@ class Projectile(Entity):
                 if distance < min_distance:
                     min_distance = distance
                     closest_enemy = enemy
-
         return closest_enemy

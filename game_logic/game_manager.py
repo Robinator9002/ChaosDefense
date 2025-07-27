@@ -1,6 +1,7 @@
 # game_logic/game_manager.py
 import logging
 import uuid
+import pygame
 from typing import Dict, List, Any, Tuple, Optional
 
 # --- Core Game Logic Imports ---
@@ -8,19 +9,23 @@ from .game_state import GameState
 from .levels.level_manager import LevelManager
 from .level_generation.grid import Grid
 from .waves.wave_manager import WaveManager
-from .entities.enemies.enemy import Enemy
+from .entities.entity import Entity
 from .entities.tower import Tower
+
+# The Enemy class is now in a subfolder, so we adjust the import path.
+from .entities.enemies.enemy import Enemy
 from .entities.projectile import Projectile
-from .upgrades.upgrade_manager import UpgradeManager  # NEW: Import UpgradeManager
+from .upgrades.upgrade_manager import UpgradeManager
+from .effects.status_effect import StatusEffect
 
 logger = logging.getLogger(__name__)
 
 
 class GameManager:
     """
-    The central "headless" engine for the game. It orchestrates all game
-    logic, including entity updates, wave spawning, and now, handling all
-    tower placement and upgrade requests.
+    The central "headless" engine for the game. It has been updated to handle
+    complex on-death effects like the "Shatter" explosion by acting as a
+    central dispatcher.
     """
 
     def __init__(self, all_configs: Dict[str, Any]):
@@ -30,31 +35,24 @@ class GameManager:
         logger.info("--- Initializing Game Manager ---")
         self.configs = all_configs
         self.tile_size = self.configs["game_settings"].get("tile_size", 32)
-
-        # --- Initialize Core Systems ---
         self.game_state: GameState = GameState()
         self.level_manager: LevelManager = LevelManager(self.configs["level_styles"])
-        # NEW: Initialize the UpgradeManager with its definitions
         self.upgrade_manager: UpgradeManager = UpgradeManager(
             self.configs.get("upgrade_definitions", {})
         )
         self.wave_manager: Optional[WaveManager] = None
         self.grid: Optional[Grid] = None
         self.paths: List[List[Tuple[int, int]]] = []
-
-        # --- Entity Lists ---
         self.enemies: List[Enemy] = []
         self.towers: List[Tower] = []
         self.projectiles: List[Projectile] = []
-
         self._setup_new_game()
 
     def _setup_new_game(self):
         """Sets up all necessary objects for a new game session."""
         logger.info("--- Setting up new game via Game Manager ---")
-        self.game_state = GameState(gold=10000, base_hp=20)
+        self.game_state = GameState(gold=150, base_hp=20)
         try:
-            # In a full game, this might be selectable from a menu.
             preset_to_load = "Forest"
             self.grid, self.paths, style_config = (
                 self.level_manager.build_level_from_preset(preset_to_load)
@@ -64,7 +62,6 @@ class GameManager:
             logger.critical(f"FATAL: Failed to build level: {e}", exc_info=True)
             self.game_state.end_game()
             return
-
         player_difficulty = self.configs["game_settings"].get("difficulty", 1)
         level_difficulty = style_config.get("generation_params", {}).get(
             "level_difficulty", 1
@@ -83,69 +80,121 @@ class GameManager:
         """The main update loop for the entire game simulation."""
         if self.game_state.game_over:
             return
-
-        # Update wave manager and spawn enemies if necessary.
         if self.wave_manager:
             spawn_job = self.wave_manager.update(dt, len(self.enemies))
             if spawn_job:
                 self._spawn_enemy(spawn_job)
             self.game_state.current_wave_number = self.wave_manager.current_wave_number
 
-        # Update towers and collect any newly fired projectiles.
         newly_fired_projectiles: List[Projectile] = []
         for tower in self.towers:
-            # MODIFIED: Tower update now returns a list of projectiles.
             projectiles = tower.update(dt, self.game_state, self.enemies)
             if projectiles:
                 newly_fired_projectiles.extend(projectiles)
         self.projectiles.extend(newly_fired_projectiles)
 
-        # Update all active enemies.
         for enemy in self.enemies:
             enemy.update(dt, self.game_state)
 
-        # Update all active projectiles.
         for projectile in self.projectiles:
-            # MODIFIED: Projectile update now needs the list of all enemies for piercing/splash.
             projectile.update(dt, self.game_state, self.enemies)
 
         self._cleanup_dead_entities()
 
     def _cleanup_dead_entities(self):
-        """Removes all entities that are no longer alive from the game."""
+        """
+        Removes dead entities from the game lists and now also processes
+        any on-death effects they might trigger.
+        """
         dead_enemies = [e for e in self.enemies if not e.is_alive]
-        if dead_enemies:
-            # Grant gold for each defeated enemy.
-            for dead_enemy in dead_enemies:
-                self.game_state.add_gold(dead_enemy.bounty)
-            # Rebuild the list of enemies, excluding the dead ones.
-            self.enemies = [e for e in self.enemies if e.is_alive]
+        if not dead_enemies:
+            return
 
+        for dead_enemy in dead_enemies:
+            # Grant gold for the kill.
+            self.game_state.add_gold(dead_enemy.bounty)
+
+            # --- NEW: Check for and trigger on-death effects ---
+            # This is the crucial new logic block.
+            self._handle_on_death_effects(dead_enemy)
+
+        # Rebuild the lists to remove the dead entities.
+        self.enemies = [e for e in self.enemies if e.is_alive]
         self.projectiles = [p for p in self.projectiles if p.is_alive]
+
+    def _handle_on_death_effects(self, dead_enemy: Enemy):
+        """
+        Checks a dead enemy for effects that trigger an action from their source,
+        like the Frost Tower's "Shatter" explosion.
+        """
+        for effect in dead_enemy.status_effects:
+            # Check if the effect has a source (was applied by a tower).
+            if effect.source_entity_id:
+                # Find the specific tower that applied the effect.
+                source_tower = next(
+                    (t for t in self.towers if t.entity_id == effect.source_entity_id),
+                    None,
+                )
+
+                # Check if that tower has the on_death_explosion upgrade.
+                if source_tower and source_tower.on_death_explosion:
+                    logger.info(
+                        f"Triggering 'on_death_explosion' from tower {source_tower.entity_id}"
+                    )
+                    self._create_explosion(
+                        dead_enemy.pos, source_tower.on_death_explosion
+                    )
+                    # An enemy should only shatter once, even if slowed by multiple towers.
+                    break
+
+    def _create_explosion(
+        self, position: pygame.Vector2, explosion_data: Dict[str, Any]
+    ):
+        """
+        Creates an instantaneous area-of-effect explosion that damages and
+        applies effects to nearby enemies.
+        """
+        radius = explosion_data.get("radius", 0)
+        damage = explosion_data.get("damage", 0)
+        effect_id = explosion_data.get("effect_id")
+
+        for enemy in self.enemies:
+            # Only affect living enemies within the radius.
+            if enemy.is_alive and position.distance_to(enemy.pos) <= radius:
+                enemy.take_damage(damage)
+
+                # If the explosion itself applies a status effect (like slow).
+                if effect_id:
+                    effect_config = self.configs.get("status_effects", {}).get(
+                        effect_id
+                    )
+                    if effect_config:
+                        # Create a new StatusEffect instance for the secondary targets.
+                        effect_instance = StatusEffect(
+                            effect_id=effect_id,
+                            effect_data=effect_config,
+                            duration=2.0,  # Duration for shatter-slow can be hardcoded or added to config
+                            potency=0.5,  # Same for potency
+                        )
+                        enemy.apply_status_effect(effect_instance)
 
     def _spawn_enemy(self, spawn_job: Dict[str, Any]):
         """Creates an Enemy instance based on data from the WaveManager."""
         enemy_type_id = spawn_job["type"]
         enemy_types_config = self.configs["enemy_types"]
         if enemy_type_id not in enemy_types_config:
-            logger.error(f"Unknown enemy type '{enemy_type_id}' in wave data.")
             return
 
         path_index = spawn_job["path_index"]
         if not (0 <= path_index < len(self.paths)):
-            logger.error(f"Invalid path index {path_index} for spawning.")
             return
-
-        chosen_path = self.paths[path_index]
-        difficulty_settings = self.wave_manager.settings
-        stat_modifier = difficulty_settings.get("stat_modifier", 1.0)
 
         enemy = Enemy(
             enemy_type_data=enemy_types_config[enemy_type_id],
             level=spawn_job["level"],
-            path=chosen_path,
+            path=self.paths[path_index],
             tile_size=self.tile_size,
-            difficulty_modifier=stat_modifier,
+            difficulty_modifier=self.wave_manager.settings.get("stat_modifier", 1.0),
         )
         self.enemies.append(enemy)
 
@@ -153,32 +202,21 @@ class GameManager:
         """Handles the logic for a player attempting to place a new tower."""
         tower_types_config = self.configs["tower_types"]
         if tower_type_id not in tower_types_config:
-            logger.warning(f"Attempted to place unknown tower type: {tower_type_id}")
             return
 
         tile = self.grid.get_tile(tile_x, tile_y)
         if not tile or tile.tile_key != "BUILDABLE":
-            logger.info(
-                f"Cannot build on tile ({tile_x}, {tile_y}). Type: {tile.tile_key if tile else 'None'}"
-            )
             return
 
         tower_data = tower_types_config[tower_type_id]
-        cost = tower_data.get("cost", 9999)
-        if not self.game_state.spend_gold(cost):
-            logger.info(
-                f"Not enough gold to build {tower_type_id}. Cost: {cost}, Have: {self.game_state.gold}"
-            )
+        if not self.game_state.spend_gold(tower_data.get("cost", 9999)):
             return
 
-        pos_x = tile_x * self.tile_size + self.tile_size / 2
-        pos_y = tile_y * self.tile_size + self.tile_size / 2
-
         new_tower = Tower(
-            x=pos_x,
-            y=pos_y,
+            x=tile_x * self.tile_size + self.tile_size / 2,
+            y=tile_y * self.tile_size + self.tile_size / 2,
             tile_size=self.tile_size,
-            tower_type_id=tower_type_id,  # MODIFIED: Pass the string ID
+            tower_type_id=tower_type_id,
             tower_type_data=tower_data,
             status_effects_config=self.configs.get("status_effects", {}),
         )
@@ -192,31 +230,18 @@ class GameManager:
         """
         Handles a request from the UI to purchase an upgrade for a specific tower.
         """
-        # 1. Find the tower instance by its unique ID.
         target_tower = next((t for t in self.towers if t.entity_id == tower_id), None)
         if not target_tower:
-            logger.warning(f"Upgrade requested for non-existent tower ID: {tower_id}")
             return
 
-        # 2. Get the next available upgrade object for the specified path.
         upgrade = self.upgrade_manager.get_next_upgrade(target_tower, path_id)
         if not upgrade:
-            logger.info(
-                f"No more upgrades available for tower {tower_id} on path '{path_id}'."
-            )
             return
 
-        # 3. Check affordability and spend gold.
         if not self.game_state.spend_gold(upgrade.cost):
-            logger.info(
-                f"Not enough gold for upgrade '{upgrade.id}'. Cost: {upgrade.cost}, Have: {self.game_state.gold}"
-            )
             return
 
-        # 4. Apply the upgrade's effects to the tower.
         self.upgrade_manager.apply_upgrade(target_tower, upgrade)
-
-        # 5. Increment the tower's tier for that path to track progress.
         if path_id == "path_a":
             target_tower.path_a_tier += 1
         elif path_id == "path_b":
