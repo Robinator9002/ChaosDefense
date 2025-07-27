@@ -7,7 +7,7 @@
       "color": [200, 60, 60]
     },
     "base_stats": {
-      "hp": 100,
+      "hp": 20,
       "speed": 50,
       "bounty": 5,
       "damage": 1
@@ -27,7 +27,7 @@
       "color": [230, 120, 120]
     },
     "base_stats": {
-      "hp": 60,
+      "hp": 10,
       "speed": 85,
       "bounty": 3,
       "damage": 1
@@ -47,7 +47,7 @@
       "color": [150, 40, 40]
     },
     "base_stats": {
-      "hp": 350,
+      "hp": 60,
       "speed": 35,
       "bounty": 10,
       "damage": 5
