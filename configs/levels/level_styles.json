@@ -6,6 +6,8 @@
       "grid_height": 50,
       "num_paths": 3,
       "difficulty": 1,
+      "starting_gold": 150,
+      "base_hp": 20,
       "features": {
         "mountains": { "min": 3, "max": 5 },
         "lakes": { "min": 2, "max": 4 },
@@ -57,6 +59,8 @@
       "grid_height": 50,
       "num_paths": 3,
       "difficulty": 2,
+      "starting_gold": 125,
+      "base_hp": 15,
       "features": {
         "mountains": { "min": 10, "max": 15 },
         "lakes": { "min": 1, "max": 3 },

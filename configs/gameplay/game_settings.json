@@ -3,7 +3,5 @@
   "screen_height": 720,
   "screen_title": "ChaosDefense",
   "tile_size": 32,
-  "difficulty": 4,
-  "starting_gold": 150,
-  "base_hp": 20
+  "difficulty": 4
 }

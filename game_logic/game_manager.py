@@ -49,26 +49,33 @@ class GameManager:
     def _setup_new_game(self):
         """
         Sets up all necessary objects for a new game session.
-        This now reads starting gold and HP from the game_settings config.
+        This now reads starting gold and HP from the loaded level's style config.
         """
         logger.info("--- Setting up new game via Game Manager ---")
 
-        # --- MODIFIED: Load starting values from config ---
-        # This removes the hardcoded values from the game logic, making them
-        # easily configurable from the JSON file.
-        game_settings = self.configs.get("game_settings", {})
-        start_gold = game_settings.get("starting_gold", 150)
-        start_hp = game_settings.get("base_hp", 20)
-        self.game_state = GameState(gold=start_gold, base_hp=start_hp)
-
         try:
+            # In a full game, this might be selectable from a menu.
             preset_to_load = "Forest"
             self.grid, self.paths, style_config = (
                 self.level_manager.build_level_from_preset(preset_to_load)
             )
+
+            # --- MODIFIED: Initialize GameState AFTER loading level style ---
+            # This makes starting conditions dependent on the selected level,
+            # allowing for more varied gameplay scenarios.
+            gen_params = style_config.get("generation_params", {})
+            start_gold = gen_params.get(
+                "starting_gold", 150
+            )  # Fallback to a default value
+            start_hp = gen_params.get("base_hp", 20)  # Fallback to a default value
+            self.game_state = GameState(gold=start_gold, base_hp=start_hp)
+
             self.game_state.level_grid = self.grid
+
         except (KeyError, ValueError) as e:
             logger.critical(f"FATAL: Failed to build level: {e}", exc_info=True)
+            # Initialize a default GameState to prevent crashes if level load fails.
+            self.game_state = GameState(gold=0, base_hp=1)
             self.game_state.end_game()
             return
 
