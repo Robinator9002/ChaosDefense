@@ -1,0 +1,20 @@
+{
+  "slow": {
+    "name": "Slow",
+    "type": "stat_modifier",
+    "stacking": "refresh",
+    "params": {
+      "stat": "speed",
+      "multiplier": 0.6
+    }
+  },
+  "poison": {
+    "name": "Poison",
+    "type": "damage_over_time",
+    "stacking": "stack_intensity",
+    "params": {
+      "damage_per_tick": 5,
+      "tick_interval": 0.5
+    }
+  }
+}
