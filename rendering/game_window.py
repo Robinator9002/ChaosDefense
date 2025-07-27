@@ -9,7 +9,7 @@ from game_logic.game_manager import GameManager
 
 # --- Rendering Imports ---
 from rendering.sprite_renderer import SpriteRenderer
-from rendering.ui_manager import UIManager
+from rendering.ui.ui_manager import UIManager
 
 logger = logging.getLogger(__name__)
 
