@@ -1,14 +1,50 @@
 {
   "grunt": {
     "name": "Grunt",
-    "hp": 100,
-    "speed": 1.5,
-    "bounty": 5
+    "sprite_key": "enemies/grunt.png",
+    "base_stats": {
+      "hp": 100,
+      "speed": 50,
+      "bounty": 5,
+      "damage": 1
+    },
+    "scaling_per_level": {
+      "hp": 1.15,
+      "speed": 1.01,
+      "bounty": 1.1
+    },
+    "abilities": []
   },
   "scout": {
     "name": "Scout",
-    "hp": 50,
-    "speed": 3.0,
-    "bounty": 3
+    "sprite_key": "enemies/scout.png",
+    "base_stats": {
+      "hp": 60,
+      "speed": 85,
+      "bounty": 3,
+      "damage": 1
+    },
+    "scaling_per_level": {
+      "hp": 1.12,
+      "speed": 1.02,
+      "bounty": 1.08
+    },
+    "abilities": []
+  },
+  "tank": {
+    "name": "Tank",
+    "sprite_key": "enemies/tank.png",
+    "base_stats": {
+      "hp": 350,
+      "speed": 35,
+      "bounty": 10,
+      "damage": 5
+    },
+    "scaling_per_level": {
+      "hp": 1.2,
+      "speed": 1.0,
+      "bounty": 1.15
+    },
+    "abilities": ["ARMORED"]
   }
 }
