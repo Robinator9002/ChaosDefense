@@ -10,7 +10,7 @@ from rendering.game_window import Game
 # --- Constants ---
 PROJECT_ROOT = Path(__file__).parent
 # Assume a 'config' directory exists at the project root.
-CONFIG_PATH = PROJECT_ROOT / "config"
+CONFIG_PATH = PROJECT_ROOT / "configs"
 ASSETS_PATH = PROJECT_ROOT / "assets"
 
 # --- Basic Logging Setup ---
@@ -41,11 +41,11 @@ def main():
     logger.info("--- Loading All Game Configurations ---")
     try:
         # Load all five essential configuration files.
-        game_settings = load_config("game_settings.json")
-        level_styles = load_config("level_styles.json")
-        enemy_types = load_config("enemy_types.json")
-        difficulty_scaling = load_config("difficulty_scaling.json")
-        wave_scaling = load_config("wave_scaling.json")  # The newly added config
+        game_settings = load_config("gameplay/game_settings.json")
+        level_styles = load_config("levels/level_styles.json")
+        enemy_types = load_config("entities/enemy_types.json")
+        difficulty_scaling = load_config("scaling/difficulty_scaling.json")
+        wave_scaling = load_config("scaling/wave_scaling.json")  # The newly added config
     except (FileNotFoundError, json.JSONDecodeError):
         logger.critical(
             "A required configuration file was missing or corrupt. Cannot start."
