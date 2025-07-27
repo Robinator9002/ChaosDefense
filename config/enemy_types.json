@@ -1,7 +1,11 @@
 {
   "grunt": {
     "name": "Grunt",
-    "sprite_key": "enemies/grunt.png",
+    "min_level_difficulty": 1,
+    "render_props": {
+      "size": 22,
+      "color": [200, 60, 60]
+    },
     "base_stats": {
       "hp": 100,
       "speed": 50,
@@ -17,7 +21,11 @@
   },
   "scout": {
     "name": "Scout",
-    "sprite_key": "enemies/scout.png",
+    "min_level_difficulty": 1,
+    "render_props": {
+      "size": 18,
+      "color": [230, 120, 120]
+    },
     "base_stats": {
       "hp": 60,
       "speed": 85,
@@ -33,7 +41,11 @@
   },
   "tank": {
     "name": "Tank",
-    "sprite_key": "enemies/tank.png",
+    "min_level_difficulty": 2,
+    "render_props": {
+      "size": 30,
+      "color": [150, 40, 40]
+    },
     "base_stats": {
       "hp": 350,
       "speed": 35,
