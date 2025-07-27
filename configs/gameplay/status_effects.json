@@ -8,13 +8,64 @@
       "multiplier": 0.6
     }
   },
+  "stun": {
+    "name": "Stun",
+    "type": "stat_modifier",
+    "stacking": "refresh",
+    "description": "Stops enemy movement completely.",
+    "params": {
+      "stat": "speed",
+      "multiplier": 0
+    }
+  },
   "poison": {
     "name": "Poison",
     "type": "damage_over_time",
     "stacking": "stack_intensity",
+    "description": "Deals damage over time. Multiple applications increase intensity.",
     "params": {
       "damage_per_tick": 5,
       "tick_interval": 0.5
+    }
+  },
+  "fire": {
+    "name": "Fire",
+    "type": "damage_over_time",
+    "stacking": "refresh",
+    "description": "Deals fire damage over time. Re-applying refreshes the duration.",
+    "params": {
+      "damage_per_tick": 8,
+      "tick_interval": 0.5
+    }
+  },
+  "bleed": {
+    "name": "Bleed",
+    "type": "damage_over_time",
+    "stacking": "stack_intensity",
+    "description": "Causes the target to bleed, taking damage over time. Stacks.",
+    "params": {
+      "damage_per_tick": 10,
+      "tick_interval": 1.0
+    }
+  },
+  "armor_break": {
+    "name": "Armor Break",
+    "type": "stat_modifier",
+    "stacking": "refresh",
+    "description": "Reduces enemy armor, causing them to take increased damage.",
+    "params": {
+      "stat": "damage_taken_multiplier",
+      "multiplier": 1.2
+    }
+  },
+  "vulnerability": {
+    "name": "Vulnerability",
+    "type": "stat_modifier",
+    "stacking": "refresh",
+    "description": "Makes the enemy vulnerable, causing them to take increased damage.",
+    "params": {
+      "stat": "damage_taken_multiplier",
+      "multiplier": 1.25
     }
   }
 }
