@@ -3,13 +3,13 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import Dict
 
-# Import the main Game class.
+# The Game class will be refactored, but the import path remains.
 from rendering.game_window import Game
 
 # --- Constants ---
 PROJECT_ROOT = Path(__file__).parent
-# Assume a 'config' directory exists at the project root.
 CONFIG_PATH = PROJECT_ROOT / "configs"
 ASSETS_PATH = PROJECT_ROOT / "assets"
 
@@ -20,19 +20,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_config(filename: str) -> dict:
-    """Loads a JSON configuration file from the config directory."""
-    file_path = CONFIG_PATH / filename
+def load_config(path: Path) -> dict:
+    """Loads a JSON configuration file."""
     try:
-        with open(file_path, "r") as f:
+        with open(path, "r") as f:
             config = json.load(f)
-            logger.info(f"Successfully loaded configuration: {filename}")
+            logger.info(f"Successfully loaded configuration: {path.name}")
             return config
     except FileNotFoundError:
-        logger.error(f"Configuration file not found: {file_path}")
+        logger.error(f"Configuration file not found: {path}")
         raise
     except json.JSONDecodeError:
-        logger.error(f"Error decoding JSON from file: {file_path}")
+        logger.error(f"Error decoding JSON from file: {path}")
         raise
 
 
@@ -40,12 +39,20 @@ def main():
     """Main function to set up and run the game."""
     logger.info("--- Loading All Game Configurations ---")
     try:
-        # Load all five essential configuration files.
-        game_settings = load_config("gameplay/game_settings.json")
-        level_styles = load_config("levels/level_styles.json")
-        enemy_types = load_config("entities/enemy_types.json")
-        difficulty_scaling = load_config("scaling/difficulty_scaling.json")
-        wave_scaling = load_config("scaling/wave_scaling.json")  # The newly added config
+        # We now load all configuration files into a single dictionary.
+        all_configs: Dict[str, Dict] = {
+            "game_settings": load_config(CONFIG_PATH / "gameplay/game_settings.json"),
+            "level_styles": load_config(CONFIG_PATH / "levels/level_styles.json"),
+            "enemy_types": load_config(CONFIG_PATH / "entities/enemy_types.json"),
+            "tower_types": load_config(CONFIG_PATH / "entities/tower_types.json"),
+            "upgrade_definitions": load_config(
+                CONFIG_PATH / "gameplay/upgrade_definitions.json"
+            ),
+            "difficulty_scaling": load_config(
+                CONFIG_PATH / "scaling/difficulty_scaling.json"
+            ),
+            "wave_scaling": load_config(CONFIG_PATH / "scaling/wave_scaling.json"),
+        }
     except (FileNotFoundError, json.JSONDecodeError):
         logger.critical(
             "A required configuration file was missing or corrupt. Cannot start."
@@ -54,14 +61,9 @@ def main():
 
     logger.info("--- Initializing Game ---")
     try:
-        # Pass all loaded configurations to the Game constructor.
-        # The Game class will need to be updated to accept these new arguments.
+        # The Game class will be updated to accept this new structure.
         game = Game(
-            game_settings=game_settings,
-            level_styles=level_styles,
-            enemy_types=enemy_types,
-            difficulty_scaling=difficulty_scaling,
-            wave_scaling=wave_scaling,
+            all_configs=all_configs,
             assets_path=ASSETS_PATH,
         )
         game.run()
