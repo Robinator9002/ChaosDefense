@@ -1,0 +1,13 @@
+{
+  "enemy_count": {
+    "base": 5,
+    "per_wave": 2,
+    "per_level_difficulty": 3
+  },
+  "spawn_cooldown": {
+    "base_seconds": 2.5,
+    "reduction_per_wave": 0.05,
+    "reduction_per_level_difficulty": 0.2,
+    "minimum_seconds": 0.25
+  }
+}
