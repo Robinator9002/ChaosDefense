@@ -8,13 +8,13 @@
     },
     "base_stats": {
       "hp": 20,
-      "speed": 50,
+      "speed": 70,
       "bounty": 5,
       "damage": 1
     },
     "scaling_per_level": {
-      "hp": 1.15,
-      "speed": 1.01,
+      "hp": 1.1,
+      "speed": 1.05,
       "bounty": 1.1
     },
     "abilities": []
@@ -27,14 +27,14 @@
       "color": [230, 120, 120]
     },
     "base_stats": {
-      "hp": 10,
-      "speed": 85,
+      "hp": 12,
+      "speed": 120,
       "bounty": 3,
       "damage": 1
     },
     "scaling_per_level": {
-      "hp": 1.12,
-      "speed": 1.02,
+      "hp": 1.05,
+      "speed": 1.15,
       "bounty": 1.08
     },
     "abilities": []
@@ -47,14 +47,14 @@
       "color": [150, 40, 40]
     },
     "base_stats": {
-      "hp": 60,
-      "speed": 35,
+      "hp": 40,
+      "speed": 50,
       "bounty": 10,
       "damage": 5
     },
     "scaling_per_level": {
-      "hp": 1.2,
-      "speed": 1.0,
+      "hp": 1.1,
+      "speed": 1.1,
       "bounty": 1.15
     },
     "abilities": ["ARMORED"]

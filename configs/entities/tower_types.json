@@ -2,7 +2,7 @@
   "turret": {
     "name": "Basic Turret",
     "cost": 50,
-    "damage": 12,
+    "damage": 8,
     "range": 160,
     "fire_rate": 1.2,
     "sprite_key": "towers/turret.png",
@@ -11,7 +11,7 @@
   "cannon": {
     "name": "Cannon Tower",
     "cost": 120,
-    "damage": 45,
+    "damage": 20,
     "range": 200,
     "fire_rate": 0.4,
     "sprite_key": "towers/cannon.png",
@@ -20,7 +20,7 @@
   "slower": {
     "name": "Frost Tower",
     "cost": 80,
-    "damage": 5,
+    "damage": 6,
     "range": 140,
     "fire_rate": 1.0,
     "sprite_key": "towers/slower.png",
