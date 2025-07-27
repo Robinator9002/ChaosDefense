@@ -67,7 +67,6 @@ class UIManager:
         current_x = start_x
         for tower_id, tower_data in tower_types.items():
             button_rect = pygame.Rect(current_x, start_y, button_size, button_size)
-            # Pass the tower_id directly now
             button = TowerButton(button_rect, tower_id, tower_data, self.assets_path)
             self.build_buttons.append(button)
             current_x += button_size + spacing
@@ -75,20 +74,13 @@ class UIManager:
     def handle_event(self, event: pygame.event.Event, game_state: "GameState") -> bool:
         """
         Passes events to UI elements and handles resulting actions.
-
-        This method now implements a hierarchy: it checks the upgrade panel first,
-        then the build panel. This ensures that a click on the upgrade panel isn't
-        mistakenly handled by the build panel if they overlap.
-
-        Returns:
-            True if a UI element handled the event, False otherwise.
         """
         # 1. Prioritize the Upgrade Panel if it's active.
         if self.upgrade_panel:
             action = self.upgrade_panel.handle_event(event, game_state)
             if action:
                 self._process_ui_action(action, game_state)
-                return True  # Event was consumed by the upgrade panel.
+                return True
 
         # 2. Check the bottom build panel buttons.
         mouse_pos = pygame.mouse.get_pos()
@@ -97,9 +89,8 @@ class UIManager:
                 action = button.handle_event(event, game_state)
                 if action:
                     self._process_ui_action(action, game_state)
-            return True  # Event was consumed by the build panel.
+            return True
 
-        # If no UI element handled the event, return False.
         return False
 
     def _process_ui_action(self, action: str, game_state: "GameState"):
@@ -115,22 +106,19 @@ class UIManager:
                 logger.info(f"Player selected '{tower_id}' for building.")
 
         elif action.startswith("purchase_upgrade_"):
-            # Example action: "purchase_upgrade_turret_a2"
             upgrade_id = action.replace("purchase_upgrade_", "")
             tower_id = game_state.selected_entity_id
-
-            # Extract the path ('a' or 'b') from the upgrade ID.
-            # e.g., "turret_a2" -> "_a"
             path_char = upgrade_id.split("_")[-1][0]
             path_id = f"path_{path_char}"
 
             if tower_id:
                 self.game_manager.purchase_tower_upgrade(tower_id, path_id)
 
-                # --- BUG FIX: Stale UI Panel ---
-                # After purchasing an upgrade, the underlying tower data has changed.
-                # We must explicitly tell the active upgrade panel to rebuild its
-                # layout to reflect these changes (e.g., show the next tier upgrade).
+                # This is the key line for BOTH bug fixes.
+                # It tells the panel to destroy its old buttons (including the one
+                # in the "processing" state) and create new ones with the
+                # updated tower data. This solves the stale UI and the
+                # button-mashing problem in one elegant step.
                 if self.upgrade_panel:
                     self.upgrade_panel._create_layout()
             else:
@@ -143,26 +131,20 @@ class UIManager:
         Updates all UI elements, including the dynamic creation and destruction
         of the upgrade panel based on the currently selected entity.
         """
-        # Update the static build buttons
         for button in self.build_buttons:
             button.update(dt, game_state)
 
-        # --- Dynamic Upgrade Panel Management ---
         selected_id = game_state.selected_entity_id
-
         if selected_id:
-            # An entity is selected. Check if it's the one we're displaying.
             if (
                 not self.upgrade_panel
                 or self.upgrade_panel.tower.entity_id != selected_id
             ):
-                # Find the selected tower object from the game's list of towers.
                 selected_tower = next(
                     (t for t in self.game_manager.towers if t.entity_id == selected_id),
                     None,
                 )
                 if selected_tower:
-                    # Create a new panel for this tower.
                     panel_rect = pygame.Rect(self.screen_rect.width - 270, 10, 260, 400)
                     self.upgrade_panel = UpgradePanel(
                         rect=panel_rect,
@@ -171,13 +153,11 @@ class UIManager:
                         game_state=game_state,
                     )
         else:
-            # No entity is selected, so ensure the panel is closed.
             if self.upgrade_panel:
                 self.upgrade_panel = None
 
     def draw(self, screen: pygame.Surface, game_state: "GameState"):
         """Draws all managed UI elements."""
-        # --- Draw Build Panel Background ---
         panel_rect = pygame.Rect(
             0, self.screen_rect.bottom - 80, self.screen_rect.width, 80
         )
@@ -185,11 +165,8 @@ class UIManager:
         panel_surf.fill((20, 25, 30, 200))
         screen.blit(panel_surf, panel_rect.topleft)
 
-        # Draw the build buttons
         for button in self.build_buttons:
             button.draw(screen, game_state)
 
-        # --- Draw Upgrade Panel ---
-        # If the upgrade panel exists, draw it on top of everything else.
         if self.upgrade_panel:
             self.upgrade_panel.draw(screen)

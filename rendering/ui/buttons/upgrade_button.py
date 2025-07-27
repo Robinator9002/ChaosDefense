@@ -18,9 +18,9 @@ class UpgradeButton(UIElement):
     """
     A specific UI element representing a clickable button for a tower upgrade.
 
-    This button displays the upgrade's name, cost, and description. It visually
-    changes based on whether the player can afford the upgrade and handles
-    click events to initiate a purchase.
+    This button now includes a 'processing' state to prevent misclicks when an
+    upgrade is purchased rapidly, providing immediate visual feedback and
+    absorbing subsequent inputs until the UI refreshes.
     """
 
     def __init__(self, rect: pygame.Rect, upgrade: "Upgrade", can_afford: bool):
@@ -31,12 +31,14 @@ class UpgradeButton(UIElement):
             rect (pygame.Rect): The rectangle for the button's position and size.
             upgrade (Upgrade): The Upgrade data object this button represents.
             can_afford (bool): Whether the player currently has enough gold for
-                               this upgrade. This is passed in to determine the
-                               initial visual state.
+                               this upgrade.
         """
         super().__init__(rect)
         self.upgrade = upgrade
         self.can_afford = can_afford
+
+        # NEW: State to track if a purchase is in progress.
+        self.is_processing = False
 
         # --- Font and Color Definitions ---
         self.font_name = pygame.font.SysFont("segoeui", 16, bold=True)
@@ -46,6 +48,7 @@ class UpgradeButton(UIElement):
         self.colors = {
             "bg_default": (40, 50, 60),
             "bg_hover": (60, 75, 90),
+            "bg_processing": (20, 25, 30),  # Color for the button while processing
             "border_default": (80, 90, 100),
             "border_hover": (150, 180, 200),
             "text_name": (230, 230, 240),
@@ -61,64 +64,56 @@ class UpgradeButton(UIElement):
         """
         Handles mouse clicks on the button.
 
-        If the button is clicked and the player can afford the upgrade, it
-        returns a unique action string to be processed by the UIManager.
-
-        Args:
-            event (pygame.event.Event): The Pygame event to process.
-            game_state (GameState): The current state of the game.
-
-        Returns:
-            An optional string representing the purchase action,
-            e.g., "purchase_upgrade_turret_a1".
+        If the button is clicked, it immediately enters a 'processing' state
+        to prevent further clicks until the UI is refreshed.
         """
+        # NEW: If the button is already processing a click, ignore all new events.
+        if self.is_processing:
+            return None
+
         action = super().handle_event(event, game_state)
         if action:
-            return action  # Base class might handle something in the future.
+            return action
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered and self.can_afford:
-                logger.info(f"Player clicked to purchase upgrade: {self.upgrade.id}")
-                # This action string is a command for the game logic.
+                logger.info(
+                    f"Player clicked to purchase upgrade: {self.upgrade.id}. Setting to processing state."
+                )
+                # NEW: Immediately set the state to processing.
+                self.is_processing = True
                 return f"purchase_upgrade_{self.upgrade.id}"
 
         return None
 
     def draw(self, screen: pygame.Surface, game_state: "GameState"):
         """
-        Draws the upgrade button with its text and dynamic colors.
-
-        Args:
-            screen (pygame.Surface): The surface to draw the button on.
-            game_state (GameState): The current game state, used to check affordability.
+        Draws the upgrade button with its text and dynamic colors, now
+        including a visual state for when a purchase is processing.
         """
-        # Continuously update affordability for visual feedback.
         self.can_afford = game_state.gold >= self.upgrade.cost
 
-        # --- Draw Background and Border ---
-        bg_color = (
-            self.colors["bg_hover"]
-            if self.is_hovered and self.can_afford
-            else self.colors["bg_default"]
-        )
-        border_color = (
-            self.colors["border_hover"]
-            if self.is_hovered and self.can_afford
-            else self.colors["border_default"]
-        )
+        # --- Draw Background and Border based on state ---
+        if self.is_processing:
+            bg_color = self.colors["bg_processing"]
+            border_color = self.colors["border_default"]
+        elif self.is_hovered and self.can_afford:
+            bg_color = self.colors["bg_hover"]
+            border_color = self.colors["border_hover"]
+        else:
+            bg_color = self.colors["bg_default"]
+            border_color = self.colors["border_default"]
+
         pygame.draw.rect(screen, bg_color, self.rect, border_radius=5)
         pygame.draw.rect(screen, border_color, self.rect, 2, border_radius=5)
 
         # --- Render and Blit Text ---
         padding = 8
-
-        # Upgrade Name
         name_surf = self.font_name.render(
             self.upgrade.name, True, self.colors["text_name"]
         )
         screen.blit(name_surf, (self.rect.x + padding, self.rect.y + padding))
 
-        # Upgrade Cost
         cost_color = (
             self.colors["cost_can_afford"]
             if self.can_afford
@@ -130,14 +125,13 @@ class UpgradeButton(UIElement):
         )
         screen.blit(cost_surf, cost_rect)
 
-        # Upgrade Description
         desc_surf = self.font_desc.render(
             self.upgrade.description, True, self.colors["text_desc"]
         )
         screen.blit(desc_surf, (self.rect.x + padding, self.rect.y + padding + 24))
 
-        # --- Draw Disabled Overlay ---
-        if not self.can_afford:
+        # --- Draw Disabled/Processing Overlay ---
+        if not self.can_afford or self.is_processing:
             overlay_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
             overlay_surf.fill(self.colors["disabled_overlay"])
             screen.blit(overlay_surf, self.rect.topleft)
