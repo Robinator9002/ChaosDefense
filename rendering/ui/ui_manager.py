@@ -126,6 +126,13 @@ class UIManager:
 
             if tower_id:
                 self.game_manager.purchase_tower_upgrade(tower_id, path_id)
+
+                # --- BUG FIX: Stale UI Panel ---
+                # After purchasing an upgrade, the underlying tower data has changed.
+                # We must explicitly tell the active upgrade panel to rebuild its
+                # layout to reflect these changes (e.g., show the next tier upgrade).
+                if self.upgrade_panel:
+                    self.upgrade_panel._create_layout()
             else:
                 logger.warning(
                     "Upgrade purchased but no tower was selected in GameState."
