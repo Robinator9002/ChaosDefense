@@ -1,7 +1,7 @@
 # game_logic/waves/wave_manager.py
 import random
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # Using absolute import path from the project's root source folder
 from game_logic.entities.enemy import Enemy
@@ -12,41 +12,43 @@ logger = logging.getLogger(__name__)
 class WaveManager:
     """
     Manages the logic of enemy waves, including timing, composition,
-    and difficulty scaling over the course of a game.
+    and the dynamic spawning of enemies over time.
 
-    This class is purely logical and does not handle rendering or direct
-    Pygame event handling.
+    This class has been refactored to handle staggered spawns. It now maintains
+    an internal queue of enemies for the current wave and manages cooldowns for
+    each enemy path (lane), ensuring a continuous but not instantaneous flow.
     """
 
     def __init__(
         self,
         difficulty_config: Dict[str, Any],
+        wave_scaling_config: Dict[str, Any],
         enemy_types: Dict[str, Any],
         player_difficulty: int,
         initial_level_difficulty: int,
+        num_paths: int,
     ):
         """
         Initializes the WaveManager.
-
-        Args:
-            difficulty_config (Dict[str, Any]): The loaded difficulty_scaling.json data.
-            enemy_types (Dict[str, Any]): The loaded enemy_types.json data.
-            player_difficulty (int): The difficulty level chosen by the player (e.g., 1-4).
-            initial_level_difficulty (int): The base difficulty of the map, determining initial enemy types.
         """
         self.difficulty_config = difficulty_config
+        self.wave_scaling_config = wave_scaling_config
         self.enemy_types = enemy_types
-        self.player_difficulty = str(player_difficulty)  # Use string for JSON keys
+        self.player_difficulty = str(player_difficulty)
         self.initial_level_difficulty = initial_level_difficulty
+        self.num_paths = num_paths
 
         # --- State Variables ---
         self.current_wave_number = 0
-        self.active_enemies: List[Enemy] = []
-        self.is_spawning_wave = False
+        self.active_enemies_on_map = 0
         self.time_until_next_wave = 5.0  # Initial delay before the first wave
         self.effective_level_difficulty = initial_level_difficulty
         self.game_over = False
         self.victory = False
+
+        # --- New Spawning System State ---
+        self._wave_spawn_queue: List[Dict[str, Any]] = []
+        self._lane_cooldowns: Dict[int, float] = {i: 0.0 for i in range(num_paths)}
 
         # --- Load Difficulty Settings ---
         self.settings = self.difficulty_config.get(
@@ -61,47 +63,67 @@ class WaveManager:
             f"Max waves: {self.max_waves}, Time between waves: {self.settings['time_between_waves']}s."
         )
 
-    def update(self, dt: float):
+    def update(self, dt: float, current_enemy_count: int) -> Optional[Dict[str, Any]]:
         """
-        Updates the wave manager's state, handling timers and wave progression.
+        Updates timers and determines if an enemy should be spawned.
 
         Args:
-            dt (float): The time elapsed since the last frame, in seconds.
+            dt (float): The time elapsed since the last frame.
+            current_enemy_count (int): The number of enemies currently on the map.
 
         Returns:
-            bool: True if a new wave should be spawned, False otherwise.
+            A dictionary defining the next enemy to spawn, or None if no enemy
+            is ready to be spawned.
         """
+        self.active_enemies_on_map = current_enemy_count
         if self.game_over or self.victory:
-            return False
+            return None
 
-        # If a wave is active (enemies are on screen), do nothing until it's cleared.
-        # This can be changed later to allow overlapping waves.
-        if self.active_enemies:
-            return False
+        # --- Inter-Wave Timer Logic ---
+        # If the spawn queue is empty and no enemies are on the map, we are between waves.
+        if not self._wave_spawn_queue and self.active_enemies_on_map == 0:
+            if self.current_wave_number >= self.max_waves:
+                self.victory = True
+                logger.info("VICTORY! All waves cleared.")
+                return None
 
-        # If the last wave was completed, check for victory.
-        if self.current_wave_number >= self.max_waves:
-            self.victory = True
-            logger.info("VICTORY! All waves cleared.")
-            return False
+            self.time_until_next_wave -= dt
+            if self.time_until_next_wave <= 0:
+                self._prepare_next_wave()
+            return None
 
-        self.time_until_next_wave -= dt
-        if self.time_until_next_wave <= 0:
-            self._prepare_next_wave()
-            return True  # Signal to the main game loop to spawn the wave.
+        # --- Intra-Wave Spawning Logic ---
+        # Decrement all lane cooldowns.
+        for i in range(self.num_paths):
+            self._lane_cooldowns[i] = max(0.0, self._lane_cooldowns[i] - dt)
 
-        return False
+        # If there are enemies waiting to be spawned, check if any can be spawned now.
+        if self._wave_spawn_queue:
+            for i, enemy_job in enumerate(self._wave_spawn_queue):
+                lane_index = enemy_job["path_index"]
+                if self._lane_cooldowns[lane_index] <= 0:
+                    # This lane is ready! Pop the job from the queue.
+                    spawn_data = self._wave_spawn_queue.pop(i)
+
+                    # Reset the cooldown for this lane.
+                    self._lane_cooldowns[lane_index] = self._calculate_spawn_cooldown()
+
+                    # Return the data so the main game loop can create the enemy.
+                    return spawn_data
+
+        return None
 
     def _prepare_next_wave(self):
         """
-        Sets up the state for the upcoming wave.
+        Calculates the composition of the next wave and populates the spawn queue.
+        This does NOT spawn enemies, it only prepares the list of what to spawn.
         """
         self.current_wave_number += 1
         logger.info(
             f"--- Preparing Wave {self.current_wave_number}/{self.max_waves} ---"
         )
 
-        # Check if it's time to increase the effective difficulty
+        # Update effective difficulty
         increase_interval = self.settings["level_difficulty_increase_interval"]
         if (
             self.current_wave_number - 1
@@ -111,73 +133,56 @@ class WaveManager:
                 f"Effective level difficulty increased to {self.effective_level_difficulty}"
             )
 
-        # Reset the timer for the next wave
+        # Reset the inter-wave timer
         self.time_until_next_wave = self.settings["time_between_waves"]
 
-    def generate_wave(self) -> List[Dict[str, Any]]:
-        """
-        Generates the composition of the current wave.
+        # --- Generate Wave Composition ---
+        # 1. Calculate total number of enemies for this wave
+        count_cfg = self.wave_scaling_config["enemy_count"]
+        total_enemies = (
+            count_cfg["base"]
+            + (self.current_wave_number * count_cfg["per_wave"])
+            + (self.effective_level_difficulty * count_cfg["per_level_difficulty"])
+        )
+        total_enemies = int(total_enemies)
 
-        Returns:
-            A list of dictionaries, where each dictionary defines an enemy to be spawned
-            (e.g., {'type': 'grunt', 'level': 3}).
-        """
-        wave_composition = []
-
-        # 1. Determine the pool of available enemies
+        # 2. Get pool of available enemies
         available_enemies = {
-            enemy_key: data
-            for enemy_key, data in self.enemy_types.items()
+            key: data
+            for key, data in self.enemy_types.items()
             if data["min_level_difficulty"] <= self.effective_level_difficulty
         }
         if not available_enemies:
-            logger.error(
-                f"No enemies available for effective difficulty {self.effective_level_difficulty}!"
-            )
-            return []
+            logger.error("No enemies available for current difficulty!")
+            return
 
-        # 2. Define a "budget" for the wave. This is a simple scaling formula.
-        wave_budget = (
-            10 + (self.current_wave_number * 5) + (self.current_wave_number**1.5)
+        # 3. Create the list of "spawn jobs"
+        for _ in range(total_enemies):
+            enemy_type = random.choice(list(available_enemies.keys()))
+            enemy_level = 1 + (
+                self.current_wave_number // 5
+            )  # Enemies get stronger in later waves
+            path_index = random.randint(0, self.num_paths - 1)
+
+            self._wave_spawn_queue.append(
+                {"type": enemy_type, "level": enemy_level, "path_index": path_index}
+            )
+
+        logger.info(
+            f"Wave {self.current_wave_number} prepared with {len(self._wave_spawn_queue)} enemies."
         )
 
-        # 3. "Spend" the budget on enemies from the available pool.
-        while wave_budget > 0:
-            enemy_key = random.choice(list(available_enemies.keys()))
-            enemy_data = available_enemies[enemy_key]
-
-            # The "cost" of an enemy can be its base bounty.
-            cost = enemy_data["base_stats"].get("bounty", 1)
-            if cost <= 0:
-                cost = 1  # Avoid infinite loops
-
-            if wave_budget - cost >= 0:
-                wave_budget -= cost
-                # The level of the enemy can also scale with the wave number
-                enemy_level = 1 + (self.current_wave_number // 4)
-                wave_composition.append({"type": enemy_key, "level": enemy_level})
-            else:
-                # Can't afford this enemy, break the loop.
-                break
-
-        logger.info(f"Generated wave with {len(wave_composition)} enemies.")
-        return wave_composition
-
-    def register_spawned_enemies(self, enemies: List[Enemy]):
+    def _calculate_spawn_cooldown(self) -> float:
         """
-        Registers a list of newly spawned enemies as active.
+        Calculates the time between individual enemy spawns on a single lane.
         """
-        self.active_enemies.extend(enemies)
-
-    def clear_dead_enemies(self):
-        """
-        Removes dead enemies from the active list.
-        This should be called each frame to keep the list clean.
-        """
-        # A list comprehension is an efficient way to create a new list
-        # containing only the living enemies.
-        initial_count = len(self.active_enemies)
-        self.active_enemies = [enemy for enemy in self.active_enemies if enemy.is_alive]
-        cleared_count = initial_count - len(self.active_enemies)
-        if cleared_count > 0:
-            logger.debug(f"Cleared {cleared_count} dead enemies.")
+        cooldown_cfg = self.wave_scaling_config["spawn_cooldown"]
+        cooldown = (
+            cooldown_cfg["base_seconds"]
+            - (self.current_wave_number * cooldown_cfg["reduction_per_wave"])
+            - (
+                self.effective_level_difficulty
+                * cooldown_cfg["reduction_per_level_difficulty"]
+            )
+        )
+        return max(cooldown_cfg["minimum_seconds"], cooldown)

@@ -34,12 +34,12 @@ class Game:
         level_styles: Dict,
         enemy_types: Dict,
         difficulty_scaling: Dict,
+        wave_scaling: Dict,
         assets_path: Path,
     ):
         """
         Initializes Pygame, the window, and all game subsystems.
-
-        This constructor is now the central point for receiving all game configurations.
+        This constructor now accepts all five configuration files.
         """
         pygame.init()
         pygame.font.init()
@@ -49,6 +49,7 @@ class Game:
         self.level_styles = level_styles
         self.enemy_types = enemy_types
         self.difficulty_scaling = difficulty_scaling
+        self.wave_scaling = wave_scaling  # Store the new config
         self.assets_path = assets_path
 
         # --- Window Setup ---
@@ -68,7 +69,7 @@ class Game:
         self.game_state: GameState | None = None
         self.wave_manager: WaveManager | None = None
         self.grid: Grid | None = None
-        self.paths: list | None = None
+        self.paths: list = []
         self.sprite_renderer: SpriteRenderer | None = None
         self.active_enemies: list[Enemy] = []
 
@@ -96,7 +97,7 @@ class Game:
 
         # --- Level Loading ---
         try:
-            preset_to_load = "Forest"  # This could be chosen from a menu later
+            preset_to_load = "Forest"
             self.grid, self.paths, style_config = (
                 self.level_manager.build_level_from_preset(preset_to_load)
             )
@@ -112,16 +113,17 @@ class Game:
         self.difficulty_settings = self.difficulty_scaling.get(
             str(player_difficulty), self.difficulty_scaling["1"]
         )
-
         level_difficulty = style_config.get("generation_params", {}).get(
             "level_difficulty", 1
         )
 
         self.wave_manager = WaveManager(
             difficulty_config=self.difficulty_scaling,
+            wave_scaling_config=self.wave_scaling,  # Pass the new config
             enemy_types=self.enemy_types,
             player_difficulty=player_difficulty,
             initial_level_difficulty=level_difficulty,
+            num_paths=len(self.paths),  # Pass the number of lanes
         )
 
         # --- Rendering Setup ---
@@ -161,7 +163,7 @@ class Game:
                 self._calculate_min_zoom()
                 self._clamp_camera_offset()
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 2 or event.button == 3:  # Middle or Right-click
+                if event.button == 2 or event.button == 3:
                     self.is_panning = True
                     self.pan_start_mouse_pos = pygame.Vector2(event.pos)
                     self.pan_start_camera_offset = self.camera_offset.copy()
@@ -181,43 +183,15 @@ class Game:
                     self._clamp_camera_offset()
 
     def _update(self, dt: float):
-        """Updates all game logic, including wave spawning and entity updates."""
+        """Updates all game logic, including staggered wave spawning."""
         if self.game_state.game_over:
             return
 
-        # --- Wave Spawning Logic ---
-        if self.wave_manager.update(dt):
-            # The WaveManager signals that it's time to spawn a new wave.
-            wave_data = self.wave_manager.generate_wave()
-            newly_spawned = []
-            stat_modifier = self.difficulty_settings.get("stat_modifier", 1.0)
-
-            for enemy_info in wave_data:
-                enemy_type = enemy_info["type"]
-                enemy_level = enemy_info["level"]
-
-                if enemy_type not in self.enemy_types:
-                    logger.error(f"Unknown enemy type '{enemy_type}' in wave data.")
-                    continue
-
-                if not self.paths:
-                    logger.error("No paths available for enemy spawning.")
-                    continue
-                chosen_path = random.choice(self.paths)
-
-                # Create the enemy instance with all required parameters.
-                enemy = Enemy(
-                    enemy_type_data=self.enemy_types[enemy_type],
-                    level=enemy_level,
-                    path=chosen_path,
-                    tile_size=self.tile_size,
-                    difficulty_modifier=stat_modifier,
-                )
-                self.active_enemies.append(enemy)
-                newly_spawned.append(enemy)
-
-            # Inform the wave manager about the newly created enemies.
-            self.wave_manager.register_spawned_enemies(newly_spawned)
+        # --- Staggered Wave Spawning ---
+        # The WaveManager now tells us exactly when and what to spawn.
+        spawn_job = self.wave_manager.update(dt, len(self.active_enemies))
+        if spawn_job:
+            self._spawn_enemy(spawn_job)
 
         # --- Update all active enemies ---
         for enemy in self.active_enemies:
@@ -229,25 +203,46 @@ class Game:
             self.active_enemies = [e for e in self.active_enemies if e.is_alive]
             for dead_enemy in dead_enemies:
                 self.game_state.add_gold(dead_enemy.bounty)
-            # Update the wave manager's internal list to reflect the cleared enemies.
-            self.wave_manager.active_enemies = self.active_enemies
 
         # Update game state with the current wave number for the GUI.
         self.game_state.current_wave_number = self.wave_manager.current_wave_number
+
+    def _spawn_enemy(self, spawn_job: Dict[str, Any]):
+        """Creates a single enemy based on a spawn job from the WaveManager."""
+        enemy_type = spawn_job["type"]
+        enemy_level = spawn_job["level"]
+        path_index = spawn_job["path_index"]
+
+        if enemy_type not in self.enemy_types:
+            logger.error(f"Unknown enemy type '{enemy_type}' in wave data.")
+            return
+
+        if not (0 <= path_index < len(self.paths)):
+            logger.error(f"Invalid path index {path_index} for spawning.")
+            return
+
+        chosen_path = self.paths[path_index]
+        stat_modifier = self.difficulty_settings.get("stat_modifier", 1.0)
+
+        enemy = Enemy(
+            enemy_type_data=self.enemy_types[enemy_type],
+            level=enemy_level,
+            path=chosen_path,
+            tile_size=self.tile_size,
+            difficulty_modifier=stat_modifier,
+        )
+        self.active_enemies.append(enemy)
 
     def _draw(self):
         """Draws everything to the screen in the correct order."""
         self.screen.fill(self.background_color)
 
-        # Draw the static map first.
         if self.sprite_renderer:
             self.sprite_renderer.draw(self.screen, self.camera_offset, self.zoom)
 
-        # Draw all active enemies on top of the map.
         for enemy in self.active_enemies:
             enemy.draw(self.screen, self.camera_offset, self.zoom)
 
-        # Draw the GUI on top of everything else.
         self._draw_gui()
         pygame.display.flip()
 
