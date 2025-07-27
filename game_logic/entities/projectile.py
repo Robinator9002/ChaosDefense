@@ -1,7 +1,7 @@
 # game_logic/entities/projectile.py
 import pygame
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from .entity import Entity
 
@@ -9,6 +9,7 @@ from .entity import Entity
 if TYPE_CHECKING:
     from .enemy import Enemy
     from game_logic.game_state import GameState
+    from game_logic.effects.status_effect import StatusEffect
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +17,17 @@ logger = logging.getLogger(__name__)
 class Projectile(Entity):
     """
     Represents a projectile fired from a tower towards a specific enemy.
-
-    This entity moves towards its target each frame and deals damage upon impact.
+    It can carry a status effect to apply on impact.
     """
 
-    def __init__(self, x: float, y: float, damage: int, target: "Enemy"):
+    def __init__(
+        self,
+        x: float,
+        y: float,
+        damage: int,
+        target: "Enemy",
+        effect: Optional["StatusEffect"] = None,
+    ):
         """
         Initializes a new Projectile.
 
@@ -29,21 +36,25 @@ class Projectile(Entity):
             y (float): The starting y-coordinate (usually the tower's center).
             damage (int): The amount of damage the projectile deals on impact.
             target (Enemy): The enemy entity that the projectile will track.
+            effect (Optional[StatusEffect]): The status effect instance to apply on impact.
         """
         # --- Projectile Properties ---
         self.damage = damage
         self.target = target
-        self.speed = 300  # pixels per second, can be configured later
+        self.speed = 300
+        self.effect_to_apply = effect  # Store the effect object
 
         # --- Create Sprite ---
-        # For now, a simple circle sprite.
         projectile_sprite = pygame.Surface((8, 8), pygame.SRCALPHA)
-        pygame.draw.circle(projectile_sprite, (255, 255, 0), (4, 4), 4)  # Yellow circle
+        # Change color if it has an effect (e.g., light blue for slow)
+        color = (
+            (173, 216, 230)
+            if self.effect_to_apply and self.effect_to_apply.effect_id == "slow"
+            else (255, 255, 0)
+        )
+        pygame.draw.circle(projectile_sprite, color, (4, 4), 4)
 
-        # --- Initialize Parent Entity ---
-        # Projectiles have no health; they are destroyed on impact.
         super().__init__(x, y, max_hp=1, sprite=projectile_sprite)
-
         logger.debug(
             f"Projectile {self.entity_id} created, targeting {target.entity_id}."
         )
@@ -51,43 +62,38 @@ class Projectile(Entity):
     def update(self, dt: float, game_state: "GameState"):
         """
         Updates the projectile's position by moving it towards its target.
-
-        Args:
-            dt (float): The time elapsed since the last frame.
-            game_state (GameState): The current state of the game.
         """
         if not self.is_alive or not self.target.is_alive:
-            # If the projectile or its target is no longer valid, kill the projectile.
             self.kill()
             return
 
-        # --- Homing Logic ---
         direction = self.target.pos - self.pos
         distance_to_target = direction.length()
 
-        # 1. Check for collision.
-        # If the distance we will travel this frame is greater than the distance
-        # to the target, we consider it a hit.
         if distance_to_target < self.speed * dt:
             self._on_impact()
             return
 
-        # 2. Move towards the target.
         self.pos += direction.normalize() * self.speed * dt
-
-        # Ensure the entity's rect is updated for drawing.
         super().update(dt, game_state)
 
     def _on_impact(self):
         """
         Handles the logic for when the projectile hits its target.
+        It deals damage and applies any status effect it carries.
         """
         if not self.target.is_alive:
-            return  # Avoids dealing damage to an already dead target
+            self.kill()
+            return
 
-        logger.debug(
-            f"Projectile {self.entity_id} hit target {self.target.entity_id}, "
-            f"dealing {self.damage} damage."
-        )
+        # 1. Deal damage
         self.target.take_damage(self.damage)
-        self.kill()  # The projectile is consumed on impact.
+
+        # 2. Apply the status effect, if any
+        if self.effect_to_apply:
+            self.target.apply_status_effect(self.effect_to_apply)
+            logger.debug(
+                f"Projectile applied '{self.effect_to_apply.effect_id}' to {self.target.entity_id}."
+            )
+
+        self.kill()

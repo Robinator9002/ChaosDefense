@@ -9,7 +9,7 @@ from .level_generation.grid import Grid
 from .waves.wave_manager import WaveManager
 from .entities.enemy import Enemy
 from .entities.tower import Tower
-from .entities.projectile import Projectile  # Import the Projectile class
+from .entities.projectile import Projectile
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +17,6 @@ logger = logging.getLogger(__name__)
 class GameManager:
     """
     The central "headless" engine for the game.
-
-    This class manages the entire game simulation, including the game state,
-    level, entities (enemies, towers, and projectiles), and wave progression.
     """
 
     def __init__(self, all_configs: Dict[str, Any]):
@@ -36,10 +33,9 @@ class GameManager:
         self.grid: Optional[Grid] = None
         self.paths: List[List[Tuple[int, int]]] = []
 
-        # --- Entity Management ---
         self.enemies: List[Enemy] = []
         self.towers: List[Tower] = []
-        self.projectiles: List[Projectile] = []  # Add a list for projectiles
+        self.projectiles: List[Projectile] = []
 
         self._setup_new_game()
 
@@ -77,14 +73,12 @@ class GameManager:
         if self.game_state.game_over:
             return
 
-        # 1. Update Wave Manager for enemy spawning.
         if self.wave_manager:
             spawn_job = self.wave_manager.update(dt, len(self.enemies))
             if spawn_job:
                 self._spawn_enemy(spawn_job)
             self.game_state.current_wave_number = self.wave_manager.current_wave_number
 
-        # 2. Update towers and collect any new projectiles.
         newly_fired_projectiles: List[Projectile] = []
         for tower in self.towers:
             projectile = tower.update(dt, self.game_state, self.enemies)
@@ -92,27 +86,22 @@ class GameManager:
                 newly_fired_projectiles.append(projectile)
         self.projectiles.extend(newly_fired_projectiles)
 
-        # 3. Update all active enemies.
         for enemy in self.enemies:
             enemy.update(dt, self.game_state)
 
-        # 4. Update all active projectiles.
         for projectile in self.projectiles:
             projectile.update(dt, self.game_state)
 
-        # 5. Clean up all dead entities.
         self._cleanup_dead_entities()
 
     def _cleanup_dead_entities(self):
         """Removes all entities that are no longer alive from the game."""
-        # Clean up enemies and award gold
         dead_enemies = [e for e in self.enemies if not e.is_alive]
         if dead_enemies:
             self.enemies = [e for e in self.enemies if e.is_alive]
             for dead_enemy in dead_enemies:
                 self.game_state.add_gold(dead_enemy.bounty)
 
-        # Clean up projectiles that have hit their target
         self.projectiles = [p for p in self.projectiles if p.is_alive]
 
     def _spawn_enemy(self, spawn_job: Dict[str, Any]):
@@ -165,8 +154,14 @@ class GameManager:
 
         pos_x = tile_x * self.tile_size + self.tile_size / 2
         pos_y = tile_y * self.tile_size + self.tile_size / 2
+
+        # --- MODIFIED: Pass the status effects config to the Tower constructor ---
         new_tower = Tower(
-            x=pos_x, y=pos_y, tile_size=self.tile_size, tower_type_data=tower_data
+            x=pos_x,
+            y=pos_y,
+            tile_size=self.tile_size,
+            tower_type_data=tower_data,
+            status_effects_config=self.configs.get("status_effects", {}),
         )
         self.towers.append(new_tower)
         self.grid.set_tile_type(tile_x, tile_y, "TOWER_OCCUPIED")

@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 from typing import Dict
 
-# The Game class will be refactored, but the import path remains.
 from rendering.game_window import Game
 
 # --- Constants ---
@@ -39,7 +38,6 @@ def main():
     """Main function to set up and run the game."""
     logger.info("--- Loading All Game Configurations ---")
     try:
-        # We now load all configuration files into a single dictionary.
         all_configs: Dict[str, Dict] = {
             "game_settings": load_config(CONFIG_PATH / "gameplay/game_settings.json"),
             "level_styles": load_config(CONFIG_PATH / "levels/level_styles.json"),
@@ -52,6 +50,8 @@ def main():
                 CONFIG_PATH / "scaling/difficulty_scaling.json"
             ),
             "wave_scaling": load_config(CONFIG_PATH / "scaling/wave_scaling.json"),
+            # --- ADDED: Load the new status effects configuration ---
+            "status_effects": load_config(CONFIG_PATH / "gameplay/status_effects.json"),
         }
     except (FileNotFoundError, json.JSONDecodeError):
         logger.critical(
@@ -61,7 +61,6 @@ def main():
 
     logger.info("--- Initializing Game ---")
     try:
-        # The Game class will be updated to accept this new structure.
         game = Game(
             all_configs=all_configs,
             assets_path=ASSETS_PATH,
