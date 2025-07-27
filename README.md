@@ -1,6 +1,6 @@
 ChaosDefense
 
-A minimalist yet engaging Tower Defense game built with Python and the Arcade library. The core innovation is an adaptive enemy AI that learns from player strategies and procedurally generated levels with distinct environmental styles.
+A minimalist yet engaging Tower Defense game built with Python and the Pygame library. The core innovation is an adaptive enemy AI that learns from player strategies and procedurally generated levels with distinct environmental styles.
 Core Concept
 
 "ChaosDefense" is a single-player Tower Defense game where players build defenses to protect their base from waves of enemies. The key differentiator is the enemy AI, which dynamically adjusts its pathfinding and wave composition based on the player's defensive setup and the outcomes of previous waves within the current game session.
@@ -14,4 +14,4 @@ Key Features
 
     Minimalist Aesthetics: Focus on clean, functional, and clear geometric visuals over high-fidelity art.
 
-    Clean Architecture: A strict separation between game logic (headless) and rendering (Arcade).
+    Clean Architecture: A strict separation between game logic (headless) and rendering (Pygame).
