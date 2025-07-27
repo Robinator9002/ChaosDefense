@@ -1,5 +1,6 @@
 # game_logic/game_manager.py
 import logging
+import uuid
 from typing import Dict, List, Any, Tuple, Optional
 
 # --- Core Game Logic Imports ---
@@ -10,13 +11,16 @@ from .waves.wave_manager import WaveManager
 from .entities.enemy import Enemy
 from .entities.tower import Tower
 from .entities.projectile import Projectile
+from .upgrades.upgrade_manager import UpgradeManager  # NEW: Import UpgradeManager
 
 logger = logging.getLogger(__name__)
 
 
 class GameManager:
     """
-    The central "headless" engine for the game.
+    The central "headless" engine for the game. It orchestrates all game
+    logic, including entity updates, wave spawning, and now, handling all
+    tower placement and upgrade requests.
     """
 
     def __init__(self, all_configs: Dict[str, Any]):
@@ -27,12 +31,18 @@ class GameManager:
         self.configs = all_configs
         self.tile_size = self.configs["game_settings"].get("tile_size", 32)
 
+        # --- Initialize Core Systems ---
         self.game_state: GameState = GameState()
         self.level_manager: LevelManager = LevelManager(self.configs["level_styles"])
+        # NEW: Initialize the UpgradeManager with its definitions
+        self.upgrade_manager: UpgradeManager = UpgradeManager(
+            self.configs.get("upgrade_definitions", {})
+        )
         self.wave_manager: Optional[WaveManager] = None
         self.grid: Optional[Grid] = None
         self.paths: List[List[Tuple[int, int]]] = []
 
+        # --- Entity Lists ---
         self.enemies: List[Enemy] = []
         self.towers: List[Tower] = []
         self.projectiles: List[Projectile] = []
@@ -44,6 +54,7 @@ class GameManager:
         logger.info("--- Setting up new game via Game Manager ---")
         self.game_state = GameState(gold=150, base_hp=20)
         try:
+            # In a full game, this might be selectable from a menu.
             preset_to_load = "Forest"
             self.grid, self.paths, style_config = (
                 self.level_manager.build_level_from_preset(preset_to_load)
@@ -73,24 +84,30 @@ class GameManager:
         if self.game_state.game_over:
             return
 
+        # Update wave manager and spawn enemies if necessary.
         if self.wave_manager:
             spawn_job = self.wave_manager.update(dt, len(self.enemies))
             if spawn_job:
                 self._spawn_enemy(spawn_job)
             self.game_state.current_wave_number = self.wave_manager.current_wave_number
 
+        # Update towers and collect any newly fired projectiles.
         newly_fired_projectiles: List[Projectile] = []
         for tower in self.towers:
-            projectile = tower.update(dt, self.game_state, self.enemies)
-            if projectile:
-                newly_fired_projectiles.append(projectile)
+            # MODIFIED: Tower update now returns a list of projectiles.
+            projectiles = tower.update(dt, self.game_state, self.enemies)
+            if projectiles:
+                newly_fired_projectiles.extend(projectiles)
         self.projectiles.extend(newly_fired_projectiles)
 
+        # Update all active enemies.
         for enemy in self.enemies:
             enemy.update(dt, self.game_state)
 
+        # Update all active projectiles.
         for projectile in self.projectiles:
-            projectile.update(dt, self.game_state)
+            # MODIFIED: Projectile update now needs the list of all enemies for piercing/splash.
+            projectile.update(dt, self.game_state, self.enemies)
 
         self._cleanup_dead_entities()
 
@@ -98,9 +115,11 @@ class GameManager:
         """Removes all entities that are no longer alive from the game."""
         dead_enemies = [e for e in self.enemies if not e.is_alive]
         if dead_enemies:
-            self.enemies = [e for e in self.enemies if e.is_alive]
+            # Grant gold for each defeated enemy.
             for dead_enemy in dead_enemies:
                 self.game_state.add_gold(dead_enemy.bounty)
+            # Rebuild the list of enemies, excluding the dead ones.
+            self.enemies = [e for e in self.enemies if e.is_alive]
 
         self.projectiles = [p for p in self.projectiles if p.is_alive]
 
@@ -131,7 +150,7 @@ class GameManager:
         self.enemies.append(enemy)
 
     def place_tower(self, tower_type_id: str, tile_x: int, tile_y: int):
-        """Attempts to place a tower on the grid."""
+        """Handles the logic for a player attempting to place a new tower."""
         tower_types_config = self.configs["tower_types"]
         if tower_type_id not in tower_types_config:
             logger.warning(f"Attempted to place unknown tower type: {tower_type_id}")
@@ -155,11 +174,11 @@ class GameManager:
         pos_x = tile_x * self.tile_size + self.tile_size / 2
         pos_y = tile_y * self.tile_size + self.tile_size / 2
 
-        # --- MODIFIED: Pass the status effects config to the Tower constructor ---
         new_tower = Tower(
             x=pos_x,
             y=pos_y,
             tile_size=self.tile_size,
+            tower_type_id=tower_type_id,  # MODIFIED: Pass the string ID
             tower_type_data=tower_data,
             status_effects_config=self.configs.get("status_effects", {}),
         )
@@ -167,4 +186,42 @@ class GameManager:
         self.grid.set_tile_type(tile_x, tile_y, "TOWER_OCCUPIED")
         logger.info(
             f"Successfully placed '{tower_type_id}' at grid ({tile_x}, {tile_y})."
+        )
+
+    def purchase_tower_upgrade(self, tower_id: uuid.UUID, path_id: str):
+        """
+        Handles a request from the UI to purchase an upgrade for a specific tower.
+        """
+        # 1. Find the tower instance by its unique ID.
+        target_tower = next((t for t in self.towers if t.entity_id == tower_id), None)
+        if not target_tower:
+            logger.warning(f"Upgrade requested for non-existent tower ID: {tower_id}")
+            return
+
+        # 2. Get the next available upgrade object for the specified path.
+        upgrade = self.upgrade_manager.get_next_upgrade(target_tower, path_id)
+        if not upgrade:
+            logger.info(
+                f"No more upgrades available for tower {tower_id} on path '{path_id}'."
+            )
+            return
+
+        # 3. Check affordability and spend gold.
+        if not self.game_state.spend_gold(upgrade.cost):
+            logger.info(
+                f"Not enough gold for upgrade '{upgrade.id}'. Cost: {upgrade.cost}, Have: {self.game_state.gold}"
+            )
+            return
+
+        # 4. Apply the upgrade's effects to the tower.
+        self.upgrade_manager.apply_upgrade(target_tower, upgrade)
+
+        # 5. Increment the tower's tier for that path to track progress.
+        if path_id == "path_a":
+            target_tower.path_a_tier += 1
+        elif path_id == "path_b":
+            target_tower.path_b_tier += 1
+
+        logger.info(
+            f"Successfully purchased upgrade '{upgrade.id}' for tower {tower_id}."
         )
