@@ -1,0 +1,3 @@
+This placeholder is only for GitHub to recognize this Folder,
+so the Structure is full. This will be removed the moment
+the saving System is fully implemented!

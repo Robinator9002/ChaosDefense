@@ -38,13 +38,14 @@ def load_config(filename: str) -> dict:
 
 def main():
     """Main function to set up and run the game."""
-    logger.info("--- Loading Game Configurations ---")
+    logger.info("--- Loading All Game Configurations ---")
     try:
-        # Load all four essential configuration files.
+        # Load all five essential configuration files.
         game_settings = load_config("game_settings.json")
         level_styles = load_config("level_styles.json")
         enemy_types = load_config("enemy_types.json")
         difficulty_scaling = load_config("difficulty_scaling.json")
+        wave_scaling = load_config("wave_scaling.json")  # The newly added config
     except (FileNotFoundError, json.JSONDecodeError):
         logger.critical(
             "A required configuration file was missing or corrupt. Cannot start."
@@ -60,6 +61,7 @@ def main():
             level_styles=level_styles,
             enemy_types=enemy_types,
             difficulty_scaling=difficulty_scaling,
+            wave_scaling=wave_scaling,
             assets_path=ASSETS_PATH,
         )
         game.run()
