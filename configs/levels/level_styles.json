@@ -6,7 +6,7 @@
       "grid_height": 50,
       "num_paths": 3,
       "difficulty": 1,
-      "starting_gold": 150,
+      "starting_gold": 150000,
       "base_hp": 20,
       "features": {
         "mountains": { "min": 3, "max": 5 },

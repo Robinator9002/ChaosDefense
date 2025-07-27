@@ -55,6 +55,14 @@ class UpgradeButton(UIElement):
             "disabled_overlay": (0, 0, 0, 100),  # Semi-transparent black
         }
 
+        # --- BUG FIX: Proactive Hover Check ---
+        # Immediately check if the mouse is already over this button the moment
+        # it's created. This solves the race condition where a button appears
+        # under a static cursor and doesn't register as 'hovered' until the
+        # mouse moves, causing spam-clicks to fail.
+        if self.rect.collidepoint(pygame.mouse.get_pos()):
+            self.is_hovered = True
+
     def handle_event(
         self, event: pygame.event.Event, game_state: "GameState"
     ) -> Optional[str]:
@@ -63,23 +71,14 @@ class UpgradeButton(UIElement):
 
         If the button is clicked and the player can afford the upgrade, it
         returns a unique action string to be processed by the UIManager.
-
-        Args:
-            event (pygame.event.Event): The Pygame event to process.
-            game_state (GameState): The current state of the game.
-
-        Returns:
-            An optional string representing the purchase action,
-            e.g., "purchase_upgrade_turret_a1".
         """
-        action = super().handle_event(event, game_state)
-        if action:
-            return action  # Base class might handle something in the future.
+        # The base class handle_event updates the hover state on MOUSEMOTION.
+        # We must call it to ensure the button de-hovers when the mouse moves away.
+        super().handle_event(event, game_state)
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered and self.can_afford:
                 logger.info(f"Player clicked to purchase upgrade: {self.upgrade.id}")
-                # This action string is a command for the game logic.
                 return f"purchase_upgrade_{self.upgrade.id}"
 
         return None
@@ -87,12 +86,7 @@ class UpgradeButton(UIElement):
     def draw(self, screen: pygame.Surface, game_state: "GameState"):
         """
         Draws the upgrade button with its text and dynamic colors.
-
-        Args:
-            screen (pygame.Surface): The surface to draw the button on.
-            game_state (GameState): The current game state, used to check affordability.
         """
-        # Continuously update affordability for visual feedback.
         self.can_afford = game_state.gold >= self.upgrade.cost
 
         # --- Draw Background and Border ---
@@ -111,14 +105,11 @@ class UpgradeButton(UIElement):
 
         # --- Render and Blit Text ---
         padding = 8
-
-        # Upgrade Name
         name_surf = self.font_name.render(
             self.upgrade.name, True, self.colors["text_name"]
         )
         screen.blit(name_surf, (self.rect.x + padding, self.rect.y + padding))
 
-        # Upgrade Cost
         cost_color = (
             self.colors["cost_can_afford"]
             if self.can_afford
@@ -130,7 +121,6 @@ class UpgradeButton(UIElement):
         )
         screen.blit(cost_surf, cost_rect)
 
-        # Upgrade Description
         desc_surf = self.font_desc.render(
             self.upgrade.description, True, self.colors["text_desc"]
         )

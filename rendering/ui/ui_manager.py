@@ -127,10 +127,9 @@ class UIManager:
             if tower_id:
                 self.game_manager.purchase_tower_upgrade(tower_id, path_id)
 
-                # --- BUG FIX: Stale UI Panel ---
-                # After purchasing an upgrade, the underlying tower data has changed.
-                # We must explicitly tell the active upgrade panel to rebuild its
-                # layout to reflect these changes (e.g., show the next tier upgrade).
+                # This line remains the key: it destroys the old panel and its
+                # buttons, and creates a new one. Our new UpgradeButton will
+                # then proactively check the mouse position.
                 if self.upgrade_panel:
                     self.upgrade_panel._create_layout()
             else:
