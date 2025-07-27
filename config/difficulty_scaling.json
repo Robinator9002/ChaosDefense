@@ -1,24 +1,28 @@
 {
   "1": {
     "name": "Easy",
+    "stat_modifier": 1.0,
     "time_between_waves": 20.0,
     "max_waves": 20,
     "level_difficulty_increase_interval": 5
   },
   "2": {
     "name": "Normal",
+    "stat_modifier": 1.5,
     "time_between_waves": 10.0,
     "max_waves": 25,
     "level_difficulty_increase_interval": 5
   },
   "3": {
     "name": "Hard",
+    "stat_modifier": 2.25,
     "time_between_waves": 5.0,
     "max_waves": 30,
     "level_difficulty_increase_interval": 4
   },
   "4": {
     "name": "Chaos",
+    "stat_modifier": 3.5,
     "time_between_waves": 0.0,
     "max_waves": 40,
     "level_difficulty_increase_interval": 3

@@ -40,19 +40,26 @@ def main():
     """Main function to set up and run the game."""
     logger.info("--- Loading Game Configurations ---")
     try:
+        # Load all four essential configuration files.
         game_settings = load_config("game_settings.json")
         level_styles = load_config("level_styles.json")
+        enemy_types = load_config("enemy_types.json")
+        difficulty_scaling = load_config("difficulty_scaling.json")
     except (FileNotFoundError, json.JSONDecodeError):
         logger.critical(
             "A required configuration file was missing or corrupt. Cannot start."
         )
-        return  # Exit the program if essential configs fail
+        return
 
     logger.info("--- Initializing Game ---")
     try:
+        # Pass all loaded configurations to the Game constructor.
+        # The Game class will need to be updated to accept these new arguments.
         game = Game(
             game_settings=game_settings,
             level_styles=level_styles,
+            enemy_types=enemy_types,
+            difficulty_scaling=difficulty_scaling,
             assets_path=ASSETS_PATH,
         )
         game.run()

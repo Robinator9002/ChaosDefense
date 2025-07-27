@@ -1,6 +1,6 @@
-# game_logic/level_manager.py
+# game_logic/levels/level_manager.py
 import logging
-from pathlib import Path
+from typing import List, Tuple, Dict
 
 # Project-specific imports
 from game_logic.level_generation.grid import Grid
@@ -39,16 +39,23 @@ class LevelManager:
         """
         return list(self.level_styles.keys())
 
-    def build_level_from_preset(self, preset_name: str) -> tuple[Grid, dict]:
+    def build_level_from_preset(
+        self, preset_name: str
+    ) -> Tuple[Grid, List[List[Tuple[int, int]]], Dict]:
         """
         Constructs a new Grid object based on a named preset.
+
+        This method now also returns the paths generated for the level, which is
+        essential for enemy movement.
 
         Args:
             preset_name (str): The key of the preset to use (e.g., "Forest").
 
         Returns:
-            tuple[Grid, dict]: A tuple containing the newly generated Grid
-                               and the full style definition dictionary for that preset.
+            A tuple containing:
+            - The newly generated Grid object.
+            - A list of the generated enemy paths.
+            - The full style definition dictionary for that preset.
 
         Raises:
             KeyError: If the preset_name does not exist in the loaded styles.
@@ -72,10 +79,8 @@ class LevelManager:
         # 1. Create a new Grid instance with the specified dimensions.
         grid = Grid(width=grid_width, height=grid_height)
 
-        # 2. Use the LevelGenerator as a tool to populate the grid.
-        #    We pass the specific generation parameters for this preset.
-        LevelGenerator.generate(grid, gen_params)
+        # 2. Use the LevelGenerator. It now returns the grid AND the paths.
+        grid, paths = LevelGenerator.generate(grid, gen_params)
 
-        # 3. Return the populated grid and the complete style configuration,
-        #    which the game will need for rendering (background color, tile sprites).
-        return grid, style_config
+        # 3. Return the populated grid, the generated paths, and the style config.
+        return grid, paths, style_config

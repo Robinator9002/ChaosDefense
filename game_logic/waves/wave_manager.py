@@ -1,9 +1,9 @@
-# game_logic/wave_manager.py
+# game_logic/waves/wave_manager.py
 import random
 import logging
 from typing import List, Dict, Any
 
-# We will need the Enemy class to instantiate them, but no Pygame is needed here.
+# Using absolute import path from the project's root source folder
 from game_logic.entities.enemy import Enemy
 
 logger = logging.getLogger(__name__)
