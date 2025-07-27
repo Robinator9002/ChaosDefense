@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 # --- Game Logic Imports ---
-# The rendering layer now only needs to know about the main manager.
 from game_logic.game_manager import GameManager
 
 # --- Rendering Imports ---
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # --- Control Constants ---
 MAX_ZOOM = 3.0
-MIN_ZOOM_CLAMP = 0.1  # A hard minimum to prevent zooming out to infinity
+MIN_ZOOM_CLAMP = 0.1
 ZOOM_INCREMENT = 0.07
 
 
@@ -24,9 +23,8 @@ class Game:
     The main window and rendering engine for the game.
 
     This class is responsible for creating the display window, handling all
-    user input (mouse, keyboard), and drawing the current game state to the
-    screen. It owns the 'GameManager' which runs the actual game simulation,
-    acting as a "dumb" client that translates inputs and renders outputs.
+    user input, and drawing the current game state to the screen. It owns
+    the 'GameManager' which runs the actual game simulation.
     """
 
     def __init__(self, all_configs: Dict[str, Any], assets_path: Path):
@@ -39,7 +37,6 @@ class Game:
         self.game_settings = all_configs["game_settings"]
         self.assets_path = assets_path
 
-        # --- Window Setup ---
         self.screen_width = self.game_settings.get("screen_width", 1280)
         self.screen_height = self.game_settings.get("screen_height", 720)
         self.screen = pygame.display.set_mode(
@@ -51,17 +48,13 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
 
-        # --- Core Game Logic Engine ---
-        # The Game class now creates and owns the GameManager.
         self.game_manager = GameManager(all_configs)
 
-        # --- Rendering Components ---
         self.sprite_renderer: Optional[SpriteRenderer] = None
         self.background_color = (0, 0, 0)
         self.gui_font = pygame.font.SysFont("segoeui", 22, bold=True)
         self.tile_size = self.game_settings.get("tile_size", 32)
 
-        # --- Camera & Input State ---
         self.zoom = 1.0
         self.min_zoom = MIN_ZOOM_CLAMP
         self.camera_offset = pygame.Vector2(0, 0)
@@ -83,7 +76,6 @@ class Game:
             self.running = False
             return
 
-        # Find the style config from the loaded level
         style_config = {}
         for style in self.game_manager.level_manager.level_styles.values():
             if style.get("generation_params", {}).get("grid_width") == grid.width:
@@ -126,12 +118,10 @@ class Game:
                 )
                 self._calculate_min_zoom()
                 self._clamp_camera_offset()
-
-            # --- Mouse Input for Camera and Gameplay ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 self._handle_mouse_down(event)
             elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 2 or event.button == 3:  # Middle or Right Mouse Up
+                if event.button == 2 or event.button == 3:
                     self.is_panning = False
             elif event.type == pygame.MOUSEMOTION:
                 if self.is_panning:
@@ -141,52 +131,46 @@ class Game:
 
     def _handle_mouse_down(self, event):
         """Handles all MOUSEBUTTONDOWN events."""
-        if event.button == 1:  # Left Click
-            # Convert screen coordinates to world, then to grid coordinates
+        if event.button == 1:
             world_pos = self._screen_to_world(pygame.Vector2(event.pos))
             tile_x = int(world_pos.x // self.tile_size)
             tile_y = int(world_pos.y // self.tile_size)
 
-            # For now, we will hardcode selecting a tower to build.
-            # Later, this will be driven by UI interaction.
             self.game_manager.game_state.selected_tower_to_build = "turret"
 
-            # If a tower is selected for building, try to place it.
             if self.game_manager.game_state.selected_tower_to_build:
                 self.game_manager.place_tower(
                     self.game_manager.game_state.selected_tower_to_build, tile_x, tile_y
                 )
-                # For simplicity, deselect after trying to build.
                 self.game_manager.game_state.clear_selection()
-
-        elif event.button == 2 or event.button == 3:  # Middle or Right Click
+        elif event.button == 2 or event.button == 3:
             self.is_panning = True
             self.pan_start_mouse_pos = pygame.Vector2(event.pos)
             self.pan_start_camera_offset = self.camera_offset.copy()
-        elif event.button == 4:  # Scroll Up
+        elif event.button == 4:
             self.zoom = min(self.zoom + ZOOM_INCREMENT, MAX_ZOOM)
             self._clamp_camera_offset()
-        elif event.button == 5:  # Scroll Down
+        elif event.button == 5:
             self.zoom = max(self.zoom - ZOOM_INCREMENT, self.min_zoom)
             self._clamp_camera_offset()
 
     def _update(self, dt: float):
         """Updates the game logic by calling the GameManager."""
         self.game_manager.update(dt)
-        if self.game_manager.game_state.game_over:
-            # We could add logic here to show a "Game Over" screen.
-            pass
 
     def _draw(self):
         """Draws the entire game state to the screen."""
         self.screen.fill(self.background_color)
 
-        # Draw the static map background
         if self.sprite_renderer:
             self.sprite_renderer.draw(self.screen, self.camera_offset, self.zoom)
 
-        # Draw all entities from the GameManager
-        all_entities = self.game_manager.enemies + self.game_manager.towers
+        # Get all entities from the GameManager and draw them.
+        all_entities = (
+            self.game_manager.enemies
+            + self.game_manager.towers
+            + self.game_manager.projectiles
+        )
         for entity in all_entities:
             entity.draw(self.screen, self.camera_offset, self.zoom)
 
@@ -225,10 +209,8 @@ class Game:
             self.screen.blit(surf, (current_x, y_pos))
             current_x += surf.get_width() + padding
 
-    # --- Camera and Coordinate Utilities ---
-
     def _screen_to_world(self, screen_pos: pygame.Vector2) -> pygame.Vector2:
-        """Converts screen coordinates (e.g., mouse position) to world coordinates."""
+        """Converts screen coordinates to world coordinates."""
         return (screen_pos - self.camera_offset) / self.zoom
 
     def _calculate_min_zoom(self):
@@ -245,6 +227,8 @@ class Game:
 
     def _center_camera(self):
         """Positions the camera to be centered on the map."""
+        if not self.sprite_renderer:
+            return
         map_w = self.sprite_renderer.map_surface.get_width() * self.zoom
         map_h = self.sprite_renderer.map_surface.get_height() * self.zoom
         self.camera_offset.x = (self.screen_width - map_w) / 2
@@ -258,13 +242,9 @@ class Game:
         map_w = self.sprite_renderer.map_surface.get_width() * self.zoom
         map_h = self.sprite_renderer.map_surface.get_height() * self.zoom
 
-        # Calculate max and min camera offsets
-        max_x = 0
-        min_x = self.screen_width - map_w
-        max_y = 0
-        min_y = self.screen_height - map_h
+        max_x, min_x = 0, self.screen_width - map_w
+        max_y, min_y = 0, self.screen_height - map_h
 
-        # If map is smaller than screen, center it instead of clamping to edge
         if map_w < self.screen_width:
             self.camera_offset.x = (self.screen_width - map_w) / 2
         else:
