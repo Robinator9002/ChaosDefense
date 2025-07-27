@@ -10,16 +10,17 @@
   },
   "cannon": {
     "name": "Cannon Tower",
-    "cost": 120,
-    "damage": 20,
+    "cost": 100,
+    "damage": 25,
     "range": 200,
-    "fire_rate": 0.4,
+    "fire_rate": 0.6,
+    "blast_radius": 80,
     "sprite_key": "towers/cannon.png",
     "placeholder_color": [80, 80, 100]
   },
   "slower": {
     "name": "Frost Tower",
-    "cost": 80,
+    "cost": 75,
     "damage": 6,
     "range": 140,
     "fire_rate": 1.0,

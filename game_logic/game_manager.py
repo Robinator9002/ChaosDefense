@@ -52,7 +52,7 @@ class GameManager:
     def _setup_new_game(self):
         """Sets up all necessary objects for a new game session."""
         logger.info("--- Setting up new game via Game Manager ---")
-        self.game_state = GameState(gold=150, base_hp=20)
+        self.game_state = GameState(gold=10000, base_hp=20)
         try:
             # In a full game, this might be selectable from a menu.
             preset_to_load = "Forest"

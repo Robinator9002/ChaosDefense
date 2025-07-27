@@ -7,28 +7,28 @@
         {
           "id": "turret_a1",
           "name": "Increased Damage",
-          "cost": 75,
+          "cost": 65,
           "description": "Increases damage by 5.",
           "effects": { "add_damage": 5 }
         },
         {
           "id": "turret_a2",
           "name": "Extended Barrel",
-          "cost": 100,
+          "cost": 85,
           "description": "Increases range by 40.",
           "effects": { "add_range": 40 }
         },
         {
           "id": "turret_a3",
           "name": "Armor Piercing",
-          "cost": 150,
+          "cost": 110,
           "description": "Shots ignore a portion of enemy armor.",
           "effects": { "add_armor_shred": 10 }
         },
         {
           "id": "turret_a4",
           "name": "Stun Rounds",
-          "cost": 250,
+          "cost": 180,
           "description": "Shots have a chance to briefly stun enemies.",
           "effects": {
             "add_effect": { "id": "stun", "potency": 0.25, "duration": 0.5 }
@@ -37,7 +37,7 @@
         {
           "id": "turret_a5",
           "name": "Executioner Shell",
-          "cost": 500,
+          "cost": 325,
           "description": "Deals massive bonus damage to enemies below 30% HP.",
           "effects": {
             "add_execute_threshold": {
@@ -62,21 +62,21 @@
         {
           "id": "turret_b2",
           "name": "Double Shot",
-          "cost": 125,
+          "cost": 110,
           "description": "Fires two projectiles simultaneously.",
           "effects": { "set_projectiles_per_shot": 2 }
         },
         {
           "id": "turret_b3",
           "name": "Improved Autoloader",
-          "cost": 175,
+          "cost": 135,
           "description": "Increases fire rate by another 30%.",
           "effects": { "multiply_fire_rate": 1.3 }
         },
         {
           "id": "turret_b4",
           "name": "Incendiary Rounds",
-          "cost": 225,
+          "cost": 170,
           "description": "Projectiles set enemies on fire, dealing damage over time.",
           "effects": {
             "add_effect": { "id": "fire", "potency": 10, "duration": 3 }
@@ -85,7 +85,7 @@
         {
           "id": "turret_b5",
           "name": "Triple Shot",
-          "cost": 450,
+          "cost": 280,
           "description": "Unleashes a devastating volley of three projectiles.",
           "effects": { "set_projectiles_per_shot": 3 }
         }
@@ -100,21 +100,21 @@
         {
           "id": "cannon_a1",
           "name": "High-Explosive Shells",
-          "cost": 150,
+          "cost": 120,
           "description": "Increases blast radius by 50%.",
           "effects": { "multiply_blast_radius": 1.5 }
         },
         {
           "id": "cannon_a2",
           "name": "Rangefinder",
-          "cost": 125,
+          "cost": 100,
           "description": "Increases attack range by 60.",
           "effects": { "add_range": 60 }
         },
         {
           "id": "cannon_a3",
           "name": "Shrapnel Shells",
-          "cost": 250,
+          "cost": 180,
           "description": "Explosions cause enemies to bleed, taking damage over time.",
           "effects": {
             "add_blast_effect": { "id": "bleed", "potency": 15, "duration": 4 }
@@ -123,14 +123,14 @@
         {
           "id": "cannon_a4",
           "name": "Reinforced Cannon",
-          "cost": 350,
+          "cost": 250,
           "description": "Greatly increases projectile damage by 25.",
           "effects": { "add_damage": 25 }
         },
         {
           "id": "cannon_a5",
           "name": "Earthshaker",
-          "cost": 600,
+          "cost": 400,
           "description": "Explosions now also daze enemies, slowing them significantly.",
           "effects": {
             "add_blast_effect": {
@@ -149,28 +149,28 @@
         {
           "id": "cannon_b1",
           "name": "Lightened Shells",
-          "cost": 120,
+          "cost": 100,
           "description": "Increases fire rate by 40%.",
           "effects": { "multiply_fire_rate": 1.4 }
         },
         {
           "id": "cannon_b2",
           "name": "Tungsten Core",
-          "cost": 200,
+          "cost": 150,
           "description": "Shells now pierce through one enemy.",
           "effects": { "set_pierce": 1 }
         },
         {
           "id": "cannon_b3",
           "name": "Improved Gearing",
-          "cost": 250,
+          "cost": 180,
           "description": "Increases fire rate by another 50%.",
           "effects": { "multiply_fire_rate": 1.5 }
         },
         {
           "id": "cannon_b4",
           "name": "Corrosive Payload",
-          "cost": 300,
+          "cost": 220,
           "description": "Shells corrode armor, making targets take more damage from all sources.",
           "effects": {
             "add_effect": { "id": "armor_break", "potency": 1.2, "duration": 5 }
@@ -179,7 +179,7 @@
         {
           "id": "cannon_b5",
           "name": "Chain Shot",
-          "cost": 550,
+          "cost": 350,
           "description": "Shells are now able to pierce through three enemies.",
           "effects": { "set_pierce": 3 }
         }
@@ -194,28 +194,28 @@
         {
           "id": "slower_a1",
           "name": "Permafrost",
-          "cost": 100,
+          "cost": 90,
           "description": "Increases the duration of the slow effect by 1 second.",
           "effects": { "multiply_effect_duration": 1.5 }
         },
         {
           "id": "slower_a2",
           "name": "Cryo-Coolant",
-          "cost": 150,
+          "cost": 120,
           "description": "Increases the potency of the slow effect.",
           "effects": { "multiply_effect_potency": 1.25 }
         },
         {
           "id": "slower_a3",
           "name": "Flash Freeze",
-          "cost": 200,
+          "cost": 160,
           "description": "Deals a small burst of damage when the slow is first applied.",
           "effects": { "add_on_apply_damage": 15 }
         },
         {
           "id": "slower_a4",
           "name": "Brittle Cold",
-          "cost": 300,
+          "cost": 225,
           "description": "Frozen enemies take 25% more damage from all sources.",
           "effects": {
             "add_effect": {
@@ -228,7 +228,7 @@
         {
           "id": "slower_a5",
           "name": "Shatter",
-          "cost": 500,
+          "cost": 350,
           "description": "Enemies that die while slowed explode, damaging and slowing nearby enemies.",
           "effects": {
             "add_on_death_explosion": {
@@ -247,35 +247,35 @@
         {
           "id": "slower_b1",
           "name": "Sharpened Icicles",
-          "cost": 80,
+          "cost": 70,
           "description": "Increases damage by 8.",
           "effects": { "add_damage": 8 }
         },
         {
           "id": "slower_b2",
           "name": "Rapid Condenser",
-          "cost": 120,
+          "cost": 100,
           "description": "Increases fire rate by 30%.",
           "effects": { "multiply_fire_rate": 1.3 }
         },
         {
           "id": "slower_b3",
           "name": "Piercing Shards",
-          "cost": 250,
+          "cost": 180,
           "description": "Projectiles now pierce through one enemy.",
           "effects": { "set_pierce": 1 }
         },
         {
           "id": "slower_b4",
           "name": "Jagged Ice",
-          "cost": 300,
+          "cost": 240,
           "description": "Further increases damage by 15.",
           "effects": { "add_damage": 15 }
         },
         {
           "id": "slower_b5",
           "name": "Glacial Lance",
-          "cost": 450,
+          "cost": 300,
           "description": "Final upgrade. Massively increases damage and range.",
           "effects": { "add_damage": 40, "add_range": 60 }
         }
