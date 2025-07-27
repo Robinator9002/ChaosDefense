@@ -71,24 +71,18 @@ class UIManager:
         Returns:
             True if a UI element handled the event, False otherwise.
         """
-        # Check if the mouse is over any button first, to prevent map interaction
-        # when clicking on the UI panel.
+        # Check if the mouse is over any button. If so, the UI will handle this event.
         mouse_pos = pygame.mouse.get_pos()
         if any(button.rect.collidepoint(mouse_pos) for button in self.buttons):
-            # If the mouse is over the panel, we handle the event.
             for button in self.buttons:
                 action = button.handle_event(event, game_state)
                 if action:
                     self._process_ui_action(action, game_state)
-            return True  # Event was consumed by the UI
+            return True  # Event was consumed by the UI, stopping further processing.
 
-        # If the click was not on the UI, clear any build selection.
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if game_state.selected_tower_to_build:
-                logger.debug("Clicked off UI, clearing build selection.")
-                game_state.clear_selection()
-
-        return False  # Event was not handled by the UI
+        # If the event was not on a UI element, the UIManager does nothing and
+        # reports that the event was not handled.
+        return False
 
     def _process_ui_action(self, action: str, game_state: GameState):
         """
@@ -97,7 +91,7 @@ class UIManager:
         if action.startswith("select_tower_"):
             tower_id = action.replace("select_tower_", "")
 
-            # Toggle selection
+            # Toggle selection: if clicking the same button, deselect. Otherwise, select the new one.
             if game_state.selected_tower_to_build == tower_id:
                 game_state.clear_selection()
             else:

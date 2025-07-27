@@ -9,7 +9,7 @@ from game_logic.game_manager import GameManager
 
 # --- Rendering Imports ---
 from rendering.sprite_renderer import SpriteRenderer
-from rendering.ui_manager import UIManager  # Import the new UIManager
+from rendering.ui_manager import UIManager
 
 logger = logging.getLogger(__name__)
 
@@ -45,16 +45,14 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
 
-        # --- Core Logic and UI Managers ---
         self.game_manager = GameManager(all_configs)
         self.ui_manager = UIManager(self.screen.get_rect(), all_configs, assets_path)
 
-        # --- Rendering Components ---
         self.sprite_renderer: Optional[SpriteRenderer] = None
         self.background_color = (0, 0, 0)
+        self.gui_font = pygame.font.SysFont("segoeui", 22, bold=True)
         self.tile_size = self.game_settings.get("tile_size", 32)
 
-        # --- Camera & Input State ---
         self.zoom = 1.0
         self.min_zoom = MIN_ZOOM_CLAMP
         self.camera_offset = pygame.Vector2(0, 0)
@@ -113,12 +111,10 @@ class Game:
                 self.running = False
                 return
 
-            # --- 1. Pass event to UIManager first ---
             ui_handled_event = self.ui_manager.handle_event(
                 event, self.game_manager.game_state
             )
 
-            # --- 2. If UI did not handle it, process as a game world event ---
             if not ui_handled_event:
                 if event.type == pygame.VIDEORESIZE:
                     self._on_resize(event)
@@ -133,8 +129,7 @@ class Game:
 
     def _handle_map_click(self, event):
         """Handles mouse clicks that occur on the game map (not the UI)."""
-        if event.button == 1:  # Left Click for placing towers
-            # Check if a tower is selected for building
+        if event.button == 1:
             tower_to_build = self.game_manager.game_state.selected_tower_to_build
             if tower_to_build:
                 world_pos = self._screen_to_world(pygame.Vector2(event.pos))
@@ -142,19 +137,15 @@ class Game:
                 tile_y = int(world_pos.y // self.tile_size)
 
                 self.game_manager.place_tower(tower_to_build, tile_x, tile_y)
-                # For now, automatically deselect after one placement.
                 self.game_manager.game_state.clear_selection()
-
-        elif (
-            event.button == 2 or event.button == 3
-        ):  # Middle or Right Click for panning
+        elif event.button == 2 or event.button == 3:
             self.is_panning = True
             self.pan_start_mouse_pos = pygame.Vector2(event.pos)
             self.pan_start_camera_offset = self.camera_offset.copy()
-        elif event.button == 4:  # Scroll Up
+        elif event.button == 4:
             self.zoom = min(self.zoom + ZOOM_INCREMENT, MAX_ZOOM)
             self._clamp_camera_offset()
-        elif event.button == 5:  # Scroll Down
+        elif event.button == 5:
             self.zoom = max(self.zoom - ZOOM_INCREMENT, self.min_zoom)
             self._clamp_camera_offset()
 
@@ -168,9 +159,7 @@ class Game:
         """Handles the window being resized."""
         self.screen_width, self.screen_height = event.w, event.h
         self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
-        self.ui_manager.screen_rect = (
-            self.screen.get_rect()
-        )  # Important: update UI Manager
+        self.ui_manager.screen_rect = self.screen.get_rect()
         self._calculate_min_zoom()
         self._clamp_camera_offset()
 
@@ -183,7 +172,6 @@ class Game:
         """Draws the entire game state to the screen."""
         self.screen.fill(self.background_color)
 
-        # Draw the world (map and entities)
         if self.sprite_renderer:
             self.sprite_renderer.draw(self.screen, self.camera_offset, self.zoom)
 
@@ -196,9 +184,42 @@ class Game:
             entity.draw(self.screen, self.camera_offset, self.zoom)
 
         # Draw the UI on top of everything
+        self._draw_gui()  # FIXED: Re-added the call to draw the top GUI panel
         self.ui_manager.draw(self.screen, self.game_manager.game_state)
 
         pygame.display.flip()
+
+    def _draw_gui(self):
+        """Draws the static user interface elements like gold, hp, and wave count."""
+        state = self.game_manager.game_state
+        wave_mgr = self.game_manager.wave_manager
+        if not state or not wave_mgr:
+            return
+
+        colors = {"gold": (255, 215, 0), "hp": (220, 20, 60), "wave": (0, 191, 255)}
+        padding, y_pos = 20, 15
+        wave_text = f"Wave: {state.current_wave_number} / {wave_mgr.max_waves}"
+
+        surfaces = [
+            self.gui_font.render(f"Gold: {state.gold}", True, colors["gold"]),
+            self.gui_font.render(f"Base HP: {state.base_hp}", True, colors["hp"]),
+            self.gui_font.render(wave_text, True, colors["wave"]),
+        ]
+
+        panel_width = sum(s.get_width() for s in surfaces) + (
+            padding * (len(surfaces) + 1)
+        )
+        panel_height = max(s.get_height() for s in surfaces) + (padding / 2)
+        panel_rect = pygame.Rect(5, 5, panel_width, panel_height)
+
+        panel_surf = pygame.Surface(panel_rect.size, pygame.SRCALPHA)
+        panel_surf.fill((0, 0, 0, 150))
+        self.screen.blit(panel_surf, panel_rect.topleft)
+
+        current_x = panel_rect.left + padding
+        for surf in surfaces:
+            self.screen.blit(surf, (current_x, y_pos))
+            current_x += surf.get_width() + padding
 
     def _screen_to_world(self, screen_pos: pygame.Vector2) -> pygame.Vector2:
         return (screen_pos - self.camera_offset) / self.zoom
