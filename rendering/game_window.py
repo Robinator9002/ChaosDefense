@@ -21,7 +21,9 @@ ZOOM_INCREMENT = 0.07
 
 class Game:
     """
-    The main window and rendering engine for the game.
+    The main window and rendering engine for the game. This class is the
+    bridge between player input (mouse, keyboard), the game's logical state
+    (GameManager), and what is drawn to the screen.
     """
 
     def __init__(self, all_configs: Dict[str, Any], assets_path: Path):
@@ -34,6 +36,7 @@ class Game:
         self.game_settings = all_configs["game_settings"]
         self.assets_path = assets_path
 
+        # --- Screen and Display Setup ---
         self.screen_width = self.game_settings.get("screen_width", 1280)
         self.screen_height = self.game_settings.get("screen_height", 720)
         self.screen = pygame.display.set_mode(
@@ -45,9 +48,16 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
 
+        # --- Core System Initialization ---
         self.game_manager = GameManager(all_configs)
-        self.ui_manager = UIManager(self.screen.get_rect(), all_configs, assets_path)
+        # MODIFIED: The UIManager now takes a direct reference to the GameManager
+        # instead of the raw config dictionary. This gives it access to the
+        # upgrade_manager and the ability to process actions.
+        self.ui_manager = UIManager(
+            self.screen.get_rect(), self.game_manager, assets_path
+        )
 
+        # --- Rendering and Camera State ---
         self.sprite_renderer: Optional[SpriteRenderer] = None
         self.background_color = (0, 0, 0)
         self.gui_font = pygame.font.SysFont("segoeui", 22, bold=True)
@@ -65,7 +75,6 @@ class Game:
     def _setup_rendering(self):
         """Initializes rendering components based on the game logic's state."""
         logger.info("--- Initializing Rendering Components ---")
-
         grid = self.game_manager.grid
         if not grid:
             logger.critical(
@@ -74,6 +83,7 @@ class Game:
             self.running = False
             return
 
+        # Find the style config for the generated level to get colors and tile definitions.
         style_config = {}
         for style in self.game_manager.level_manager.level_styles.values():
             if style.get("generation_params", {}).get("grid_width") == grid.width:
@@ -98,6 +108,7 @@ class Game:
     def run(self):
         """The main game loop."""
         while self.running:
+            # Calculate delta time for frame-rate independent physics.
             dt = self.clock.tick(60) / 1000.0
             self._handle_events()
             self._update(dt)
@@ -111,41 +122,83 @@ class Game:
                 self.running = False
                 return
 
+            # The UIManager gets the first chance to handle any event.
+            # This is crucial to prevent clicks on UI elements from being
+            # processed as clicks on the game map underneath.
             ui_handled_event = self.ui_manager.handle_event(
                 event, self.game_manager.game_state
             )
 
+            # Only process map-related events if the UI did not handle them.
             if not ui_handled_event:
                 if event.type == pygame.VIDEORESIZE:
                     self._on_resize(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     self._handle_map_click(event)
                 elif event.type == pygame.MOUSEBUTTONUP:
-                    if event.button == 2 or event.button == 3:
+                    if (
+                        event.button == 2 or event.button == 3
+                    ):  # Middle or Right mouse up
                         self.is_panning = False
                 elif event.type == pygame.MOUSEMOTION:
                     if self.is_panning:
                         self._handle_pan(event)
 
     def _handle_map_click(self, event):
-        """Handles mouse clicks that occur on the game map (not the UI)."""
+        """
+        Handles mouse clicks that occur on the game map (not the UI).
+        This method now has dual functionality: placing new towers and
+        selecting existing towers for upgrades.
+        """
+        # --- Left Mouse Button Click ---
         if event.button == 1:
-            tower_to_build = self.game_manager.game_state.selected_tower_to_build
-            if tower_to_build:
+            game_state = self.game_manager.game_state
+
+            # --- ACTION 1: Place a new tower ---
+            if game_state.selected_tower_to_build:
                 world_pos = self._screen_to_world(pygame.Vector2(event.pos))
                 tile_x = int(world_pos.x // self.tile_size)
                 tile_y = int(world_pos.y // self.tile_size)
+                self.game_manager.place_tower(
+                    game_state.selected_tower_to_build, tile_x, tile_y
+                )
+                game_state.clear_selection()  # Deselect from build bar after placing.
+                return
 
-                self.game_manager.place_tower(tower_to_build, tile_x, tile_y)
-                self.game_manager.game_state.clear_selection()
+            # --- ACTION 2: Select an existing tower for upgrades ---
+            world_pos = self._screen_to_world(pygame.Vector2(event.pos))
+            clicked_on_tower = False
+            for tower in self.game_manager.towers:
+                # The tower's rect is in world coordinates. We check if the
+                # world-space mouse position collides with it.
+                if tower.rect.collidepoint(world_pos):
+                    # If we clicked the same tower that's already selected, deselect it.
+                    if game_state.selected_entity_id == tower.entity_id:
+                        game_state.clear_selection()
+                    else:
+                        # Otherwise, select the new tower. This is the trigger for the UI.
+                        game_state.selected_entity_id = tower.entity_id
+                        logger.info(
+                            f"Player selected tower {tower.entity_id} for upgrade."
+                        )
+                    clicked_on_tower = True
+                    break  # Stop after finding the first clicked tower.
+
+            # --- ACTION 3: Deselect by clicking on empty ground ---
+            if not clicked_on_tower:
+                game_state.clear_selection()
+
+        # --- Middle/Right Mouse Button for Panning ---
         elif event.button == 2 or event.button == 3:
             self.is_panning = True
             self.pan_start_mouse_pos = pygame.Vector2(event.pos)
             self.pan_start_camera_offset = self.camera_offset.copy()
-        elif event.button == 4:
+
+        # --- Mouse Wheel for Zooming ---
+        elif event.button == 4:  # Scroll up
             self.zoom = min(self.zoom + ZOOM_INCREMENT, MAX_ZOOM)
             self._clamp_camera_offset()
-        elif event.button == 5:
+        elif event.button == 5:  # Scroll down
             self.zoom = max(self.zoom - ZOOM_INCREMENT, self.min_zoom)
             self._clamp_camera_offset()
 
@@ -172,9 +225,11 @@ class Game:
         """Draws the entire game state to the screen."""
         self.screen.fill(self.background_color)
 
+        # Draw the static map background.
         if self.sprite_renderer:
             self.sprite_renderer.draw(self.screen, self.camera_offset, self.zoom)
 
+        # Draw all active entities (enemies, towers, projectiles).
         all_entities = (
             self.game_manager.enemies
             + self.game_manager.towers
@@ -183,13 +238,13 @@ class Game:
         for entity in all_entities:
             entity.draw(self.screen, self.camera_offset, self.zoom)
 
-        # Draw the UI on top of everything
-        self._draw_gui()  # FIXED: Re-added the call to draw the top GUI panel
+        # Draw the UI on top of everything else.
+        self._draw_top_gui()
         self.ui_manager.draw(self.screen, self.game_manager.game_state)
 
         pygame.display.flip()
 
-    def _draw_gui(self):
+    def _draw_top_gui(self):
         """Draws the static user interface elements like gold, hp, and wave count."""
         state = self.game_manager.game_state
         wave_mgr = self.game_manager.wave_manager
@@ -222,9 +277,11 @@ class Game:
             current_x += surf.get_width() + padding
 
     def _screen_to_world(self, screen_pos: pygame.Vector2) -> pygame.Vector2:
+        """Converts screen coordinates to world (map) coordinates."""
         return (screen_pos - self.camera_offset) / self.zoom
 
     def _calculate_min_zoom(self):
+        """Calculates the minimum zoom level to fit the whole map on screen."""
         if not self.sprite_renderer:
             return
         map_w = self.sprite_renderer.map_surface.get_width()
@@ -236,6 +293,7 @@ class Game:
             )
 
     def _center_camera(self):
+        """Centers the camera on the map."""
         if not self.sprite_renderer:
             return
         map_w = self.sprite_renderer.map_surface.get_width() * self.zoom
@@ -245,6 +303,7 @@ class Game:
         self._clamp_camera_offset()
 
     def _clamp_camera_offset(self):
+        """Prevents the camera from panning off the edge of the map."""
         if not self.sprite_renderer:
             return
         map_w, map_h = (
