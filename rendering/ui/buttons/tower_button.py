@@ -1,4 +1,4 @@
-# rendering/ui/tower_button.py
+# rendering/ui/buttons/tower_button.py
 import pygame
 import logging
 from pathlib import Path
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 class TowerButton(UIElement):
     """
     A specific UI element that represents a clickable button to select a tower.
+    This has been updated to display a numeric hotkey.
     """
 
     def __init__(
@@ -24,6 +25,7 @@ class TowerButton(UIElement):
         tower_type_id: str,
         tower_data: Dict[str, Any],
         assets_path: Path,
+        hotkey_number: int,  # NEW: Added hotkey number
     ):
         """
         Initializes a new TowerButton.
@@ -33,17 +35,22 @@ class TowerButton(UIElement):
             tower_type_id (str): The unique identifier for the tower (e.g., "turret").
             tower_data (Dict[str, Any]): The configuration data for this tower type.
             assets_path (Path): The root path to the assets directory.
+            hotkey_number (int): The number to display as the keyboard shortcut (e.g., 1, 2).
         """
         super().__init__(rect)
         self.tower_type_id = tower_type_id
         self.tower_data = tower_data
         self.assets_path = assets_path
+        self.hotkey_number = hotkey_number  # NEW: Store the hotkey
 
         self.cost = self.tower_data.get("cost", 0)
         self.tooltip = f"{self.tower_data.get('name', 'N/A')} - Cost: {self.cost}"
 
         # --- Asset Loading ---
         self.font = pygame.font.SysFont("segoeui", 14, bold=True)
+        self.hotkey_font = pygame.font.SysFont(
+            "segoeui", 12, bold=True
+        )  # NEW: Font for the hotkey
         self.icon = self._load_icon()
 
     def _load_icon(self) -> pygame.Surface:
@@ -75,7 +82,7 @@ class TowerButton(UIElement):
         return placeholder
 
     def handle_event(
-        self, event: pygame.event.Event, game_state: GameState
+        self, event: pygame.event.Event, game_state: "GameState"
     ) -> Optional[str]:
         """Handles mouse clicks on the button."""
         action = super().handle_event(event, game_state)
@@ -89,8 +96,8 @@ class TowerButton(UIElement):
 
         return None
 
-    def draw(self, screen: pygame.Surface, game_state: GameState):
-        """Draws the button, its icon, and its cost to the screen."""
+    def draw(self, screen: pygame.Surface, game_state: "GameState"):
+        """Draws the button, its icon, its cost, and its hotkey to the screen."""
         # Determine background color based on state
         is_selected = game_state.selected_tower_to_build == self.tower_type_id
         can_afford = game_state.gold >= self.cost
@@ -122,3 +129,10 @@ class TowerButton(UIElement):
             else ((150, 180, 200) if self.is_hovered else (80, 90, 100))
         )
         pygame.draw.rect(screen, border_color, self.rect, 2, border_radius=5)
+
+        # --- NEW: Draw Hotkey Number ---
+        hotkey_surf = self.hotkey_font.render(
+            str(self.hotkey_number), True, (200, 200, 200)
+        )
+        hotkey_rect = hotkey_surf.get_rect(topleft=(self.rect.x + 5, self.rect.y + 5))
+        screen.blit(hotkey_surf, hotkey_rect)

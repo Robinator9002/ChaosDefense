@@ -50,9 +50,6 @@ class Game:
 
         # --- Core System Initialization ---
         self.game_manager = GameManager(all_configs)
-        # MODIFIED: The UIManager now takes a direct reference to the GameManager
-        # instead of the raw config dictionary. This gives it access to the
-        # upgrade_manager and the ability to process actions.
         self.ui_manager = UIManager(
             self.screen.get_rect(), self.game_manager, assets_path
         )
@@ -83,7 +80,6 @@ class Game:
             self.running = False
             return
 
-        # Find the style config for the generated level to get colors and tile definitions.
         style_config = {}
         for style in self.game_manager.level_manager.level_styles.values():
             if style.get("generation_params", {}).get("grid_width") == grid.width:
@@ -108,7 +104,6 @@ class Game:
     def run(self):
         """The main game loop."""
         while self.running:
-            # Calculate delta time for frame-rate independent physics.
             dt = self.clock.tick(60) / 1000.0
             self._handle_events()
             self._update(dt)
@@ -122,39 +117,65 @@ class Game:
                 self.running = False
                 return
 
-            # The UIManager gets the first chance to handle any event.
-            # This is crucial to prevent clicks on UI elements from being
-            # processed as clicks on the game map underneath.
             ui_handled_event = self.ui_manager.handle_event(
                 event, self.game_manager.game_state
             )
 
-            # Only process map-related events if the UI did not handle them.
             if not ui_handled_event:
                 if event.type == pygame.VIDEORESIZE:
                     self._on_resize(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     self._handle_map_click(event)
                 elif event.type == pygame.MOUSEBUTTONUP:
-                    if (
-                        event.button == 2 or event.button == 3
-                    ):  # Middle or Right mouse up
+                    if event.button == 2 or event.button == 3:
                         self.is_panning = False
                 elif event.type == pygame.MOUSEMOTION:
                     if self.is_panning:
                         self._handle_pan(event)
+                # --- NEW: Handle Keyboard Input for Hotkeys ---
+                elif event.type == pygame.KEYDOWN:
+                    self._handle_keyboard_input(event.key)
+
+    def _handle_keyboard_input(self, key):
+        """Handles keyboard presses for game actions, like tower selection."""
+        # Map pygame key constants to numbers 1-9
+        key_to_number = {
+            pygame.K_1: 1,
+            pygame.K_2: 2,
+            pygame.K_3: 3,
+            pygame.K_4: 4,
+            pygame.K_5: 5,
+            pygame.K_6: 6,
+            pygame.K_7: 7,
+            pygame.K_8: 8,
+            pygame.K_9: 9,
+        }
+
+        if key in key_to_number:
+            number_pressed = key_to_number[key]
+            hotkey_index = number_pressed - 1
+
+            # Check if the pressed number corresponds to a valid tower hotkey
+            if 0 <= hotkey_index < len(self.ui_manager.hotkey_map):
+                tower_id = self.ui_manager.hotkey_map[hotkey_index]
+                game_state = self.game_manager.game_state
+
+                # Toggle selection logic
+                if game_state.selected_tower_to_build == tower_id:
+                    game_state.clear_selection()
+                else:
+                    game_state.selected_tower_to_build = tower_id
+                    logger.info(
+                        f"Player selected '{tower_id}' for building via hotkey {number_pressed}."
+                    )
 
     def _handle_map_click(self, event):
         """
         Handles mouse clicks that occur on the game map (not the UI).
-        This method now has dual functionality: placing new towers and
-        selecting existing towers for upgrades.
         """
-        # --- Left Mouse Button Click ---
         if event.button == 1:
             game_state = self.game_manager.game_state
 
-            # --- ACTION 1: Place a new tower ---
             if game_state.selected_tower_to_build:
                 world_pos = self._screen_to_world(pygame.Vector2(event.pos))
                 tile_x = int(world_pos.x // self.tile_size)
@@ -162,43 +183,35 @@ class Game:
                 self.game_manager.place_tower(
                     game_state.selected_tower_to_build, tile_x, tile_y
                 )
-                game_state.clear_selection()  # Deselect from build bar after placing.
+                game_state.clear_selection()
                 return
 
-            # --- ACTION 2: Select an existing tower for upgrades ---
             world_pos = self._screen_to_world(pygame.Vector2(event.pos))
             clicked_on_tower = False
             for tower in self.game_manager.towers:
-                # The tower's rect is in world coordinates. We check if the
-                # world-space mouse position collides with it.
                 if tower.rect.collidepoint(world_pos):
-                    # If we clicked the same tower that's already selected, deselect it.
                     if game_state.selected_entity_id == tower.entity_id:
                         game_state.clear_selection()
                     else:
-                        # Otherwise, select the new tower. This is the trigger for the UI.
                         game_state.selected_entity_id = tower.entity_id
                         logger.info(
                             f"Player selected tower {tower.entity_id} for upgrade."
                         )
                     clicked_on_tower = True
-                    break  # Stop after finding the first clicked tower.
+                    break
 
-            # --- ACTION 3: Deselect by clicking on empty ground ---
             if not clicked_on_tower:
                 game_state.clear_selection()
 
-        # --- Middle/Right Mouse Button for Panning ---
         elif event.button == 2 or event.button == 3:
             self.is_panning = True
             self.pan_start_mouse_pos = pygame.Vector2(event.pos)
             self.pan_start_camera_offset = self.camera_offset.copy()
 
-        # --- Mouse Wheel for Zooming ---
-        elif event.button == 4:  # Scroll up
+        elif event.button == 4:
             self.zoom = min(self.zoom + ZOOM_INCREMENT, MAX_ZOOM)
             self._clamp_camera_offset()
-        elif event.button == 5:  # Scroll down
+        elif event.button == 5:
             self.zoom = max(self.zoom - ZOOM_INCREMENT, self.min_zoom)
             self._clamp_camera_offset()
 
@@ -225,11 +238,9 @@ class Game:
         """Draws the entire game state to the screen."""
         self.screen.fill(self.background_color)
 
-        # Draw the static map background.
         if self.sprite_renderer:
             self.sprite_renderer.draw(self.screen, self.camera_offset, self.zoom)
 
-        # Draw all active entities (enemies, towers, projectiles).
         all_entities = (
             self.game_manager.enemies
             + self.game_manager.towers
@@ -238,7 +249,6 @@ class Game:
         for entity in all_entities:
             entity.draw(self.screen, self.camera_offset, self.zoom)
 
-        # Draw the UI on top of everything else.
         self._draw_top_gui()
         self.ui_manager.draw(self.screen, self.game_manager.game_state)
 
