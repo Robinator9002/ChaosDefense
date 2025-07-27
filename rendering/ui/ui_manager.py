@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from rendering.ui.tower_button import TowerButton
+from rendering.ui.buttons.tower_button import TowerButton
 
 # Using Any for game_state to avoid circular dependencies
 if "GameState" not in globals():

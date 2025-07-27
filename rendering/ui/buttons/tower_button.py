@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from .ui_element import UIElement
+from ..ui_element import UIElement
 
 # Using Any for game_state to avoid circular dependencies
 if "GameState" not in globals():
