@@ -11,8 +11,6 @@ from .level_generation.grid import Grid
 from .waves.wave_manager import WaveManager
 from .entities.entity import Entity
 from .entities.tower import Tower
-
-# The Enemy class is now in a subfolder, so we adjust the import path.
 from .entities.enemies.enemy import Enemy
 from .entities.projectile import Projectile
 from .upgrades.upgrade_manager import UpgradeManager
@@ -23,9 +21,9 @@ logger = logging.getLogger(__name__)
 
 class GameManager:
     """
-    The central "headless" engine for the game. It has been updated to handle
-    complex on-death effects like the "Shatter" explosion by acting as a
-    central dispatcher.
+    The central "headless" engine for the game. It orchestrates all game
+    logic, including entity updates, wave spawning, and handling all
+    tower placement and upgrade requests.
     """
 
     def __init__(self, all_configs: Dict[str, Any]):
@@ -49,9 +47,20 @@ class GameManager:
         self._setup_new_game()
 
     def _setup_new_game(self):
-        """Sets up all necessary objects for a new game session."""
+        """
+        Sets up all necessary objects for a new game session.
+        This now reads starting gold and HP from the game_settings config.
+        """
         logger.info("--- Setting up new game via Game Manager ---")
-        self.game_state = GameState(gold=150, base_hp=20)
+
+        # --- MODIFIED: Load starting values from config ---
+        # This removes the hardcoded values from the game logic, making them
+        # easily configurable from the JSON file.
+        game_settings = self.configs.get("game_settings", {})
+        start_gold = game_settings.get("starting_gold", 150)
+        start_hp = game_settings.get("base_hp", 20)
+        self.game_state = GameState(gold=start_gold, base_hp=start_hp)
+
         try:
             preset_to_load = "Forest"
             self.grid, self.paths, style_config = (
@@ -62,6 +71,7 @@ class GameManager:
             logger.critical(f"FATAL: Failed to build level: {e}", exc_info=True)
             self.game_state.end_game()
             return
+
         player_difficulty = self.configs["game_settings"].get("difficulty", 1)
         level_difficulty = style_config.get("generation_params", {}).get(
             "level_difficulty", 1
@@ -111,14 +121,9 @@ class GameManager:
             return
 
         for dead_enemy in dead_enemies:
-            # Grant gold for the kill.
             self.game_state.add_gold(dead_enemy.bounty)
-
-            # --- NEW: Check for and trigger on-death effects ---
-            # This is the crucial new logic block.
             self._handle_on_death_effects(dead_enemy)
 
-        # Rebuild the lists to remove the dead entities.
         self.enemies = [e for e in self.enemies if e.is_alive]
         self.projectiles = [p for p in self.projectiles if p.is_alive]
 
@@ -128,15 +133,11 @@ class GameManager:
         like the Frost Tower's "Shatter" explosion.
         """
         for effect in dead_enemy.status_effects:
-            # Check if the effect has a source (was applied by a tower).
             if effect.source_entity_id:
-                # Find the specific tower that applied the effect.
                 source_tower = next(
                     (t for t in self.towers if t.entity_id == effect.source_entity_id),
                     None,
                 )
-
-                # Check if that tower has the on_death_explosion upgrade.
                 if source_tower and source_tower.on_death_explosion:
                     logger.info(
                         f"Triggering 'on_death_explosion' from tower {source_tower.entity_id}"
@@ -144,7 +145,6 @@ class GameManager:
                     self._create_explosion(
                         dead_enemy.pos, source_tower.on_death_explosion
                     )
-                    # An enemy should only shatter once, even if slowed by multiple towers.
                     break
 
     def _create_explosion(
@@ -159,22 +159,18 @@ class GameManager:
         effect_id = explosion_data.get("effect_id")
 
         for enemy in self.enemies:
-            # Only affect living enemies within the radius.
             if enemy.is_alive and position.distance_to(enemy.pos) <= radius:
                 enemy.take_damage(damage)
-
-                # If the explosion itself applies a status effect (like slow).
                 if effect_id:
                     effect_config = self.configs.get("status_effects", {}).get(
                         effect_id
                     )
                     if effect_config:
-                        # Create a new StatusEffect instance for the secondary targets.
                         effect_instance = StatusEffect(
                             effect_id=effect_id,
                             effect_data=effect_config,
-                            duration=2.0,  # Duration for shatter-slow can be hardcoded or added to config
-                            potency=0.5,  # Same for potency
+                            duration=2.0,
+                            potency=0.5,
                         )
                         enemy.apply_status_effect(effect_instance)
 
