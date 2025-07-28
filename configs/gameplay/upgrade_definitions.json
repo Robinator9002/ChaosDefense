@@ -1,5 +1,5 @@
 {
-  "//": "Full Roster Rebalance: Reworked Freezer into a heavy support role. Increased Cannon fire rate costs. Rebalanced Mortar and massively buffed Energy Beacon's debuff path.",
+  "//": "TOWER REBALANCE PASS: Adjusted upgrade paths to align with new tower roles. Cannon piercing is now a late-game investment. Turret's multi-shot capabilities have been toned down to prevent hyper-scaling.",
   "turret": {
     "path_a": {
       "name": "Heavy Caliber",
@@ -68,7 +68,7 @@
         {
           "id": "turret_b2",
           "name": "Double Shot",
-          "cost": 65,
+          "cost": 75,
           "description": "Fires two projectiles simultaneously.",
           "effects": { "set_projectiles_per_shot": 2 }
         },
@@ -90,16 +90,15 @@
         },
         {
           "id": "turret_b5",
-          "name": "Triple Shot",
+          "name": "Advanced Double Shot",
           "cost": 175,
-          "description": "Unleashes a devastating volley of three projectiles.",
-          "effects": { "set_projectiles_per_shot": 3 }
+          "description": "Further increases fire rate and damage.",
+          "effects": { "multiply_fire_rate": 1.2, "add_damage": 5 }
         }
       ]
     }
   },
   "freezer": {
-    "//": "REWORKED: Damage upgrades are minimal. Path A is now focused on making enemies take more damage, while Path B focuses on AoE crowd control.",
     "path_a": {
       "name": "Deep Freeze",
       "description": "Focuses on extreme crowd control and debuffs.",
@@ -253,7 +252,6 @@
       ]
     },
     "path_b": {
-      "//": "REBALANCED: Fire rate upgrade costs increased due to high efficiency.",
       "name": "Auto-Cannon",
       "description": "Converts the cannon into a rapid-fire, armor-shredding weapon.",
       "upgrades": [
@@ -267,7 +265,7 @@
         {
           "id": "cannon_b2",
           "name": "Tungsten Core",
-          "cost": 100,
+          "cost": 120,
           "description": "Shells now pierce through one enemy.",
           "effects": { "set_pierce": 1 }
         },
@@ -291,14 +289,13 @@
           "id": "cannon_b5",
           "name": "Chain Shot",
           "cost": 250,
-          "description": "Shells are now able to pierce through three enemies.",
-          "effects": { "set_pierce": 3 }
+          "description": "Shells are now able to pierce through two enemies.",
+          "effects": { "set_pierce": 2 }
         }
       ]
     }
   },
   "energy_beacon": {
-    "//": "REWORKED: Path A is now a master debuffer, with a powerful endgame payoff. Path B is the ultimate single-target lockdown tower.",
     "path_a": {
       "name": "Debuff Cascade",
       "description": "Adds a new, stacking status effect with each upgrade.",
