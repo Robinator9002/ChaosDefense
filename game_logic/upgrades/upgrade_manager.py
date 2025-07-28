@@ -45,10 +45,7 @@ class UpgradeManager:
         This internal method populates the self.definitions dictionary.
         """
         for tower_type_id, paths_data in raw_definitions.items():
-            # --- BUG FIX: VALIDATION STEP ---
-            # Before processing, check if the value for this key is actually
-            # a dictionary. This prevents the code from crashing on comment
-            # lines or other non-dict data in the JSON file.
+            # First-level validation: Skip top-level comments.
             if not isinstance(paths_data, dict):
                 logger.debug(
                     f"Skipping non-dictionary key '{tower_type_id}' in upgrade definitions."
@@ -57,6 +54,15 @@ class UpgradeManager:
 
             self.definitions[tower_type_id] = {}
             for path_id, path_data in paths_data.items():
+                # --- BUG FIX: SECOND-LEVEL VALIDATION ---
+                # Before processing a path, check if its data is a dictionary.
+                # This prevents crashes on comments inside a tower's definition.
+                if not isinstance(path_data, dict):
+                    logger.debug(
+                        f"Skipping non-dictionary path key '{path_id}' for tower '{tower_type_id}'."
+                    )
+                    continue
+
                 self.definitions[tower_type_id][path_id] = [
                     Upgrade(**upgrade_data)
                     for upgrade_data in path_data.get("upgrades", [])
@@ -142,6 +148,13 @@ class UpgradeManager:
                 tower.on_apply_damage += value
             elif effect_key == "add_on_death_explosion":
                 tower.on_death_explosion = value
+            # --- Start of new effect handlers for Energy Beacon ---
+            elif effect_key == "add_bonus_damage_per_debuff":
+                tower.bonus_damage_per_debuff += value
+            elif effect_key == "add_conditional_effect":
+                tower.conditional_effects.append(value)
+            elif effect_key == "add_area_effect_on_hit":
+                tower.on_hit_area_effects.append(value)
             else:
                 # Log a warning for any effect keys that are not recognized.
                 # This helps in debugging new or mistyped upgrade effects.
