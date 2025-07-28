@@ -1,15 +1,15 @@
 {
-  "//": "Level Design Overhaul: Each level now presents a unique strategic challenge, balancing starting resources against map layout and enemy difficulty.",
+  "//": "Level Design Overhaul: Rebalanced starting gold and base HP to scale logically with each map's difficulty.",
 
   "Forest": {
-    "//": "ROLE: Introductory Level. Generous starting gold and HP. Wide open spaces allow for flexible tower placement and learning the basics.",
+    "//": "ROLE: Introductory Level. level_difficulty: 1. Gold: 100 (base) + 100*1 = 200.",
     "background_color": [20, 40, 25],
     "generation_params": {
       "grid_width": 100,
       "grid_height": 50,
       "num_paths": 2,
       "level_difficulty": 1,
-      "starting_gold": 250,
+      "starting_gold": 200,
       "base_hp": 25,
       "features": {
         "mountains": { "min": 2, "max": 4 },
@@ -38,14 +38,14 @@
   },
 
   "Rocky": {
-    "//": "ROLE: Standard Challenge. Less starting gold and HP. More obstacles create natural choke points, rewarding thoughtful tower placement.",
+    "//": "ROLE: Standard Challenge. level_difficulty: 2. Gold: 100 (base) + 100*2 = 300.",
     "background_color": [60, 60, 70],
     "generation_params": {
       "grid_width": 80,
       "grid_height": 50,
       "num_paths": 3,
       "level_difficulty": 2,
-      "starting_gold": 200,
+      "starting_gold": 300,
       "base_hp": 20,
       "features": {
         "mountains": { "min": 10, "max": 15 },
@@ -82,57 +82,15 @@
     }
   },
 
-  "Volcanic": {
-    "//": "ROLE: Hard Difficulty. Tests economic efficiency. Lava fields severely restrict buildable space.",
-    "background_color": [40, 20, 20],
-    "generation_params": {
-      "grid_width": 90,
-      "grid_height": 60,
-      "num_paths": 3,
-      "level_difficulty": 4,
-      "starting_gold": 175,
-      "base_hp": 15,
-      "features": {
-        "mountains": { "min": 8, "max": 12 },
-        "lakes": { "min": 5, "max": 8 },
-        "trees": { "min": 0, "max": 0 }
-      }
-    },
-    "tile_definitions": {
-      "BUILDABLE": {
-        "color": [80, 70, 70],
-        "sprite": "environment/ash_buildable.png"
-      },
-      "PATH": {
-        "color": [20, 20, 20],
-        "sprite": "environment/obsidian_path.png"
-      },
-      "BASE_ZONE": {
-        "color": [50, 40, 40],
-        "sprite": "environment/base_foundation_volcanic.png"
-      },
-      "TREE": {
-        "color": [47, 79, 79],
-        "sprite": "environment/rock_obstacle.png"
-      },
-      "MOUNTAIN": {
-        "color": [60, 30, 30],
-        "sprite": "environment/volcano.png"
-      },
-      "LAKE": { "color": [255, 100, 0], "sprite": "environment/lava.png" },
-      "BORDER": { "color": [15, 5, 5], "sprite": "environment/border_dark.png" }
-    }
-  },
-
   "CrystalCaverns": {
-    "//": "ROLE: Unique Challenge. Shorter paths test burst damage and crowd control.",
+    "//": "ROLE: Unique Challenge. level_difficulty: 3. Gold: 100 (base) + 100*3 = 400.",
     "background_color": [25, 20, 40],
     "generation_params": {
       "grid_width": 70,
       "grid_height": 55,
       "num_paths": 2,
       "level_difficulty": 3,
-      "starting_gold": 200,
+      "starting_gold": 400,
       "base_hp": 15,
       "features": {
         "mountains": { "min": 15, "max": 25 },
@@ -163,6 +121,48 @@
       },
       "LAKE": { "color": [10, 5, 20], "sprite": "environment/chasm.png" },
       "BORDER": { "color": [20, 15, 30], "sprite": "environment/cave_wall.png" }
+    }
+  },
+
+  "Volcanic": {
+    "//": "ROLE: Hard Difficulty. level_difficulty: 4. Gold: 100 (base) + 100*4 = 500.",
+    "background_color": [40, 20, 20],
+    "generation_params": {
+      "grid_width": 90,
+      "grid_height": 60,
+      "num_paths": 3,
+      "level_difficulty": 4,
+      "starting_gold": 500,
+      "base_hp": 10,
+      "features": {
+        "mountains": { "min": 8, "max": 12 },
+        "lakes": { "min": 5, "max": 8 },
+        "trees": { "min": 0, "max": 0 }
+      }
+    },
+    "tile_definitions": {
+      "BUILDABLE": {
+        "color": [80, 70, 70],
+        "sprite": "environment/ash_buildable.png"
+      },
+      "PATH": {
+        "color": [20, 20, 20],
+        "sprite": "environment/obsidian_path.png"
+      },
+      "BASE_ZONE": {
+        "color": [50, 40, 40],
+        "sprite": "environment/base_foundation_volcanic.png"
+      },
+      "TREE": {
+        "color": [47, 79, 79],
+        "sprite": "environment/rock_obstacle.png"
+      },
+      "MOUNTAIN": {
+        "color": [60, 30, 30],
+        "sprite": "environment/volcano.png"
+      },
+      "LAKE": { "color": [255, 100, 0], "sprite": "environment/lava.png" },
+      "BORDER": { "color": [15, 5, 5], "sprite": "environment/border_dark.png" }
     }
   }
 }
