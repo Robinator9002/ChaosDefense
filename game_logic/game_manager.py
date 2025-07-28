@@ -60,21 +60,15 @@ class GameManager:
                 self.level_manager.build_level_from_preset(preset_to_load)
             )
 
-            # --- MODIFIED: Initialize GameState AFTER loading level style ---
-            # This makes starting conditions dependent on the selected level,
-            # allowing for more varied gameplay scenarios.
             gen_params = style_config.get("generation_params", {})
-            start_gold = gen_params.get(
-                "starting_gold", 150
-            )  # Fallback to a default value
-            start_hp = gen_params.get("base_hp", 20)  # Fallback to a default value
+            start_gold = gen_params.get("starting_gold", 150)
+            start_hp = gen_params.get("base_hp", 20)
             self.game_state = GameState(gold=start_gold, base_hp=start_hp)
 
             self.game_state.level_grid = self.grid
 
         except (KeyError, ValueError) as e:
             logger.critical(f"FATAL: Failed to build level: {e}", exc_info=True)
-            # Initialize a default GameState to prevent crashes if level load fails.
             self.game_state = GameState(gold=0, base_hp=1)
             self.game_state.end_game()
             return
@@ -201,20 +195,36 @@ class GameManager:
         )
         self.enemies.append(enemy)
 
-    def place_tower(self, tower_type_id: str, tile_x: int, tile_y: int):
-        """Handles the logic for a player attempting to place a new tower."""
+    def place_tower(self, tower_type_id: str, tile_x: int, tile_y: int) -> bool:
+        """
+        Handles the logic for a player attempting to place a new tower.
+
+        Returns:
+            bool: True if the tower was successfully placed, False otherwise.
+        """
         tower_types_config = self.configs["tower_types"]
         if tower_type_id not in tower_types_config:
-            return
+            logger.warning(f"Attempted to place unknown tower type: {tower_type_id}")
+            return False
 
         tile = self.grid.get_tile(tile_x, tile_y)
         if not tile or tile.tile_key != "BUILDABLE":
-            return
+            # This is a common, valid player action (clicking a non-buildable tile),
+            # so we log it at a debug level.
+            logger.debug(
+                f"Tower placement failed: Tile ({tile_x}, {tile_y}) is not BUILDABLE."
+            )
+            return False
 
         tower_data = tower_types_config[tower_type_id]
         if not self.game_state.spend_gold(tower_data.get("cost", 9999)):
-            return
+            # This is also a common case, so no need for a warning.
+            logger.info(
+                f"Tower placement failed: Not enough gold for '{tower_type_id}'."
+            )
+            return False
 
+        # If all checks pass, create and place the tower.
         new_tower = Tower(
             x=tile_x * self.tile_size + self.tile_size / 2,
             y=tile_y * self.tile_size + self.tile_size / 2,
@@ -228,6 +238,8 @@ class GameManager:
         logger.info(
             f"Successfully placed '{tower_type_id}' at grid ({tile_x}, {tile_y})."
         )
+        # Return True on successful placement.
+        return True
 
     def purchase_tower_upgrade(self, tower_id: uuid.UUID, path_id: str):
         """
