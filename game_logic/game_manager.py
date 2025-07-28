@@ -114,19 +114,21 @@ class GameManager:
 
     def _cleanup_dead_entities(self):
         """
-        Removes dead entities from the game lists and now also processes
-        any on-death effects they might trigger.
+        Removes all dead entities (enemies, projectiles, and now salvaged towers)
+        from the game lists and processes any on-death effects.
         """
+        # Check for dead enemies to process their bounties and on-death effects.
         dead_enemies = [e for e in self.enemies if not e.is_alive]
-        if not dead_enemies:
-            return
+        if dead_enemies:
+            for dead_enemy in dead_enemies:
+                self.game_state.add_gold(dead_enemy.bounty)
+                self._handle_on_death_effects(dead_enemy)
 
-        for dead_enemy in dead_enemies:
-            self.game_state.add_gold(dead_enemy.bounty)
-            self._handle_on_death_effects(dead_enemy)
-
+        # Filter all entity lists to remove any entity where is_alive is False.
         self.enemies = [e for e in self.enemies if e.is_alive]
         self.projectiles = [p for p in self.projectiles if p.is_alive]
+        # NEW: Ensure salvaged towers are removed from the active list.
+        self.towers = [t for t in self.towers if t.is_alive]
 
     def _handle_on_death_effects(self, dead_enemy: Enemy):
         """
@@ -198,9 +200,7 @@ class GameManager:
     def place_tower(self, tower_type_id: str, tile_x: int, tile_y: int) -> bool:
         """
         Handles the logic for a player attempting to place a new tower.
-
-        Returns:
-            bool: True if the tower was successfully placed, False otherwise.
+        Returns True if the tower was successfully placed, False otherwise.
         """
         tower_types_config = self.configs["tower_types"]
         if tower_type_id not in tower_types_config:
@@ -209,8 +209,6 @@ class GameManager:
 
         tile = self.grid.get_tile(tile_x, tile_y)
         if not tile or tile.tile_key != "BUILDABLE":
-            # This is a common, valid player action (clicking a non-buildable tile),
-            # so we log it at a debug level.
             logger.debug(
                 f"Tower placement failed: Tile ({tile_x}, {tile_y}) is not BUILDABLE."
             )
@@ -218,13 +216,11 @@ class GameManager:
 
         tower_data = tower_types_config[tower_type_id]
         if not self.game_state.spend_gold(tower_data.get("cost", 9999)):
-            # This is also a common case, so no need for a warning.
             logger.info(
                 f"Tower placement failed: Not enough gold for '{tower_type_id}'."
             )
             return False
 
-        # If all checks pass, create and place the tower.
         new_tower = Tower(
             x=tile_x * self.tile_size + self.tile_size / 2,
             y=tile_y * self.tile_size + self.tile_size / 2,
@@ -238,12 +234,12 @@ class GameManager:
         logger.info(
             f"Successfully placed '{tower_type_id}' at grid ({tile_x}, {tile_y})."
         )
-        # Return True on successful placement.
         return True
 
     def purchase_tower_upgrade(self, tower_id: uuid.UUID, path_id: str):
         """
         Handles a request from the UI to purchase an upgrade for a specific tower.
+        Now also updates the tower's total investment value.
         """
         target_tower = next((t for t in self.towers if t.entity_id == tower_id), None)
         if not target_tower:
@@ -256,12 +252,60 @@ class GameManager:
         if not self.game_state.spend_gold(upgrade.cost):
             return
 
+        # Apply the upgrade's effects to the tower.
         self.upgrade_manager.apply_upgrade(target_tower, upgrade)
+
+        # NEW: Add the cost of this upgrade to the tower's total investment.
+        target_tower.total_investment += upgrade.cost
+
+        # Update the tower's tier for the specified path.
         if path_id == "path_a":
             target_tower.path_a_tier += 1
         elif path_id == "path_b":
             target_tower.path_b_tier += 1
 
         logger.info(
-            f"Successfully purchased upgrade '{upgrade.id}' for tower {tower_id}."
+            f"Successfully purchased upgrade '{upgrade.id}' for tower {tower_id}. "
+            f"New total investment: {target_tower.total_investment}G."
         )
+
+    def salvage_tower(self, tower_id: uuid.UUID):
+        """
+        NEW: Handles all logic for salvaging a tower.
+        Calculates refund, restores gold, frees the tile, and removes the tower.
+        """
+        target_tower = next((t for t in self.towers if t.entity_id == tower_id), None)
+        if not target_tower:
+            logger.error(f"Attempted to salvage non-existent tower with ID: {tower_id}")
+            return
+
+        if not self.wave_manager:
+            logger.error("Cannot salvage tower: WaveManager is not available.")
+            return
+
+        # 1. Get the refund percentage from the current difficulty settings.
+        refund_percentage = self.wave_manager.settings.get(
+            "salvage_refund_percentage", 0.0
+        )
+
+        # 2. Calculate the refund amount.
+        refund_amount = int(target_tower.total_investment * refund_percentage)
+
+        # 3. Add the gold back to the player's total.
+        self.game_state.add_gold(refund_amount)
+        logger.info(
+            f"Salvaged tower {tower_id} for {refund_amount}G "
+            f"({target_tower.total_investment}G * {refund_percentage * 100}%)."
+        )
+
+        # 4. Free up the grid tile where the tower was located.
+        tile_x = int(target_tower.pos.x // self.tile_size)
+        tile_y = int(target_tower.pos.y // self.tile_size)
+        if self.grid.is_valid_coord(tile_x, tile_y):
+            self.grid.set_tile_type(tile_x, tile_y, "BUILDABLE")
+
+        # 5. Mark the tower as not alive. It will be removed by _cleanup_dead_entities.
+        target_tower.kill()
+
+        # 6. Clear the player's selection to close the UI.
+        self.game_state.clear_selection()
