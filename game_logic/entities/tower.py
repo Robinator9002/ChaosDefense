@@ -2,6 +2,8 @@
 import pygame
 import logging
 import uuid
+import random
+import math
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 
 from .entity import Entity
@@ -10,7 +12,6 @@ from ..effects.status_effect import StatusEffect
 
 # Use TYPE_CHECKING to avoid circular imports at runtime.
 if TYPE_CHECKING:
-    # The Enemy class is now in a subfolder, so we adjust the import path.
     from .enemies.enemy import Enemy
     from ..game_state import GameState
 
@@ -21,9 +22,10 @@ class Tower(Entity):
     """
     Represents a defensive tower that can target and attack enemies.
 
-    This class has been reworked to correctly pass all necessary upgrade
-    information (e.g., source_id for effects, armor_shred, execute thresholds)
-    down to the projectiles it creates.
+    This class is the factory for projectiles. Its primary role in the update
+    loop is to find valid targets and, when its fire cooldown is ready, create
+    Projectile instances, bundling them with all the necessary stats and effects
+    derived from the tower's current upgrade level.
     """
 
     def __init__(
@@ -37,6 +39,14 @@ class Tower(Entity):
     ):
         """
         Initializes a new Tower entity.
+
+        Args:
+            x (float): The x-coordinate of the tower's center.
+            y (float): The y-coordinate of the tower's center.
+            tile_size (int): The pixel size of a single grid tile.
+            tower_type_id (str): The ID from tower_types.json (e.g., "turret").
+            tower_type_data (Dict[str, Any]): The configuration block for this tower type.
+            status_effects_config (Dict[str, Any]): The full status_effects.json config.
         """
         super().__init__(x, y, max_hp=100)
 
@@ -56,7 +66,7 @@ class Tower(Entity):
 
         # --- Firing and Targeting State ---
         self.fire_cooldown = 0.0
-        self.target: Optional[Enemy] = None
+        self.current_targets: List[Enemy] = []
 
         # --- Attributes Modified by Upgrades ---
         self.projectiles_per_shot = 1
@@ -99,55 +109,91 @@ class Tower(Entity):
     ) -> List[Projectile]:
         """
         Updates the tower's logic. Main responsibilities include managing fire
-        cooldown, acquiring a target, and firing projectiles.
+        cooldown, acquiring targets, and firing projectiles.
         """
         super().update(dt, game_state)
         if self.fire_cooldown > 0:
             self.fire_cooldown = max(0.0, self.fire_cooldown - dt)
 
-        if self.target and (
-            not self.target.is_alive or self.get_distance_to(self.target) > self.range
-        ):
-            self.target = None
+        # Find all valid targets within range.
+        self._find_new_targets(enemies)
 
-        if not self.target:
-            self.target = self._find_new_target(enemies)
-
-        if self.target and self.fire_cooldown <= 0:
-            return self._fire_at_target()
+        # If we have targets and the cooldown is ready, fire.
+        if self.current_targets and self.fire_cooldown <= 0:
+            return self._fire()
         return []
 
-    def _find_new_target(self, enemies: List["Enemy"]) -> Optional["Enemy"]:
-        """Finds the best target from the list of enemies, based on proximity."""
-        closest_enemy: Optional["Enemy"] = None
-        min_distance = float("inf")
+    def _find_new_targets(self, enemies: List["Enemy"]):
+        """
+        Finds all valid targets within the tower's range and sorts them by
+        distance to prioritize the closest ones.
+        """
+        self.current_targets.clear()
+        potential_targets = []
         for enemy in enemies:
             if enemy.is_alive:
                 distance = self.get_distance_to(enemy)
-                if distance <= self.range and distance < min_distance:
-                    min_distance = distance
-                    closest_enemy = enemy
-        return closest_enemy
+                if distance <= self.range:
+                    potential_targets.append((distance, enemy))
 
-    def _fire_at_target(self) -> List[Projectile]:
+        # Sort targets by distance (closest first).
+        potential_targets.sort(key=lambda t: t[0])
+        self.current_targets = [enemy for distance, enemy in potential_targets]
+
+    def _fire(self) -> List[Projectile]:
         """
-        Creates and returns a list of projectiles aimed at the current target.
+        Creates and returns a list of projectiles aimed at the current target(s).
         This is the critical point where all upgrade data is bundled up and
-        passed to the new projectile instances.
+        passed to the new projectile instances. It now handles multi-shot,
+        visual spread, and chance-based effects.
         """
-        if not self.target:
+        if not self.current_targets:
             return []
 
+        # Reset the fire cooldown.
         if self.fire_rate > 0:
             self.fire_cooldown = 1.0 / self.fire_rate
         else:
+            # A fire rate of 0 or less means the tower cannot fire.
             self.fire_cooldown = float("inf")
 
-        projectiles = []
-        for _ in range(self.projectiles_per_shot):
+        projectiles_to_fire = []
+        num_shots = self.projectiles_per_shot
+
+        # Loop for the number of projectiles this tower can fire per shot.
+        for i in range(num_shots):
+            # --- Target Selection for Multi-Shot ---
+            # Cycle through the available targets.
+            target = self.current_targets[i % len(self.current_targets)]
+
+            # --- Calculate Projectile Origin for Visual Spread ---
+            origin_pos = self.pos.copy()
+            if num_shots > 1:
+                # For multi-shots, create a fanned-out spread.
+                spread_angle_deg = 15  # Max angle for the fan
+                # Calculate the angle for this specific shot in the fan
+                angle_offset = ((i / (num_shots - 1)) - 0.5) * spread_angle_deg * 2
+
+                # Get the base angle towards the primary target
+                direction_to_target = target.pos - self.pos
+                base_angle_rad = math.atan2(
+                    direction_to_target.y, direction_to_target.x
+                )
+
+                # Add the offset and create the new origin point
+                offset_angle_rad = base_angle_rad + math.radians(angle_offset)
+                offset_distance = 8  # How far from the center to spawn
+                origin_pos.x += offset_distance * math.cos(offset_angle_rad)
+                origin_pos.y += offset_distance * math.sin(offset_angle_rad)
+
             # --- Create StatusEffect instances for the projectile ---
             effect_instances = []
             for effect_data in self.on_hit_effects:
+                # Check for chance-based effects.
+                chance = effect_data.get("chance", 1.0)
+                if random.random() > chance:
+                    continue  # The effect did not proc this time.
+
                 effect_id = effect_data["id"]
                 if effect_id in self.status_effects_config:
                     effect_definition = self.status_effects_config[effect_id]
@@ -159,26 +205,25 @@ class Tower(Entity):
                             * self.base_effect_duration_multiplier,
                             potency=effect_data.get("potency", 1.0)
                             * self.base_effect_potency_multiplier,
-                            # This is the crucial link for on-death effects.
                             source_entity_id=self.entity_id,
                         )
                     )
 
             # --- Create and return the projectile ---
             new_projectile = Projectile(
-                x=self.pos.x,
-                y=self.pos.y,
+                x=origin_pos.x,
+                y=origin_pos.y,
                 damage=self.damage,
-                target=self.target,
+                target=target,
                 effects_to_apply=effect_instances,
                 pierce_count=self.pierce_count,
                 blast_radius=self.blast_radius,
                 on_blast_effects_data=self.on_blast_effects,
                 status_effects_config=self.status_effects_config,
-                # Pass all other direct-damage upgrade effects
                 armor_shred=self.armor_shred,
                 execute_threshold=self.execute_threshold,
                 on_apply_damage=self.on_apply_damage,
             )
-            projectiles.append(new_projectile)
-        return projectiles
+            projectiles_to_fire.append(new_projectile)
+
+        return projectiles_to_fire
