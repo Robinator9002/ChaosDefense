@@ -5,7 +5,7 @@
     "stat_modifier": 1.0,
     "time_between_waves": 18.0,
     "max_waves": 20,
-    "level_difficulty_increase_interval": 5,
+    "level_difficulty_increase_interval": 4,
     "salvage_refund_percentage": 1.0
   },
   "2": {
@@ -13,7 +13,7 @@
     "stat_modifier": 1.1,
     "time_between_waves": 8.0,
     "max_waves": 25,
-    "level_difficulty_increase_interval": 4,
+    "level_difficulty_increase_interval": 3,
     "salvage_refund_percentage": 0.8
   },
   "3": {
@@ -21,7 +21,7 @@
     "stat_modifier": 1.2,
     "time_between_waves": 4.0,
     "max_waves": 35,
-    "level_difficulty_increase_interval": 3,
+    "level_difficulty_increase_interval": 2,
     "salvage_refund_percentage": 0.8
   },
   "4": {
