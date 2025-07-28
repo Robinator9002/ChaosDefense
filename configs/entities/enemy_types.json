@@ -7,9 +7,9 @@
     "min_level_difficulty": 1,
     "render_props": { "size": 22, "color": [200, 60, 60] },
     "base_stats": {
-      "hp": 25,
-      "speed": 70,
-      "bounty": 5,
+      "hp": 20,
+      "speed": 60,
+      "bounty": 6,
       "damage": 1,
       "armor": 2
     },
