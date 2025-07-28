@@ -3,7 +3,7 @@
 
   "turret": {
     "name": "Basic Turret",
-    "cost": 50,
+    "cost": 40,
     "damage": 8,
     "range": 160,
     "fire_rate": 1.2,
@@ -13,7 +13,7 @@
   "freezer": {
     "//": "REWORKED: Formerly 'Slower'. Renamed and damage significantly reduced to solidify its role as a pure support/utility tower.",
     "name": "Freezer",
-    "cost": 80,
+    "cost": 60,
     "damage": 2,
     "range": 140,
     "fire_rate": 1.0,
@@ -28,7 +28,7 @@
   },
   "cannon": {
     "name": "Cannon Tower",
-    "cost": 110,
+    "cost": 80,
     "damage": 18,
     "range": 200,
     "fire_rate": 0.6,
@@ -39,10 +39,10 @@
   "energy_beacon": {
     "//": "BUFFED: Base damage reduced to 1 to make it clear that its power comes from its debuffs, not direct damage.",
     "name": "Energy Beacon",
-    "cost": 90,
-    "damage": 1,
+    "cost": 100,
+    "damage": 2,
     "range": 170,
-    "fire_rate": 12.0,
+    "fire_rate": 14.0,
     "sprite_key": "towers/beam.png",
     "placeholder_color": [255, 0, 255],
     "effects": {
@@ -55,7 +55,7 @@
   "mortar": {
     "//": "REBALANCED: Damage reduced, range increased. This is a strategic, long-range suppression weapon.",
     "name": "Mortar",
-    "cost": 160,
+    "cost": 120,
     "damage": 25,
     "range": 450,
     "fire_rate": 0.4,

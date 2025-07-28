@@ -130,13 +130,13 @@
     "generation_params": {
       "grid_width": 90,
       "grid_height": 60,
-      "num_paths": 3,
+      "num_paths": 1,
       "level_difficulty": 4,
       "starting_gold": 500,
-      "base_hp": 10,
+      "base_hp": 1,
       "features": {
         "mountains": { "min": 8, "max": 12 },
-        "lakes": { "min": 5, "max": 8 },
+        "lakes": { "min": 30, "max": 40 },
         "trees": { "min": 0, "max": 0 }
       }
     },

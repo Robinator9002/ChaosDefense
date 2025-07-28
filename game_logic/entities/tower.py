@@ -21,11 +21,6 @@ logger = logging.getLogger(__name__)
 class Tower(Entity):
     """
     Represents a defensive tower that can target and attack enemies.
-
-    This class is the factory for projectiles. Its primary role in the update
-    loop is to find valid targets and, when its fire cooldown is ready, create
-    Projectile instances, bundling them with all the necessary stats and effects
-    derived from the tower's current upgrade level.
     """
 
     def __init__(
@@ -39,14 +34,6 @@ class Tower(Entity):
     ):
         """
         Initializes a new Tower entity.
-
-        Args:
-            x (float): The x-coordinate of the tower's center.
-            y (float): The y-coordinate of the tower's center.
-            tile_size (int): The pixel size of a single grid tile.
-            tower_type_id (str): The ID from tower_types.json (e.g., "turret").
-            tower_type_data (Dict[str, Any]): The configuration block for this tower type.
-            status_effects_config (Dict[str, Any]): The full status_effects.json config.
         """
         super().__init__(x, y, max_hp=100)
 
@@ -79,6 +66,11 @@ class Tower(Entity):
         self.base_effect_potency_multiplier = 1.0
         self.on_hit_effects: List[Dict[str, Any]] = []
         self.on_blast_effects: List[Dict[str, Any]] = []
+
+        # --- NEW Attributes for Energy Beacon ---
+        self.bonus_damage_per_debuff = 0
+        self.conditional_effects: List[Dict[str, Any]] = []
+        self.on_hit_area_effects: List[Dict[str, Any]] = []
 
         # Load any innate effects from the tower's base definition.
         initial_effects = tower_type_data.get("effects")
@@ -143,56 +135,38 @@ class Tower(Entity):
     def _fire(self) -> List[Projectile]:
         """
         Creates and returns a list of projectiles aimed at the current target(s).
-        This is the critical point where all upgrade data is bundled up and
-        passed to the new projectile instances. It now handles multi-shot,
-        visual spread, and chance-based effects.
         """
         if not self.current_targets:
             return []
 
-        # Reset the fire cooldown.
         if self.fire_rate > 0:
             self.fire_cooldown = 1.0 / self.fire_rate
         else:
-            # A fire rate of 0 or less means the tower cannot fire.
             self.fire_cooldown = float("inf")
 
         projectiles_to_fire = []
         num_shots = self.projectiles_per_shot
 
-        # Loop for the number of projectiles this tower can fire per shot.
         for i in range(num_shots):
-            # --- Target Selection for Multi-Shot ---
-            # Cycle through the available targets.
             target = self.current_targets[i % len(self.current_targets)]
-
-            # --- Calculate Projectile Origin for Visual Spread ---
             origin_pos = self.pos.copy()
             if num_shots > 1:
-                # For multi-shots, create a fanned-out spread.
-                spread_angle_deg = 15  # Max angle for the fan
-                # Calculate the angle for this specific shot in the fan
+                spread_angle_deg = 15
                 angle_offset = ((i / (num_shots - 1)) - 0.5) * spread_angle_deg * 2
-
-                # Get the base angle towards the primary target
                 direction_to_target = target.pos - self.pos
                 base_angle_rad = math.atan2(
                     direction_to_target.y, direction_to_target.x
                 )
-
-                # Add the offset and create the new origin point
                 offset_angle_rad = base_angle_rad + math.radians(angle_offset)
-                offset_distance = 8  # How far from the center to spawn
+                offset_distance = 8
                 origin_pos.x += offset_distance * math.cos(offset_angle_rad)
                 origin_pos.y += offset_distance * math.sin(offset_angle_rad)
 
-            # --- Create StatusEffect instances for the projectile ---
             effect_instances = []
             for effect_data in self.on_hit_effects:
-                # Check for chance-based effects.
                 chance = effect_data.get("chance", 1.0)
                 if random.random() > chance:
-                    continue  # The effect did not proc this time.
+                    continue
 
                 effect_id = effect_data["id"]
                 if effect_id in self.status_effects_config:
@@ -209,7 +183,6 @@ class Tower(Entity):
                         )
                     )
 
-            # --- Create and return the projectile ---
             new_projectile = Projectile(
                 x=origin_pos.x,
                 y=origin_pos.y,
@@ -223,6 +196,9 @@ class Tower(Entity):
                 armor_shred=self.armor_shred,
                 execute_threshold=self.execute_threshold,
                 on_apply_damage=self.on_apply_damage,
+                bonus_damage_per_debuff=self.bonus_damage_per_debuff,
+                conditional_effects=self.conditional_effects,
+                on_hit_area_effects=self.on_hit_area_effects,
             )
             projectiles_to_fire.append(new_projectile)
 
