@@ -1,8 +1,9 @@
 {
+  "//": "BALANCE PASS: Increased enemy count scaling to make waves longer and more intense, creating more pressure on the player's economy and defenses.",
   "enemy_count": {
-    "base": 5,
-    "per_wave": 2,
-    "per_level_difficulty": 3
+    "base": 8,
+    "per_wave": 3,
+    "per_level_difficulty": 4
   },
   "spawn_cooldown": {
     "base_seconds": 1.5,
