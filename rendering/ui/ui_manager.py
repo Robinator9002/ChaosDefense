@@ -88,16 +88,13 @@ class UIManager:
         The UI has priority; if it handles an event, it returns True to stop
         further processing by the main game window.
         """
-        # Prioritize the upgrade panel if it's active, as it overlays other UI.
         if self.upgrade_panel:
             action = self.upgrade_panel.handle_event(event, game_state)
             if action:
                 self._process_ui_action(action, game_state)
-                return True  # Event was handled by the upgrade panel.
+                return True
 
-        # Check build buttons only if the mouse is over them.
         mouse_pos = pygame.mouse.get_pos()
-        # A quick check to see if the mouse is in the build panel's vertical area.
         if (
             self.build_buttons
             and self.build_buttons[0].rect.y
@@ -105,14 +102,12 @@ class UIManager:
             <= self.build_buttons[0].rect.bottom
         ):
             for button in self.build_buttons:
-                # Check individual button collision before handling event.
                 if button.rect.collidepoint(mouse_pos):
                     action = button.handle_event(event, game_state)
                     if action:
                         self._process_ui_action(action, game_state)
-                        return True  # Event was handled by a build button.
+                        return True
 
-        # If no UI element handled the event, return False.
         return False
 
     def _process_ui_action(self, action: str, game_state: "GameState"):
@@ -121,7 +116,6 @@ class UIManager:
         """
         if action.startswith("select_tower_"):
             tower_id = action.replace("select_tower_", "")
-            # Toggle selection: if clicking the same button, deselect. Otherwise, select.
             if game_state.selected_tower_to_build == tower_id:
                 game_state.clear_selection()
             else:
@@ -133,15 +127,11 @@ class UIManager:
             tower_id = game_state.selected_entity_id
 
             if tower_id:
-                # The path_id is inferred from the upgrade's name, e.g., "turret_a1" -> "path_a"
                 path_char = upgrade_id.split("_")[-1][0]
                 path_id = f"path_{path_char}"
 
                 self.game_manager.purchase_tower_upgrade(tower_id, path_id)
 
-                # After an upgrade, the panel's data is stale.
-                # Forcing it to None will cause it to be recreated in the next
-                # `update` cycle with the new tower stats.
                 if self.upgrade_panel:
                     self.upgrade_panel = None
             else:
@@ -149,11 +139,18 @@ class UIManager:
                     "Upgrade purchased but no tower was selected in GameState."
                 )
 
-        # --- NEW: Handle the close button action from the Upgrade Panel ---
         elif action == "close_panel":
-            # This simply clears the selection, which will cause the UIManager's
-            # update loop to destroy the upgrade panel instance.
             game_state.clear_selection()
+
+        # --- NEW: Handle the salvage button action ---
+        elif action == "salvage_tower":
+            tower_id = game_state.selected_entity_id
+            if tower_id:
+                # The UIManager tells the GameManager WHICH tower to salvage.
+                # The GameManager handles all the underlying logic.
+                self.game_manager.salvage_tower(tower_id)
+            else:
+                logger.warning("Salvage action received but no tower was selected.")
 
     def update(self, dt: float, game_state: "GameState"):
         """
@@ -165,8 +162,6 @@ class UIManager:
 
         selected_id = game_state.selected_entity_id
         if selected_id:
-            # If a tower is selected, but we have no panel OR the panel is for the wrong tower,
-            # create a new one.
             if (
                 not self.upgrade_panel
                 or self.upgrade_panel.tower.entity_id != selected_id
@@ -176,22 +171,30 @@ class UIManager:
                     None,
                 )
                 if selected_tower:
-                    # Define the panel's rectangle on screen.
                     panel_rect = pygame.Rect(self.screen_rect.width - 270, 10, 260, 400)
+
+                    # --- NEW: Get the current salvage rate from the game logic ---
+                    # This ensures the UI always displays the correct value based on difficulty.
+                    salvage_rate = 0.0
+                    if self.game_manager.wave_manager:
+                        salvage_rate = self.game_manager.wave_manager.settings.get(
+                            "salvage_refund_percentage", 0.0
+                        )
+
+                    # Create the panel, now passing the salvage rate to it.
                     self.upgrade_panel = UpgradePanel(
                         rect=panel_rect,
                         tower=selected_tower,
                         upgrade_manager=self.game_manager.upgrade_manager,
                         game_state=game_state,
+                        salvage_refund_percentage=salvage_rate,
                     )
         else:
-            # If no entity is selected, ensure the upgrade panel is removed.
             if self.upgrade_panel:
                 self.upgrade_panel = None
 
     def draw(self, screen: pygame.Surface, game_state: "GameState"):
         """Draws all managed UI elements."""
-        # Draw the bottom panel for tower build buttons
         panel_rect = pygame.Rect(
             0, self.screen_rect.bottom - 80, self.screen_rect.width, 80
         )
@@ -202,6 +205,5 @@ class UIManager:
         for button in self.build_buttons:
             button.draw(screen, game_state)
 
-        # Draw the upgrade panel only if it exists.
         if self.upgrade_panel:
             self.upgrade_panel.draw(screen)
