@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 class Enemy(Entity):
     """
     Represents an enemy unit that moves along a path.
+    Now supports immunities to certain status effects.
     """
 
     def __init__(
@@ -51,6 +52,11 @@ class Enemy(Entity):
         )
         self.damage_to_base = int(base_stats.get("damage", 1) * difficulty_modifier)
 
+        # --- NEW: Immunity System ---
+        # Loads a list of status effect IDs (e.g., ["slow", "stun"]) from the
+        # config. The enemy will be completely immune to these effects.
+        self.immunities: List[str] = base_stats.get("immunities", [])
+
         self.path = path
         self.tile_size = tile_size
         self.pixel_path = [
@@ -79,7 +85,7 @@ class Enemy(Entity):
         self, amount: int, armor_shred: int = 0, ignores_armor: bool = False
     ):
         """
-        Reduces the entity's current HP by a given amount.
+        Reduces the entity's current HP by a given amount, factoring in armor.
         """
         if not self.is_alive:
             return
@@ -98,13 +104,25 @@ class Enemy(Entity):
 
     def apply_status_effect(self, new_effect: "StatusEffect"):
         """
-        Applies a new status effect to the enemy, handling stacking logic.
+        Applies a new status effect to the enemy, checking for immunities first,
+        and then handling stacking logic.
         """
+        # --- NEW: Immunity Check ---
+        # Before any logic is processed, check if the enemy is immune to this
+        # specific effect type. If so, the effect is completely ignored.
+        if new_effect.effect_id in self.immunities:
+            logger.debug(
+                f"Enemy {self.entity_id} resisted effect '{new_effect.effect_id}' due to immunity."
+            )
+            return
+
+        # Check for an existing effect of the same type to stack with.
         for existing_effect in self.status_effects:
             if existing_effect.effect_id == new_effect.effect_id:
                 existing_effect.stack_with(new_effect)
                 return
 
+        # If no existing effect was found, add the new one to the list.
         self.status_effects.append(new_effect)
 
     def _update_status_effects(self, dt: float):
@@ -112,6 +130,7 @@ class Enemy(Entity):
         if not self.status_effects:
             return
 
+        # Iterate backwards to safely remove items from the list.
         for i in range(len(self.status_effects) - 1, -1, -1):
             effect = self.status_effects[i]
             dot_damage = effect.update(dt)
@@ -125,6 +144,7 @@ class Enemy(Entity):
     def _apply_stat_modifiers(self):
         """
         Calculates final stats for this frame based on active status effects.
+        Resets stats to base values first, then applies all active modifiers.
         """
         self.speed = self.base_speed
         self.armor = self.base_armor

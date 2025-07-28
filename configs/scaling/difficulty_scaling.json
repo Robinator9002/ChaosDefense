@@ -4,15 +4,15 @@
     "name": "Easy",
     "stat_modifier": 1.0,
     "time_between_waves": 18.0,
-    "max_waves": 20,
-    "level_difficulty_increase_interval": 3,
+    "max_waves": 30,
+    "level_difficulty_increase_interval": 2,
     "salvage_refund_percentage": 1.0
   },
   "2": {
     "name": "Normal",
     "stat_modifier": 1.1,
     "time_between_waves": 8.0,
-    "max_waves": 25,
+    "max_waves": 40,
     "level_difficulty_increase_interval": 2,
     "salvage_refund_percentage": 0.8
   },
@@ -20,7 +20,7 @@
     "name": "Hard",
     "stat_modifier": 1.2,
     "time_between_waves": 4.0,
-    "max_waves": 35,
+    "max_waves": 50,
     "level_difficulty_increase_interval": 1,
     "salvage_refund_percentage": 0.8
   },
@@ -28,7 +28,7 @@
     "name": "Chaos",
     "stat_modifier": 1.3,
     "time_between_waves": 0.0,
-    "max_waves": 50,
+    "max_waves": 60,
     "level_difficulty_increase_interval": 1,
     "salvage_refund_percentage": 0.75
   }
