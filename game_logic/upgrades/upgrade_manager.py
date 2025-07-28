@@ -5,9 +5,6 @@ from typing import Dict, Any, Optional, TYPE_CHECKING
 from .upgrade import Upgrade
 
 # Use TYPE_CHECKING to avoid a circular import dependency at runtime.
-# This allows type hints for the Tower class without causing import errors,
-# as the type checker can see it, but the Python interpreter does not
-# execute the import.
 if TYPE_CHECKING:
     from ..entities.tower import Tower
 
@@ -47,12 +44,19 @@ class UpgradeManager:
         Parses the raw upgrade definition dictionary into Upgrade objects.
         This internal method populates the self.definitions dictionary.
         """
-        for tower_type_id, paths in raw_definitions.items():
+        for tower_type_id, paths_data in raw_definitions.items():
+            # --- BUG FIX: VALIDATION STEP ---
+            # Before processing, check if the value for this key is actually
+            # a dictionary. This prevents the code from crashing on comment
+            # lines or other non-dict data in the JSON file.
+            if not isinstance(paths_data, dict):
+                logger.debug(
+                    f"Skipping non-dictionary key '{tower_type_id}' in upgrade definitions."
+                )
+                continue
+
             self.definitions[tower_type_id] = {}
-            for path_id, path_data in paths.items():
-                # Using a list comprehension to create Upgrade objects from the data.
-                # The **upgrade_data syntax unpacks the dictionary from the JSON
-                # directly into the arguments of the Upgrade dataclass constructor.
+            for path_id, path_data in paths_data.items():
                 self.definitions[tower_type_id][path_id] = [
                     Upgrade(**upgrade_data)
                     for upgrade_data in path_data.get("upgrades", [])
