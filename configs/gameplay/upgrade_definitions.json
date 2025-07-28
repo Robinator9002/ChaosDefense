@@ -31,7 +31,12 @@
           "cost": 80,
           "description": "Shots have a chance to briefly stun enemies.",
           "effects": {
-            "add_effect": { "id": "stun", "potency": 0.25, "duration": 0.5 }
+            "add_effect": {
+              "id": "stun",
+              "potency": 0.0,
+              "duration": 0.5,
+              "chance": 0.25
+            }
           }
         },
         {
@@ -79,7 +84,7 @@
           "cost": 120,
           "description": "Projectiles set enemies on fire, dealing damage over time.",
           "effects": {
-            "add_effect": { "id": "fire", "potency": 10, "duration": 3 }
+            "add_effect": { "id": "fire", "potency": 8, "duration": 3 }
           }
         },
         {
@@ -269,7 +274,7 @@
           "cost": 180,
           "description": "Shells corrode armor, making targets take more damage from all sources.",
           "effects": {
-            "add_effect": { "id": "armor_break", "potency": 1.2, "duration": 5 }
+            "add_effect": { "id": "armor_break", "potency": 5, "duration": 5 }
           }
         },
         {

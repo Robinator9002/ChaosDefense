@@ -3,6 +3,7 @@
     "name": "Slow",
     "type": "stat_modifier",
     "stacking": "refresh",
+    "description": "Reduces enemy movement speed.",
     "params": {
       "stat": "speed",
       "multiplier": 0.6
@@ -50,19 +51,19 @@
   },
   "armor_break": {
     "name": "Armor Break",
-    "type": "stat_modifier",
-    "stacking": "refresh",
-    "description": "Reduces enemy armor, causing them to take increased damage.",
+    "type": "stat_debuff",
+    "stacking": "stack_potency",
+    "description": "Reduces enemy armor, causing them to take increased damage from physical attacks.",
     "params": {
-      "stat": "damage_taken_multiplier",
-      "multiplier": 1.2
+      "stat": "armor",
+      "amount": 5
     }
   },
   "vulnerability": {
     "name": "Vulnerability",
     "type": "stat_modifier",
     "stacking": "refresh",
-    "description": "Makes the enemy vulnerable, causing them to take increased damage.",
+    "description": "Makes the enemy vulnerable, causing them to take increased damage from all sources.",
     "params": {
       "stat": "damage_taken_multiplier",
       "multiplier": 1.25
