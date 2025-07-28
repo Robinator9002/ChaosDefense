@@ -1,5 +1,5 @@
 {
-  "//": "Tower Roster Overhaul: Added Beam Emitter (single-target specialist) and Mortar (long-range AoE).",
+  "//": "Tower Roster Overhaul: Reworked the Beam Emitter into the 'Energy Beacon', a utility-focused tower.",
 
   "turret": {
     "name": "Basic Turret",
@@ -36,22 +36,24 @@
     "placeholder_color": [80, 80, 100]
   },
 
-  "beam_emitter": {
-    "//": "NEW TOWER: Single-target specialist. Damage ramps up the longer it focuses on one enemy.",
-    "name": "Beam Emitter",
-    "cost": 125,
-    "damage": 4,
-    "range": 180,
-    "fire_rate": 8.0,
+  "energy_beacon": {
+    "//": "REWORKED: Now a cheap utility tower. Starts weak but has massive endgame potential via upgrades.",
+    "name": "Energy Beacon",
+    "cost": 80,
+    "damage": 2,
+    "range": 170,
+    "fire_rate": 10.0,
     "sprite_key": "towers/beam.png",
     "placeholder_color": [255, 0, 255],
-    "special_properties": {
-      "ramping_damage_per_hit": 1
+    "effects": {
+      "slow": {
+        "potency": 0.15,
+        "duration": 1.0
+      }
     }
   },
 
   "mortar": {
-    "//": "NEW TOWER: Strategic long-range AoE. Slow fire rate, but high damage and large blast radius.",
     "name": "Mortar",
     "cost": 150,
     "damage": 40,

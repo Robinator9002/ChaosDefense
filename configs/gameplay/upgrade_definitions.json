@@ -1,5 +1,5 @@
 {
-  "//": "Full Roster Rebalance: Added two new towers and their upgrade paths. Re-tuned costs of existing upgrades to ensure strategic parity.",
+  "//": "Full Roster Rebalance: Overhauled the 'Energy Beacon' (formerly Beam Emitter) with new upgrade paths.",
   "turret": {
     "path_a": {
       "name": "Heavy Caliber",
@@ -288,94 +288,109 @@
       ]
     }
   },
-  "beam_emitter": {
+  "energy_beacon": {
     "path_a": {
-      "name": "Focusing Lens",
-      "description": "Dramatically increases the beam's single-target damage potential.",
+      "name": "Debuff Cascade",
+      "description": "Adds a new, stacking status effect with each upgrade.",
       "upgrades": [
         {
-          "id": "beam_a1",
-          "name": "Improved Emitter",
-          "cost": 70,
-          "description": "Doubles the rate at which damage ramps up.",
-          "effects": { "add_ramping_damage_per_hit": 1 }
-        },
-        {
-          "id": "beam_a2",
-          "name": "Crystal Amplifier",
-          "cost": 90,
-          "description": "Increases the beam's base damage by 4.",
-          "effects": { "add_damage": 4 }
-        },
-        {
-          "id": "beam_a3",
-          "name": "Overcharge",
-          "cost": 140,
-          "description": "Further increases the damage ramp-up rate.",
-          "effects": { "add_ramping_damage_per_hit": 2 }
-        },
-        {
-          "id": "beam_a4",
-          "name": "Meltdown",
-          "cost": 200,
-          "description": "The beam now melts armor, reducing it by 1 for every hit.",
-          "effects": { "add_armor_shred_per_hit": 1 }
-        },
-        {
-          "id": "beam_a5",
-          "name": "Super-Focus",
-          "cost": 250,
-          "description": "Final upgrade. Massively increases base damage and range.",
-          "effects": { "add_damage": 10, "add_range": 60 }
-        }
-      ]
-    },
-    "path_b": {
-      "name": "Prismatic Core",
-      "description": "Adds powerful utility and multi-target capabilities to the beam.",
-      "upgrades": [
-        {
-          "id": "beam_b1",
-          "name": "Diffraction Lens",
-          "cost": 80,
-          "description": "The beam now slows the target.",
+          "id": "beacon_a1",
+          "name": "Corrosive Particles",
+          "cost": 60,
+          "description": "Beacon now applies a stacking armor break effect.",
           "effects": {
-            "add_effect": { "id": "slow", "potency": 0.3, "duration": 1.0 }
+            "add_effect": { "id": "armor_break", "potency": 1, "duration": 3 }
           }
         },
         {
-          "id": "beam_b2",
-          "name": "Extended Range",
-          "cost": 100,
-          "description": "Increases the beam's range by 50.",
-          "effects": { "add_range": 50 }
-        },
-        {
-          "id": "beam_b3",
-          "name": "Chain Lightning",
-          "cost": 150,
-          "description": "When the primary target dies, the beam chains to a nearby enemy.",
-          "effects": { "set_chaining": 1 }
-        },
-        {
-          "id": "beam_b4",
-          "name": "Vulnerability Field",
-          "cost": 220,
-          "description": "The beam makes the target vulnerable, taking 20% more damage.",
+          "id": "beacon_a2",
+          "name": "Vulnerability Scan",
+          "cost": 90,
+          "description": "Beacon now also makes targets vulnerable.",
           "effects": {
             "add_effect": {
               "id": "vulnerability",
-              "potency": 1.2,
-              "duration": 1.5
+              "potency": 1.1,
+              "duration": 2
             }
           }
         },
         {
-          "id": "beam_b5",
-          "name": "Grand Prism",
+          "id": "beacon_a3",
+          "name": "Long-Range Emitter",
+          "cost": 120,
+          "description": "Increases range and fire rate to apply effects more reliably.",
+          "effects": { "add_range": 40, "multiply_fire_rate": 1.2 }
+        },
+        {
+          "id": "beacon_a4",
+          "name": "Hemorrhage Signal",
+          "cost": 180,
+          "description": "Beacon now also applies a stacking bleed effect.",
+          "effects": {
+            "add_effect": { "id": "bleed", "potency": 5, "duration": 4 }
+          }
+        },
+        {
+          "id": "beacon_a5",
+          "name": "System Shock",
           "cost": 300,
-          "description": "The beam can now chain to two additional targets.",
-          "effects": { "set_chaining": 2 }
+          "description": "Beacon deals bonus damage for each unique status effect on the target.",
+          "effects": { "add_bonus_damage_per_debuff": 5 }
+        }
+      ]
+    },
+    "path_b": {
+      "name": "Focused Intensity",
+      "description": "Dramatically enhances the beacon's primary slow effect.",
+      "upgrades": [
+        {
+          "id": "beacon_b1",
+          "name": "Lingering Field",
+          "cost": 50,
+          "description": "Greatly increases the duration of the slow effect.",
+          "effects": { "multiply_effect_duration": 2.0 }
+        },
+        {
+          "id": "beacon_b2",
+          "name": "Deep Chill",
+          "cost": 80,
+          "description": "Greatly increases the potency of the slow effect.",
+          "effects": { "multiply_effect_potency": 1.5 }
+        },
+        {
+          "id": "beacon_b3",
+          "name": "Cryo-Shock",
+          "cost": 110,
+          "description": "Deals a burst of 20 damage when the slow is first applied.",
+          "effects": { "add_on_apply_damage": 20 }
+        },
+        {
+          "id": "beacon_b4",
+          "name": "Flash Freeze",
+          "cost": 200,
+          "description": "Has a chance to briefly stun targets already affected by the beacon's slow.",
+          "effects": {
+            "add_conditional_effect": {
+              "if_target_has": "slow",
+              "chance": 0.15,
+              "effect": { "id": "stun", "potency": 0, "duration": 0.25 }
+            }
+          }
+        },
+        {
+          "id": "beacon_b5",
+          "name": "Absolute Zero",
+          "cost": 350,
+          "description": "The beam periodically releases a frost nova, slowing and damaging nearby enemies.",
+          "effects": {
+            "add_area_effect_on_hit": {
+              "chance": 0.2,
+              "radius": 60,
+              "damage": 15,
+              "effect": { "id": "slow", "potency": 0.3, "duration": 2.0 }
+            }
+          }
         }
       ]
     }
