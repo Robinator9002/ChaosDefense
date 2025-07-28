@@ -82,9 +82,6 @@ class Game:
 
         style_config = {}
         for style in self.game_manager.level_manager.level_styles.values():
-            # --- BUG FIX: VALIDATION STEP ---
-            # Ensure we only process actual level style dictionaries, skipping
-            # any comments or other non-dict data in the JSON file.
             if isinstance(style, dict):
                 gen_params = style.get("generation_params", {})
                 if gen_params.get("grid_width") == grid.width:
@@ -122,28 +119,64 @@ class Game:
                 self.running = False
                 return
 
+            # Give the UI the first chance to handle any event.
             ui_handled_event = self.ui_manager.handle_event(
                 event, self.game_manager.game_state
             )
 
+            # If the UI did not consume the event, process it for game world interaction.
             if not ui_handled_event:
                 if event.type == pygame.VIDEORESIZE:
                     self._on_resize(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    self._handle_map_click(event)
+                    # Route mouse clicks to a dedicated handler for clarity.
+                    self._handle_mouse_down(event)
                 elif event.type == pygame.MOUSEBUTTONUP:
-                    if event.button == 2 or event.button == 3:
+                    # Stop panning when the middle mouse button is released.
+                    if event.button == 2:
                         self.is_panning = False
                 elif event.type == pygame.MOUSEMOTION:
                     if self.is_panning:
                         self._handle_pan(event)
-                # --- NEW: Handle Keyboard Input for Hotkeys ---
                 elif event.type == pygame.KEYDOWN:
                     self._handle_keyboard_input(event.key)
 
+    def _handle_mouse_down(self, event):
+        """
+        Handles all mouse down events, routing them based on the button.
+        This is the core of the new input remapping.
+        """
+        # --- Left Click (Action Button) ---
+        if event.button == 1:
+            self._handle_map_click(event)
+
+        # --- Middle Click (Pan Camera) ---
+        elif event.button == 2:
+            self.is_panning = True
+            self.pan_start_mouse_pos = pygame.Vector2(event.pos)
+            self.pan_start_camera_offset = self.camera_offset.copy()
+
+        # --- Right Click (Cancel / Deselect) ---
+        elif event.button == 3:
+            game_state = self.game_manager.game_state
+            # If the player is trying to build a tower OR has a tower selected,
+            # right-clicking will cancel that action and clear the selection.
+            if game_state.selected_tower_to_build or game_state.selected_entity_id:
+                game_state.clear_selection()
+                logger.debug("Player cancelled action with right-click.")
+
+        # --- Scroll Wheel Up (Zoom In) ---
+        elif event.button == 4:
+            self.zoom = min(self.zoom + ZOOM_INCREMENT, MAX_ZOOM)
+            self._clamp_camera_offset()
+
+        # --- Scroll Wheel Down (Zoom Out) ---
+        elif event.button == 5:
+            self.zoom = max(self.zoom - ZOOM_INCREMENT, self.min_zoom)
+            self._clamp_camera_offset()
+
     def _handle_keyboard_input(self, key):
         """Handles keyboard presses for game actions, like tower selection."""
-        # Map pygame key constants to numbers 1-9
         key_to_number = {
             pygame.K_1: 1,
             pygame.K_2: 2,
@@ -160,11 +193,9 @@ class Game:
             number_pressed = key_to_number[key]
             hotkey_index = number_pressed - 1
 
-            # Check if the pressed number corresponds to a valid tower hotkey
             if 0 <= hotkey_index < len(self.ui_manager.hotkey_map):
                 tower_id = self.ui_manager.hotkey_map[hotkey_index]
                 game_state = self.game_manager.game_state
-
                 # Toggle selection logic
                 if game_state.selected_tower_to_build == tower_id:
                     game_state.clear_selection()
@@ -176,49 +207,45 @@ class Game:
 
     def _handle_map_click(self, event):
         """
-        Handles mouse clicks that occur on the game map (not the UI).
+        Handles left-clicks that occur on the game map (not the UI).
         """
-        if event.button == 1:
-            game_state = self.game_manager.game_state
+        game_state = self.game_manager.game_state
 
-            if game_state.selected_tower_to_build:
-                world_pos = self._screen_to_world(pygame.Vector2(event.pos))
-                tile_x = int(world_pos.x // self.tile_size)
-                tile_y = int(world_pos.y // self.tile_size)
-                self.game_manager.place_tower(
-                    game_state.selected_tower_to_build, tile_x, tile_y
-                )
-                game_state.clear_selection()
-                return
-
+        # --- Action 1: Place a selected tower ---
+        if game_state.selected_tower_to_build:
             world_pos = self._screen_to_world(pygame.Vector2(event.pos))
-            clicked_on_tower = False
-            for tower in self.game_manager.towers:
-                if tower.rect.collidepoint(world_pos):
-                    if game_state.selected_entity_id == tower.entity_id:
-                        game_state.clear_selection()
-                    else:
-                        game_state.selected_entity_id = tower.entity_id
-                        logger.info(
-                            f"Player selected tower {tower.entity_id} for upgrade."
-                        )
-                    clicked_on_tower = True
-                    break
+            tile_x = int(world_pos.x // self.tile_size)
+            tile_y = int(world_pos.y // self.tile_size)
 
-            if not clicked_on_tower:
-                game_state.clear_selection()
+            # The game manager now returns True on successful placement
+            self.game_manager.place_tower(
+                game_state.selected_tower_to_build, tile_x, tile_y
+            )
 
-        elif event.button == 2 or event.button == 3:
-            self.is_panning = True
-            self.pan_start_mouse_pos = pygame.Vector2(event.pos)
-            self.pan_start_camera_offset = self.camera_offset.copy()
+            # MODIFICATION: The selection is NO LONGER cleared automatically.
+            # This allows the player to place multiple towers of the same type
+            # without re-selecting from the UI. The action is cancelled via
+            # Right-Click or by selecting another tower.
+            return
 
-        elif event.button == 4:
-            self.zoom = min(self.zoom + ZOOM_INCREMENT, MAX_ZOOM)
-            self._clamp_camera_offset()
-        elif event.button == 5:
-            self.zoom = max(self.zoom - ZOOM_INCREMENT, self.min_zoom)
-            self._clamp_camera_offset()
+        # --- Action 2: Select an existing tower on the map ---
+        world_pos = self._screen_to_world(pygame.Vector2(event.pos))
+        clicked_on_tower = False
+        for tower in self.game_manager.towers:
+            if tower.rect.collidepoint(world_pos):
+                # If we click the same tower that is already selected, deselect it.
+                if game_state.selected_entity_id == tower.entity_id:
+                    game_state.clear_selection()
+                # Otherwise, select the new tower.
+                else:
+                    game_state.selected_entity_id = tower.entity_id
+                    logger.info(f"Player selected tower {tower.entity_id} for upgrade.")
+                clicked_on_tower = True
+                break
+
+        # If we clicked on the empty map, clear any selection.
+        if not clicked_on_tower:
+            game_state.clear_selection()
 
     def _handle_pan(self, event):
         """Handles camera movement when panning."""
