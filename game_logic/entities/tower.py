@@ -51,6 +51,12 @@ class Tower(Entity):
         self.path_a_tier = 0
         self.path_b_tier = 0
 
+        # --- NEW: Salvage Value Tracking ---
+        # This attribute tracks the total gold spent on this tower,
+        # including its base cost and all purchased upgrades. It is essential
+        # for calculating the correct salvage refund amount.
+        self.total_investment: int = self.cost
+
         # --- Firing and Targeting State ---
         self.fire_cooldown = 0.0
         self.current_targets: List[Enemy] = []
