@@ -18,13 +18,22 @@
       }
     },
     "tile_definitions": {
-      "BUILDABLE": { "sprite": "environment/grass_buildable.png" },
-      "PATH": { "sprite": "environment/dirt_path.png" },
-      "BASE_ZONE": { "sprite": "environment/base_foundation.png" },
-      "TREE": { "sprite": "environment/tree.png" },
-      "MOUNTAIN": { "sprite": "environment/mountain.png" },
-      "LAKE": { "sprite": "environment/water.png" },
-      "BORDER": { "sprite": "environment/border.png" }
+      "BUILDABLE": {
+        "color": [50, 120, 50],
+        "sprite": "environment/grass_buildable.png"
+      },
+      "PATH": { "color": [139, 69, 19], "sprite": "environment/dirt_path.png" },
+      "BASE_ZONE": {
+        "color": [184, 134, 11],
+        "sprite": "environment/base_foundation.png"
+      },
+      "TREE": { "color": [34, 80, 34], "sprite": "environment/tree.png" },
+      "MOUNTAIN": {
+        "color": [100, 100, 100],
+        "sprite": "environment/mountain.png"
+      },
+      "LAKE": { "color": [70, 80, 190], "sprite": "environment/water.png" },
+      "BORDER": { "color": [10, 20, 12], "sprite": "environment/border.png" }
     }
   },
 
@@ -45,18 +54,36 @@
       }
     },
     "tile_definitions": {
-      "BUILDABLE": { "sprite": "environment/rock_buildable.png" },
-      "PATH": { "sprite": "environment/gravel_path.png" },
-      "BASE_ZONE": { "sprite": "environment/base_foundation_rock.png" },
-      "TREE": { "sprite": "environment/rock_obstacle.png" },
-      "MOUNTAIN": { "sprite": "environment/mountain_dark.png" },
-      "LAKE": { "sprite": "environment/water_dark.png" },
-      "BORDER": { "sprite": "environment/border_dark.png" }
+      "BUILDABLE": {
+        "color": [119, 136, 153],
+        "sprite": "environment/rock_buildable.png"
+      },
+      "PATH": {
+        "color": [210, 180, 140],
+        "sprite": "environment/gravel_path.png"
+      },
+      "BASE_ZONE": {
+        "color": [112, 128, 144],
+        "sprite": "environment/base_foundation_rock.png"
+      },
+      "TREE": {
+        "color": [47, 79, 79],
+        "sprite": "environment/rock_obstacle.png"
+      },
+      "MOUNTAIN": {
+        "color": [40, 40, 50],
+        "sprite": "environment/mountain_dark.png"
+      },
+      "LAKE": {
+        "color": [90, 90, 150],
+        "sprite": "environment/water_dark.png"
+      },
+      "BORDER": { "color": [5, 5, 10], "sprite": "environment/border_dark.png" }
     }
   },
 
   "Volcanic": {
-    "//": "ROLE: Hard Difficulty. Tests economic efficiency. Low starting gold and HP, with a high level difficulty. Lava fields severely restrict buildable space, making long-range towers (like Cannons) very valuable.",
+    "//": "ROLE: Hard Difficulty. Tests economic efficiency. Lava fields severely restrict buildable space.",
     "background_color": [40, 20, 20],
     "generation_params": {
       "grid_width": 90,
@@ -72,18 +99,33 @@
       }
     },
     "tile_definitions": {
-      "BUILDABLE": { "sprite": "environment/ash_buildable.png" },
-      "PATH": { "sprite": "environment/obsidian_path.png" },
-      "BASE_ZONE": { "sprite": "environment/base_foundation_volcanic.png" },
-      "TREE": { "sprite": "environment/rock_obstacle.png" },
-      "MOUNTAIN": { "sprite": "environment/volcano.png" },
-      "LAKE": { "sprite": "environment/lava.png" },
-      "BORDER": { "sprite": "environment/border_dark.png" }
+      "BUILDABLE": {
+        "color": [80, 70, 70],
+        "sprite": "environment/ash_buildable.png"
+      },
+      "PATH": {
+        "color": [20, 20, 20],
+        "sprite": "environment/obsidian_path.png"
+      },
+      "BASE_ZONE": {
+        "color": [50, 40, 40],
+        "sprite": "environment/base_foundation_volcanic.png"
+      },
+      "TREE": {
+        "color": [47, 79, 79],
+        "sprite": "environment/rock_obstacle.png"
+      },
+      "MOUNTAIN": {
+        "color": [60, 30, 30],
+        "sprite": "environment/volcano.png"
+      },
+      "LAKE": { "color": [255, 100, 0], "sprite": "environment/lava.png" },
+      "BORDER": { "color": [15, 5, 5], "sprite": "environment/border_dark.png" }
     }
   },
 
   "CrystalCaverns": {
-    "//": "ROLE: Unique Challenge. Tests burst damage and crowd control. Paths are shorter, giving less time to react. Fewer buildable tiles are available, but they are clustered around the paths, rewarding dense, synergistic tower setups.",
+    "//": "ROLE: Unique Challenge. Shorter paths test burst damage and crowd control.",
     "background_color": [25, 20, 40],
     "generation_params": {
       "grid_width": 70,
@@ -99,13 +141,28 @@
       }
     },
     "tile_definitions": {
-      "BUILDABLE": { "sprite": "environment/crystal_floor.png" },
-      "PATH": { "sprite": "environment/crystal_path.png" },
-      "BASE_ZONE": { "sprite": "environment/base_foundation_crystal.png" },
-      "TREE": { "sprite": "environment/rock_obstacle.png" },
-      "MOUNTAIN": { "sprite": "environment/crystal_formation.png" },
-      "LAKE": { "sprite": "environment/chasm.png" },
-      "BORDER": { "sprite": "environment/cave_wall.png" }
+      "BUILDABLE": {
+        "color": [80, 70, 100],
+        "sprite": "environment/crystal_floor.png"
+      },
+      "PATH": {
+        "color": [150, 140, 180],
+        "sprite": "environment/crystal_path.png"
+      },
+      "BASE_ZONE": {
+        "color": [60, 50, 80],
+        "sprite": "environment/base_foundation_crystal.png"
+      },
+      "TREE": {
+        "color": [47, 79, 79],
+        "sprite": "environment/rock_obstacle.png"
+      },
+      "MOUNTAIN": {
+        "color": [200, 190, 220],
+        "sprite": "environment/crystal_formation.png"
+      },
+      "LAKE": { "color": [10, 5, 20], "sprite": "environment/chasm.png" },
+      "BORDER": { "color": [20, 15, 30], "sprite": "environment/cave_wall.png" }
     }
   }
 }
