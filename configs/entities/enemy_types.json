@@ -1,36 +1,11 @@
 {
-  "//": "Enemy Roster Overhaul: The goal is to create a 'strategic triangle'. Grunts are generalists, Runners test speed, and Guardians test armor-piercing.",
+  "//": "ENEMY ROSTER OVERHAUL: Expanded the enemy roster to introduce more strategic variety and clear threats. Rebalanced existing units to better fit their intended roles.",
 
-  "grunt": {
-    "//": "The baseline, all-around enemy. No special strengths or weaknesses.",
-    "name": "Grunt",
+  "scout": {
+    "//": "ROLE: Early-game speed check. Tests map coverage and punishes slow-firing towers.",
+    "name": "Scout",
     "min_level_difficulty": 1,
-    "render_props": {
-      "size": 22,
-      "color": [200, 60, 60]
-    },
-    "base_stats": {
-      "hp": 25,
-      "speed": 70,
-      "bounty": 5,
-      "damage": 1,
-      "armor": 2
-    },
-    "scaling_per_level": {
-      "hp": 1.12,
-      "speed": 1.05,
-      "bounty": 1.1
-    }
-  },
-
-  "runner": {
-    "//": "NEW ENEMY: Fast and weak. Designed to punish slow-firing towers and test map coverage.",
-    "name": "Runner",
-    "min_level_difficulty": 1,
-    "render_props": {
-      "size": 18,
-      "color": [230, 120, 120]
-    },
+    "render_props": { "size": 18, "color": [230, 120, 120] },
     "base_stats": {
       "hp": 15,
       "speed": 130,
@@ -38,54 +13,81 @@
       "damage": 1,
       "armor": 0
     },
-    "scaling_per_level": {
-      "hp": 1.08,
-      "speed": 1.1,
-      "bounty": 1.08
-    }
+    "scaling_per_level": { "hp": 1.08, "speed": 1.1, "bounty": 1.08 }
+  },
+
+  "grunt": {
+    "//": "ROLE: Generalist. The baseline enemy that makes up the bulk of early waves.",
+    "name": "Grunt",
+    "min_level_difficulty": 2,
+    "render_props": { "size": 22, "color": [200, 60, 60] },
+    "base_stats": {
+      "hp": 25,
+      "speed": 70,
+      "bounty": 5,
+      "damage": 1,
+      "armor": 2
+    },
+    "scaling_per_level": { "hp": 1.12, "speed": 1.05, "bounty": 1.1 }
   },
 
   "tank": {
-    "//": "REBALANCED: Now a true 'health sponge'. Has moderate armor, but its main threat is its massive HP pool.",
+    "//": "ROLE: Health sponge. A straightforward test of the player's raw damage output.",
     "name": "Tank",
-    "min_level_difficulty": 2,
-    "render_props": {
-      "size": 30,
-      "color": [150, 40, 40]
-    },
+    "min_level_difficulty": 4,
+    "render_props": { "size": 30, "color": [150, 40, 40] },
     "base_stats": {
-      "hp": 80,
+      "hp": 100,
       "speed": 50,
       "bounty": 10,
       "damage": 5,
       "armor": 8
     },
-    "scaling_per_level": {
-      "hp": 1.15,
-      "speed": 1.05,
-      "bounty": 1.15
-    }
+    "scaling_per_level": { "hp": 1.18, "speed": 1.05, "bounty": 1.15 }
+  },
+
+  "runner": {
+    "//": "ROLE: Late-game speed threat. A pure test of map coverage and high-velocity projectiles.",
+    "name": "Runner",
+    "min_level_difficulty": 6,
+    "render_props": { "size": 20, "color": [255, 180, 180] },
+    "base_stats": {
+      "hp": 40,
+      "speed": 160,
+      "bounty": 8,
+      "damage": 2,
+      "armor": 2
+    },
+    "scaling_per_level": { "hp": 1.12, "speed": 1.12, "bounty": 1.1 }
   },
 
   "guardian": {
-    "//": "NEW ENEMY: The 'armor wall'. Low HP but extremely high armor. Makes armor-shredding upgrades essential.",
+    "//": "ROLE: Armor wall. Requires sustained fire from armor-shredding towers to take down.",
     "name": "Guardian",
-    "min_level_difficulty": 4,
-    "render_props": {
-      "size": 26,
-      "color": [180, 180, 200]
-    },
+    "min_level_difficulty": 8,
+    "render_props": { "size": 26, "color": [180, 180, 200] },
     "base_stats": {
-      "hp": 40,
+      "hp": 150,
       "speed": 60,
-      "bounty": 12,
+      "bounty": 25,
       "damage": 3,
+      "armor": 30
+    },
+    "scaling_per_level": { "hp": 1.15, "speed": 1.05, "bounty": 1.2 }
+  },
+
+  "bomber": {
+    "//": "ROLE: High-priority strategic threat. Forces focus fire due to its devastating base damage.",
+    "name": "Bomber",
+    "min_level_difficulty": 9,
+    "render_props": { "size": 28, "color": [255, 140, 0] },
+    "base_stats": {
+      "hp": 120,
+      "speed": 100,
+      "bounty": 20,
+      "damage": 8,
       "armor": 25
     },
-    "scaling_per_level": {
-      "hp": 1.1,
-      "speed": 1.05,
-      "bounty": 1.2
-    }
+    "scaling_per_level": { "hp": 1.2, "speed": 1.0, "bounty": 1.25 }
   }
 }
