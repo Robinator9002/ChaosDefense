@@ -54,12 +54,16 @@ class UIManager:
         spacing = 10
         tower_types = self.game_manager.configs.get("tower_types", {})
 
-        # --- MODIFIED: Removed the alphabetical sort ---
-        # By iterating directly over .items(), we respect the order defined
-        # in the tower_types.json file (for Python 3.7+).
-        tower_items = tower_types.items()
+        # --- Create a filtered list of actual tower data first ---
+        valid_tower_items = []
+        for tower_id, tower_data in tower_types.items():
+            # --- BUG FIX: VALIDATION STEP ---
+            # Ensure we only process entries that are dictionaries, skipping
+            # any comments or other non-dict data in the JSON.
+            if isinstance(tower_data, dict):
+                valid_tower_items.append((tower_id, tower_data))
 
-        num_buttons = len(tower_items)
+        num_buttons = len(valid_tower_items)
         total_width = (num_buttons * button_size) + ((num_buttons - 1) * spacing)
         start_x = self.screen_rect.centerx - (total_width / 2)
         start_y = (
@@ -68,7 +72,7 @@ class UIManager:
 
         current_x = start_x
         # Use enumerate to get an index for the hotkey number.
-        for index, (tower_id, tower_data) in enumerate(tower_items):
+        for index, (tower_id, tower_data) in enumerate(valid_tower_items):
             hotkey = index + 1
             self.hotkey_map.append(tower_id)  # Add the ID to our ordered map.
 

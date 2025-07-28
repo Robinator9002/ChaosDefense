@@ -82,9 +82,14 @@ class Game:
 
         style_config = {}
         for style in self.game_manager.level_manager.level_styles.values():
-            if style.get("generation_params", {}).get("grid_width") == grid.width:
-                style_config = style
-                break
+            # --- BUG FIX: VALIDATION STEP ---
+            # Ensure we only process actual level style dictionaries, skipping
+            # any comments or other non-dict data in the JSON file.
+            if isinstance(style, dict):
+                gen_params = style.get("generation_params", {})
+                if gen_params.get("grid_width") == grid.width:
+                    style_config = style
+                    break
 
         self.background_color = style_config.get("background_color", (10, 10, 10))
         tile_definitions = style_config.get("tile_definitions", {})
