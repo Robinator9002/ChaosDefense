@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 class UpgradePanel(UIElement):
     """
     A UI panel that displays detailed stats and upgrade options for a selected tower.
-    This panel is dynamically created and populated when a player selects a tower
-    on the map. It is responsible for laying out all the relevant information.
+    This panel now also includes a button for salvaging the tower.
     """
 
     def __init__(
@@ -28,6 +27,8 @@ class UpgradePanel(UIElement):
         tower: "Tower",
         upgrade_manager: "UpgradeManager",
         game_state: "GameState",
+        # NEW: The panel now needs to know the current refund rate to display it.
+        salvage_refund_percentage: float,
     ):
         """
         Initializes the UpgradePanel.
@@ -36,26 +37,32 @@ class UpgradePanel(UIElement):
         self.tower = tower
         self.upgrade_manager = upgrade_manager
         self.game_state = game_state
+        self.salvage_refund_percentage = salvage_refund_percentage
 
         self.upgrade_buttons: List[UpgradeButton] = []
         self._setup_fonts_and_colors()
         self._create_layout()
 
-        # --- NEW: Close Button Attributes ---
-        # Define the rectangle for the close button in the top-right corner.
+        # --- Close Button Attributes ---
         self.close_button_rect = pygame.Rect(
             self.rect.right - 28, self.rect.y + 8, 20, 20
         )
-        # State to track if the mouse is hovering over the close button.
         self.is_close_hovered = False
+
+        # --- NEW: Salvage Button Attributes ---
+        self.salvage_button_rect = pygame.Rect(
+            self.rect.x + 15, self.rect.bottom - 55, self.rect.width - 30, 40
+        )
+        self.is_salvage_hovered = False
 
     def _setup_fonts_and_colors(self):
         """Initializes fonts and color constants for drawing."""
         self.font_title = pygame.font.SysFont("segoeui", 22, bold=True)
         self.font_header = pygame.font.SysFont("segoeui", 18, bold=True)
         self.font_stat = pygame.font.SysFont("segoeui", 16)
-        # Font for the 'X' close button.
         self.font_close = pygame.font.SysFont("segoeui", 20, bold=True)
+        # NEW: Font for the salvage button.
+        self.font_salvage = pygame.font.SysFont("segoeui", 16, bold=True)
         self.colors = {
             "bg": (25, 30, 40, 230),
             "border": (80, 90, 100),
@@ -63,9 +70,13 @@ class UpgradePanel(UIElement):
             "header": (200, 200, 210),
             "stat_label": (160, 160, 170),
             "stat_value": (220, 220, 230),
-            # Colors for the new close button.
             "close_default": (150, 150, 160),
             "close_hover": (255, 80, 80),
+            # NEW: Colors for the salvage button.
+            "salvage_bg_default": (80, 40, 40),
+            "salvage_bg_hover": (110, 50, 50),
+            "salvage_border": (150, 80, 80),
+            "salvage_text": (230, 210, 210),
         }
 
     def _create_layout(self):
@@ -76,7 +87,6 @@ class UpgradePanel(UIElement):
         padding = 15
         button_height = 60
         button_spacing = 10
-        # Start drawing stats and buttons below the title/header area.
         stats_start_y = self.rect.y + 80
 
         # --- Upgrade Path A ---
@@ -85,7 +95,7 @@ class UpgradePanel(UIElement):
             can_afford_a = self.game_state.gold >= next_upgrade_a.cost
             button_rect_a = pygame.Rect(
                 self.rect.x + padding,
-                stats_start_y + 120,  # Position below the stats section
+                stats_start_y + 120,
                 self.rect.width - padding * 2,
                 button_height,
             )
@@ -97,7 +107,6 @@ class UpgradePanel(UIElement):
         next_upgrade_b = self.upgrade_manager.get_next_upgrade(self.tower, "path_b")
         if next_upgrade_b:
             can_afford_b = self.game_state.gold >= next_upgrade_b.cost
-            # Position the second button below the first one.
             y_pos_b = stats_start_y + 120 + button_height + button_spacing
             button_rect_b = pygame.Rect(
                 self.rect.x + padding,
@@ -113,25 +122,30 @@ class UpgradePanel(UIElement):
         self, event: pygame.event.Event, game_state: "GameState"
     ) -> Optional[str]:
         """
-        Delegates event handling to child buttons and the new close button.
+        Delegates event handling to all interactive elements on the panel.
         """
         mouse_pos = pygame.mouse.get_pos()
-        # First, check if the mouse is even inside the panel. If not, do nothing.
         if not self.rect.collidepoint(mouse_pos):
             self.is_close_hovered = False
-            # Also reset hover state on child buttons
+            self.is_salvage_hovered = False
             for button in self.upgrade_buttons:
                 button.is_hovered = False
             return None
 
-        # --- NEW: Handle Close Button Interaction ---
+        # --- Handle Hover States ---
         if event.type == pygame.MOUSEMOTION:
             self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
+            self.is_salvage_hovered = self.salvage_button_rect.collidepoint(mouse_pos)
 
+        # --- Handle Click Events ---
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_close_hovered:
                 logger.debug("Upgrade panel close button clicked.")
-                return "close_panel"  # This action will be handled by the UIManager
+                return "close_panel"
+            # NEW: Handle salvage button click.
+            if self.is_salvage_hovered:
+                logger.info(f"Player clicked salvage for tower {self.tower.entity_id}.")
+                return "salvage_tower"
 
         # Pass the event to each upgrade button.
         for button in self.upgrade_buttons:
@@ -142,19 +156,15 @@ class UpgradePanel(UIElement):
 
     def draw(self, screen: pygame.Surface):
         """Draws the panel and all its components."""
-        # --- Draw Panel Background and Border ---
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
         panel_surf.fill(self.colors["bg"])
         screen.blit(panel_surf, self.rect.topleft)
         pygame.draw.rect(screen, self.colors["border"], self.rect, 2, border_radius=5)
 
-        # --- Draw Text Information ---
         self._draw_text(screen)
-
-        # --- Draw the new Close button ---
         self._draw_close_button(screen)
+        self._draw_salvage_button(screen)  # NEW
 
-        # --- Draw Child Buttons ---
         for button in self.upgrade_buttons:
             button.draw(screen, self.game_state)
 
@@ -169,26 +179,50 @@ class UpgradePanel(UIElement):
         text_rect = text_surf.get_rect(center=self.close_button_rect.center)
         screen.blit(text_surf, text_rect)
 
+    def _draw_salvage_button(self, screen: pygame.Surface):
+        """NEW: Draws the salvage button at the bottom of the panel."""
+        bg_color = (
+            self.colors["salvage_bg_hover"]
+            if self.is_salvage_hovered
+            else self.colors["salvage_bg_default"]
+        )
+        pygame.draw.rect(screen, bg_color, self.salvage_button_rect, border_radius=5)
+        pygame.draw.rect(
+            screen,
+            self.colors["salvage_border"],
+            self.salvage_button_rect,
+            2,
+            border_radius=5,
+        )
+
+        # Calculate the refund amount to display on the button.
+        refund_amount = int(
+            self.tower.total_investment * self.salvage_refund_percentage
+        )
+        button_text = f"Salvage for {refund_amount}G"
+
+        text_surf = self.font_salvage.render(
+            button_text, True, self.colors["salvage_text"]
+        )
+        text_rect = text_surf.get_rect(center=self.salvage_button_rect.center)
+        screen.blit(text_surf, text_rect)
+
     def _draw_text(self, screen: pygame.Surface):
         """Renders and blits all the text elements for the panel."""
         padding = 15
         line_height = 24
         current_y = self.rect.y + padding
 
-        # Tower Name (Title)
         title_surf = self.font_title.render(self.tower.name, True, self.colors["title"])
-        # Position title, leaving space for the close button on the right
         screen.blit(title_surf, (self.rect.x + padding, current_y))
         current_y += 40
 
-        # Stats Header
         stats_header_surf = self.font_header.render(
             "Statistics", True, self.colors["header"]
         )
         screen.blit(stats_header_surf, (self.rect.x + padding, current_y))
         current_y += line_height + 5
 
-        # Individual Stats
         stats_to_display = {
             "Damage": self.tower.damage,
             "Range": self.tower.range,
@@ -198,7 +232,6 @@ class UpgradePanel(UIElement):
         }
 
         for label, value in stats_to_display.items():
-            # Don't display stats that are zero (like Pierce on a base turret)
             if value == 0 and label in ["Pierce", "Projectiles"]:
                 continue
 
