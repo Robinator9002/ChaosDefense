@@ -1,25 +1,10 @@
 {
   "//": "ENEMY ROSTER OVERHAUL: Expanded the enemy roster to introduce more strategic variety and clear threats. Rebalanced existing units to better fit their intended roles.",
 
-  "scout": {
-    "//": "ROLE: Early-game speed check. Tests map coverage and punishes slow-firing towers.",
-    "name": "Scout",
-    "min_level_difficulty": 1,
-    "render_props": { "size": 18, "color": [230, 120, 120] },
-    "base_stats": {
-      "hp": 15,
-      "speed": 130,
-      "bounty": 4,
-      "damage": 1,
-      "armor": 0
-    },
-    "scaling_per_level": { "hp": 1.08, "speed": 1.1, "bounty": 1.08 }
-  },
-
   "grunt": {
     "//": "ROLE: Generalist. The baseline enemy that makes up the bulk of early waves.",
     "name": "Grunt",
-    "min_level_difficulty": 2,
+    "min_level_difficulty": 1,
     "render_props": { "size": 22, "color": [200, 60, 60] },
     "base_stats": {
       "hp": 25,
@@ -29,6 +14,21 @@
       "armor": 2
     },
     "scaling_per_level": { "hp": 1.12, "speed": 1.05, "bounty": 1.1 }
+  },
+
+  "scout": {
+    "//": "ROLE: Early-game speed check. Tests map coverage and punishes slow-firing towers.",
+    "name": "Scout",
+    "min_level_difficulty": 2,
+    "render_props": { "size": 18, "color": [230, 120, 120] },
+    "base_stats": {
+      "hp": 15,
+      "speed": 130,
+      "bounty": 4,
+      "damage": 1,
+      "armor": 0
+    },
+    "scaling_per_level": { "hp": 1.08, "speed": 1.1, "bounty": 1.08 }
   },
 
   "tank": {
