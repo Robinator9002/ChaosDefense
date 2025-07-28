@@ -150,7 +150,10 @@ class WaveManager:
         available_enemies = {
             key: data
             for key, data in self.enemy_types.items()
-            if data["min_level_difficulty"] <= self.effective_level_difficulty
+            # --- BUG FIX: VALIDATION STEP ---
+            # Ensure we only process actual enemy dictionaries, skipping comments.
+            if isinstance(data, dict)
+            and data.get("min_level_difficulty", 999) <= self.effective_level_difficulty
         }
         if not available_enemies:
             logger.error("No enemies available for current difficulty!")
