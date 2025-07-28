@@ -14,22 +14,22 @@
         {
           "id": "turret_a2",
           "name": "Extended Barrel",
-          "cost": 40,
+          "cost": 35,
           "description": "Increases range by 40.",
           "effects": { "add_range": 40 }
         },
         {
           "id": "turret_a3",
           "name": "Armor Piercing",
-          "cost": 60,
+          "cost": 50,
           "description": "Heavier Rounds pierce through enemy armor.",
           "effects": { "add_armor_shred": 5, "add_damage": 5 }
         },
         {
           "id": "turret_a4",
           "name": "Stun Rounds",
-          "cost": 80,
-          "description": "Shots have a chance to briefly stun enemies.",
+          "cost": 75,
+          "description": "Shots have a 25% chance to briefly stun enemies.",
           "effects": {
             "add_effect": {
               "id": "stun",
@@ -105,23 +105,23 @@
         {
           "id": "slower_a1",
           "name": "Permafrost",
-          "cost": 40,
+          "cost": 35,
           "description": "Increases the duration of the slow effect by 1 second.",
           "effects": { "multiply_effect_duration": 1.5 }
         },
         {
           "id": "slower_a2",
           "name": "Cryo-Coolant",
-          "cost": 60,
+          "cost": 50,
           "description": "Increases the potency of the slow effect.",
           "effects": { "multiply_effect_potency": 1.25 }
         },
         {
           "id": "slower_a3",
           "name": "Flash Freeze",
-          "cost": 80,
-          "description": "Deals a small burst of damage when the slow is first applied.",
-          "effects": { "add_on_apply_damage": 15 }
+          "cost": 70,
+          "description": "Deals a burst of damage when the slow is first applied.",
+          "effects": { "add_on_apply_damage": 30 }
         },
         {
           "id": "slower_a4",
@@ -201,7 +201,7 @@
         {
           "id": "cannon_a1",
           "name": "High-Explosive Shells",
-          "cost": 50,
+          "cost": 60,
           "description": "Increases blast radius by 50%.",
           "effects": { "multiply_blast_radius": 1.5 }
         },
@@ -250,21 +250,21 @@
         {
           "id": "cannon_b1",
           "name": "Lightened Shells",
-          "cost": 50,
+          "cost": 45,
           "description": "Increases fire rate by 50%.",
           "effects": { "multiply_fire_rate": 1.5 }
         },
         {
           "id": "cannon_b2",
           "name": "Tungsten Core",
-          "cost": 100,
+          "cost": 90,
           "description": "Shells now pierce through one enemy.",
           "effects": { "set_pierce": 1 }
         },
         {
           "id": "cannon_b3",
           "name": "Improved Gearing",
-          "cost": 150,
+          "cost": 140,
           "description": "Increases fire rate by another 50%.",
           "effects": { "multiply_fire_rate": 1.5 }
         },

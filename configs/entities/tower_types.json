@@ -26,10 +26,10 @@
   "cannon": {
     "name": "Cannon Tower",
     "cost": 100,
-    "damage": 25,
+    "damage": 22,
     "range": 200,
     "fire_rate": 0.6,
-    "blast_radius": 80,
+    "blast_radius": 70,
     "sprite_key": "towers/cannon.png",
     "placeholder_color": [80, 80, 100]
   }
