@@ -10,10 +10,9 @@ class StatusEffect:
     """
     Represents an active status effect applied to an entity.
 
-    This class manages its own duration and holds the parameters of the
-    effect. It has been updated to include an optional source_entity_id
-    to track which entity created the effect, which is crucial for abilities
-    that trigger on an enemy's death (e.g., explosions).
+    This class is a self-contained state machine for an effect. It manages its
+    own duration, stacking behavior, and parameters. For Damage-over-Time (DoT)
+    effects, it also manages the interval between damage ticks.
     """
 
     def __init__(
@@ -22,7 +21,7 @@ class StatusEffect:
         effect_data: Dict[str, Any],
         duration: float,
         potency: float,
-        source_entity_id: Optional[uuid.UUID] = None,  # NEW: Added source entity ID
+        source_entity_id: Optional[uuid.UUID] = None,
     ):
         """
         Initializes a new instance of a status effect.
@@ -31,59 +30,88 @@ class StatusEffect:
             effect_id (str): The unique identifier for the effect (e.g., "slow").
             effect_data (Dict[str, Any]): The definition of the effect from the config.
             duration (float): The total duration of this effect instance in seconds.
-            potency (float): The strength of this effect (e.g., 0.4 for a 40% slow).
+            potency (float): The strength of this effect (e.g., 0.4 for a 40% slow,
+                             or 5 for 5 armor reduction).
             source_entity_id (Optional[uuid.UUID]): The unique ID of the entity that
                                                    created this effect.
         """
+        # --- Core Properties ---
         self.effect_id = effect_id
         self.effect_type = effect_data.get("type")
         self.stacking_logic = effect_data.get("stacking", "refresh")
-        self.source_entity_id = source_entity_id  # NEW: Store the source ID
-
-        # Store effect-specific parameters
+        self.source_entity_id = source_entity_id
         self.params = effect_data.get("params", {})
         self.stat_to_modify = self.params.get("stat")
 
-        # Overwrite the base multiplier with the specific instance's potency
-        if "multiplier" in self.params:
-            self.params["multiplier"] = potency
-
+        # --- Instance-specific State ---
         self.duration_remaining = duration
         self.is_active = True
+        self.potency = potency  # Generic potency for multipliers or flat amounts
 
-        logger.debug(f"Applied status effect '{self.effect_id}' for {duration}s.")
+        # --- Damage-over-Time (DoT) Specific State ---
+        self.tick_interval = self.params.get("tick_interval", 0)
+        self.tick_timer = self.tick_interval  # Start the timer ready for the first tick
 
-    def update(self, dt: float):
+        logger.debug(
+            f"Applied status effect '{self.effect_id}' (potency: {self.potency}) "
+            f"for {duration}s."
+        )
+
+    def update(self, dt: float) -> int:
         """
-        Ticks down the effect's duration.
+        Ticks down the effect's duration and handles DoT logic.
 
         Args:
             dt (float): The time elapsed since the last frame.
+
+        Returns:
+            int: The amount of DoT damage to be applied this frame, or 0.
         """
         if not self.is_active:
-            return
+            return 0
 
         self.duration_remaining -= dt
         if self.duration_remaining <= 0:
             self.expire()
+            return 0
+
+        # --- Handle DoT Ticking ---
+        if self.effect_type == "damage_over_time" and self.tick_interval > 0:
+            self.tick_timer -= dt
+            if self.tick_timer <= 0:
+                self.tick_timer += self.tick_interval  # Reset timer for the next tick
+                # The potency for a DoT is its damage per tick.
+                return int(self.potency)
+
+        return 0
 
     def expire(self):
         """Marks the effect as no longer active."""
         self.is_active = False
         logger.debug(f"Status effect '{self.effect_id}' has expired.")
 
-    def refresh(self, new_duration: float, new_potency: float):
+    def stack_with(self, new_effect: "StatusEffect"):
         """
-        Refreshes the effect's duration and potentially its potency.
+        Applies stacking logic when an effect of the same type is reapplied.
 
-        Used for effects with 'refresh' stacking logic.
+        Args:
+            new_effect (StatusEffect): The new effect instance being applied.
         """
-        self.duration_remaining = new_duration
+        # Always reset the duration on any kind of stack.
+        self.duration_remaining = max(
+            self.duration_remaining, new_effect.duration_remaining
+        )
 
-        # Update potency only if the new one is stronger
-        if "multiplier" in self.params and new_potency > self.params.get(
-            "multiplier", 0
-        ):
-            self.params["multiplier"] = new_potency
+        # --- Handle Potency Stacking ---
+        if self.stacking_logic == "refresh":
+            # Take the stronger of the two potencies.
+            self.potency = max(self.potency, new_effect.potency)
 
-        logger.debug(f"Refreshed status effect '{self.effect_id}'.")
+        elif self.stacking_logic in ["stack_potency", "stack_intensity"]:
+            # Add the potencies together.
+            self.potency += new_effect.potency
+
+        logger.debug(
+            f"Stacked effect '{self.effect_id}'. New potency: {self.potency}, "
+            f"New duration: {self.duration_remaining:.2f}s"
+        )
