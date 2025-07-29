@@ -22,7 +22,7 @@
     "placeholder_color": [100, 180, 255],
     "effects": {
       "slow": {
-        "potency": 0.1,
+        "potency": 0.2,
         "duration": 2.0
       }
     }
