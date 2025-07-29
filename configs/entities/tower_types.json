@@ -73,6 +73,23 @@
     }
   },
 
+  "energy_beacon": {
+    "name": "Energy Beacon",
+    "category": "elemental",
+    "cost": 100,
+    "damage": 2,
+    "range": 170,
+    "fire_rate": 14.0,
+    "sprite_key": "towers/beam.png",
+    "placeholder_color": [255, 0, 255],
+    "effects": {
+      "slow": {
+        "potency": 0.5,
+        "duration": 1.0
+      }
+    }
+  },
+
   "//": "--- NEW: Magic Towers ---",
   "//": "These towers utilize the new 'Attack Behavior' system to create unique, non-projectile effects.",
 
