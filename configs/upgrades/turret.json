@@ -1,0 +1,113 @@
+{
+  "path_a": {
+    "name": "Heavy Caliber",
+    "description": "Focuses on high-impact, single-target damage.",
+    "upgrades": [
+      {
+        "id": "turret_a1",
+        "name": "Increased Damage",
+        "cost": 30,
+        "description": "Increases damage by 4.",
+        "effects": [{ "type": "add_damage", "value": 4 }]
+      },
+      {
+        "id": "turret_a2",
+        "name": "Extended Barrel",
+        "cost": 40,
+        "description": "Increases range by 40.",
+        "effects": [{ "type": "add_range", "value": 40 }]
+      },
+      {
+        "id": "turret_a3",
+        "name": "Armor Piercing",
+        "cost": 65,
+        "description": "Heavier Rounds shred enemy armor on hit.",
+        "effects": [
+          { "type": "add_armor_shred", "value": 5 },
+          { "type": "add_damage", "value": 4 }
+        ]
+      },
+      {
+        "id": "turret_a4",
+        "name": "Stun Rounds",
+        "cost": 90,
+        "description": "Shots have a 25% chance to briefly stun enemies.",
+        "effects": [
+          {
+            "type": "add_effect",
+            "value": {
+              "id": "stun",
+              "potency": 0.0,
+              "duration": 0.5,
+              "chance": 0.25
+            }
+          }
+        ]
+      },
+      {
+        "id": "turret_a5",
+        "name": "Executioner Shell",
+        "cost": 120,
+        "description": "Deals massive bonus damage to enemies below 30% HP.",
+        "effects": [
+          {
+            "type": "add_execute_threshold",
+            "value": {
+              "percentage": 0.3,
+              "damage_multiplier": 3.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "path_b": {
+    "name": "Gatling Assembly",
+    "description": "Focuses on overwhelming enemies with rapid fire.",
+    "upgrades": [
+      {
+        "id": "turret_b1",
+        "name": "Faster Firing",
+        "cost": 30,
+        "description": "Increases fire rate by 40%.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.4 }]
+      },
+      {
+        "id": "turret_b2",
+        "name": "Double Shot",
+        "cost": 75,
+        "description": "Fires two projectiles simultaneously.",
+        "effects": [{ "type": "set_projectiles_per_shot", "value": 2 }]
+      },
+      {
+        "id": "turret_b3",
+        "name": "Improved Autoloader",
+        "cost": 115,
+        "description": "Increases fire rate by another 40%.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.4 }]
+      },
+      {
+        "id": "turret_b4",
+        "name": "Incendiary Rounds",
+        "cost": 140,
+        "description": "Projectiles set enemies on fire, dealing damage over time.",
+        "effects": [
+          {
+            "type": "add_effect",
+            "value": { "id": "fire", "potency": 8, "duration": 3 }
+          }
+        ]
+      },
+      {
+        "id": "turret_b5",
+        "name": "Advanced Double Shot",
+        "cost": 175,
+        "description": "Further increases fire rate and damage.",
+        "effects": [
+          { "type": "multiply_fire_rate", "value": 1.2 },
+          { "type": "add_damage", "value": 5 }
+        ]
+      }
+    ]
+  }
+}
