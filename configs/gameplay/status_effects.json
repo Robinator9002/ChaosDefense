@@ -5,8 +5,7 @@
     "stacking": "refresh",
     "description": "Reduces enemy movement speed.",
     "params": {
-      "stat": "speed",
-      "multiplier": 0.6
+      "stat": "speed"
     }
   },
   "stun": {
@@ -25,7 +24,6 @@
     "stacking": "stack_intensity",
     "description": "Deals damage over time. Multiple applications increase intensity.",
     "params": {
-      "damage_per_tick": 5,
       "tick_interval": 0.5
     }
   },
@@ -35,7 +33,6 @@
     "stacking": "refresh",
     "description": "Deals fire damage over time. Re-applying refreshes the duration.",
     "params": {
-      "damage_per_tick": 8,
       "tick_interval": 0.5
     }
   },
@@ -45,7 +42,6 @@
     "stacking": "stack_intensity",
     "description": "Causes the target to bleed, taking damage over time. Stacks.",
     "params": {
-      "damage_per_tick": 10,
       "tick_interval": 1.0
     }
   },
@@ -55,8 +51,7 @@
     "stacking": "stack_potency",
     "description": "Reduces enemy armor, causing them to take increased damage from physical attacks.",
     "params": {
-      "stat": "armor",
-      "amount": 5
+      "stat": "armor"
     }
   },
   "vulnerability": {
@@ -65,8 +60,16 @@
     "stacking": "refresh",
     "description": "Makes the enemy vulnerable, causing them to take increased damage from all sources.",
     "params": {
-      "stat": "damage_taken_multiplier",
-      "multiplier": 1.25
+      "stat": "damage_taken_multiplier"
+    }
+  },
+  "elemental_vulnerability": {
+    "name": "Elemental Vulnerability",
+    "type": "stat_modifier",
+    "stacking": "refresh",
+    "description": "Cursed enemies take massively increased damage from all sources.",
+    "params": {
+      "stat": "damage_taken_multiplier"
     }
   }
 }
