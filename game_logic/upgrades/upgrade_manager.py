@@ -38,6 +38,9 @@ class UpgradeManager:
         # effect_applicators module. To add a new effect to the game, you
         # only need to add an entry here and in the applicators file.
         self._effect_handlers: Dict[str, Callable[["Tower", Any], None]] = {
+            # --- NEW: Handler for modifying nested attack data ---
+            "modify_attack_data": effect_applicators.modify_attack_data,
+            # --- Existing Handlers ---
             "add_damage": effect_applicators.add_damage,
             "add_range": effect_applicators.add_range,
             "multiply_fire_rate": effect_applicators.multiply_fire_rate,
@@ -75,8 +78,6 @@ class UpgradeManager:
                 if not isinstance(path_data, dict):
                     continue
 
-                # NOTE: This assumes the 'Upgrade' dataclass has been updated to expect
-                # 'effects: List[Dict[str, Any]]' to match the new JSON format.
                 self.definitions[tower_type_id][path_id] = [
                     Upgrade(**upgrade_data)
                     for upgrade_data in path_data.get("upgrades", [])
@@ -106,23 +107,15 @@ class UpgradeManager:
         """
         logger.info(f"Applying upgrade '{upgrade.id}' to tower {tower.entity_id}.")
 
-        # --- REFACTORED: The core logic is now a simple loop ---
-        # The rigid if/elif block is gone. We now iterate through the list of
-        # effects defined in the JSON for this upgrade.
         for effect_data in upgrade.effects:
             effect_type = effect_data.get("type")
             effect_value = effect_data.get("value")
 
-            # Look up the correct handler function from our dispatch table.
             handler = self._effect_handlers.get(effect_type)
 
             if handler:
-                # If a handler is found, execute it, passing the tower and
-                # the effect's value.
                 handler(tower, effect_value)
             else:
-                # If no handler is registered for this effect type, log a
-                # warning. This makes debugging new or mistyped effects easy.
                 logger.warning(
                     f"Unknown upgrade effect type found in config: '{effect_type}'"
                 )

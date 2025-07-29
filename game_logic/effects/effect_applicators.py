@@ -1,4 +1,4 @@
-# game_logic/upgrades/effect_applicators.py
+# game_logic/effects/effect_applicators.py
 import logging
 from typing import TYPE_CHECKING, Any, Dict
 
@@ -13,9 +13,49 @@ logger = logging.getLogger(__name__)
 # Each function in this module is a self-contained "handler" responsible for
 # applying a single, specific type of effect to a tower. This approach
 # decouples the upgrade logic from the UpgradeManager, making the system
-# modular and easy to extend. To add a new upgrade effect to the game,
-# one simply needs to add a new handler function here and register it in
-# the UpgradeManager.
+# modular and easy to extend.
+
+
+def modify_attack_data(tower: "Tower", value: Dict[str, Any]):
+    """
+    A generic handler to modify a numeric value within the tower's attack_data.
+    This is essential for upgrading aura-based towers whose stats (like dps,
+    duration, radius) are not top-level attributes of the Tower class.
+
+    The 'value' dictionary should contain:
+    - 'key' (str): The key of the attribute to modify inside attack_data['data'].
+    - 'operation' (str): 'add', 'multiply', or 'set'.
+    - 'amount' (float/int): The value to use for the operation.
+    """
+    key = value.get("key")
+    operation = value.get("operation")
+    amount = value.get("amount")
+
+    if not all([key, operation, amount is not None]):
+        logger.error(f"Invalid 'modify_attack_data' payload: {value}")
+        return
+
+    # We modify the value directly in the tower's attack_data dictionary.
+    attack_specifics = tower.attack_data.get("data", {})
+    if key not in attack_specifics:
+        logger.warning(f"Key '{key}' not found in attack_data for tower '{tower.name}'")
+        return
+
+    original_value = attack_specifics[key]
+    if operation == "add":
+        attack_specifics[key] += amount
+    elif operation == "multiply":
+        attack_specifics[key] *= amount
+    elif operation == "set":
+        attack_specifics[key] = amount
+    else:
+        logger.error(f"Unknown operation '{operation}' in 'modify_attack_data'")
+        return
+
+    logger.debug(
+        f"Applied 'modify_attack_data': {key} {operation} {amount}. "
+        f"Value changed from {original_value} to {attack_specifics[key]}."
+    )
 
 
 def add_damage(tower: "Tower", value: int):
