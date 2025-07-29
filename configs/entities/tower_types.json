@@ -53,27 +53,6 @@
       }
     }
   },
-  "energy_beacon": {
-    "name": "Energy Beacon",
-    "category": "elemental",
-    "cost": 100,
-    "sprite_key": "towers/beam.png",
-    "placeholder_color": [255, 0, 255],
-    "attack": {
-      "type": "standard_projectile",
-      "data": {
-        "damage": 2,
-        "range": 170,
-        "fire_rate": 14.0,
-        "effects": {
-          "slow": {
-            "potency": 0.5,
-            "duration": 1.0
-          }
-        }
-      }
-    }
-  },
   "mortar": {
     "name": "Mortar",
     "category": "artillery",
@@ -90,6 +69,68 @@
         "range": 500,
         "fire_rate": 0.3,
         "blast_radius": 100
+      }
+    }
+  },
+
+  "//": "--- NEW: Magic Towers ---",
+  "//": "These towers utilize the new 'Attack Behavior' system to create unique, non-projectile effects.",
+
+  "inferno_weaver": {
+    "name": "Inferno Weaver",
+    "category": "magic",
+    "cost": 150,
+    "sprite_key": "towers/inferno_weaver.png",
+    "placeholder_color": [255, 100, 0],
+    "attack": {
+      "type": "persistent_ground_aura",
+      "data": {
+        "range": 150,
+        "fire_rate": 0.4,
+        "radius": 60,
+        "duration": 3.5,
+        "dps": 25,
+        "tick_rate": 5,
+        "effects": {
+          "fire": { "potency": 5, "duration": 2.0 }
+        }
+      }
+    }
+  },
+  "stormcaller": {
+    "name": "Stormcaller",
+    "category": "magic",
+    "cost": 165,
+    "sprite_key": "towers/stormcaller.png",
+    "placeholder_color": [180, 180, 255],
+    "attack": {
+      "type": "persistent_attached_aura",
+      "data": {
+        "range": 180,
+        "fire_rate": 0.3,
+        "radius": 80,
+        "duration": 4.0,
+        "dps": 12,
+        "tick_rate": 4,
+        "bonus_damage_vs_armor_multiplier": 0.5
+      }
+    }
+  },
+  "curse_weaver": {
+    "name": "Curse Weaver",
+    "category": "magic",
+    "cost": 130,
+    "sprite_key": "towers/curse_weaver.png",
+    "placeholder_color": [140, 0, 255],
+    "attack": {
+      "type": "standard_projectile",
+      "data": {
+        "damage": 5,
+        "range": 220,
+        "fire_rate": 0.8,
+        "effects": {
+          "elemental_vulnerability": { "potency": 1.5, "duration": 5.0 }
+        }
       }
     }
   }
