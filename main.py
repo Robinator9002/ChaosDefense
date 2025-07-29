@@ -41,7 +41,12 @@ def main():
         all_configs: Dict[str, Dict] = {
             "game_settings": load_config(CONFIG_PATH / "gameplay/game_settings.json"),
             "level_styles": load_config(CONFIG_PATH / "levels/level_styles.json"),
-            "enemy_types": load_config(CONFIG_PATH / "entities/enemy_types.json"),
+            # MODIFIED: Updated path to reflect new directory structure.
+            "enemy_types": load_config(
+                CONFIG_PATH / "entities/enemies/enemy_types.json"
+            ),
+            # NEW: Loading the boss definitions.
+            "boss_types": load_config(CONFIG_PATH / "entities/enemies/boss_types.json"),
             "tower_types": load_config(CONFIG_PATH / "entities/tower_types.json"),
             "upgrade_definitions": load_config(
                 CONFIG_PATH / "gameplay/upgrade_definitions.json"
@@ -50,7 +55,6 @@ def main():
                 CONFIG_PATH / "scaling/difficulty_scaling.json"
             ),
             "wave_scaling": load_config(CONFIG_PATH / "scaling/wave_scaling.json"),
-            # --- ADDED: Load the new status effects configuration ---
             "status_effects": load_config(CONFIG_PATH / "gameplay/status_effects.json"),
         }
     except (FileNotFoundError, json.JSONDecodeError):
