@@ -11,43 +11,49 @@ logger = logging.getLogger(__name__)
 
 class BossEnemy(Enemy):
     """
-    Represents a unique and powerful Boss enemy.
+    Represents a unique and powerful Boss enemy that can now scale its stats
+    based on its spawn level and the game's difficulty modifier.
 
     This class inherits from the standard Enemy class but is initialized with
-    data from the boss_types.json configuration. It serves as a distinct entity
-    type, allowing for the future implementation of unique boss-specific
-    mechanics, such as special attacks, phase changes, or unique visual cues,
-    without altering the behavior of regular enemies.
+    data from the boss_types.json configuration. By accepting level and
+    difficulty, it can now function as both a fixed-difficulty scripted
+    encounter and a scaling late-game random threat.
     """
 
+    # --- REFACTORED: The constructor now accepts scaling parameters ---
+    # This is the key change that enables the entire boss scaling system.
+    # Instead of hardcoding level=1, we now pass these values through to the
+    # parent Enemy's constructor, allowing its stats to be calculated dynamically.
     def __init__(
         self,
         boss_type_data: Dict[str, Any],
         path: List[Tuple[int, int]],
         tile_size: int,
+        level: int,
+        difficulty_modifier: float,
     ):
         """
-        Initializes a new BossEnemy.
+        Initializes a new, scalable BossEnemy.
 
         Args:
-            boss_type_data (Dict[str, Any]): The full data dictionary for this
-                                           specific boss from boss_types.json.
-            path (List[Tuple[int, int]]): The grid coordinate path for the boss
-                                          to follow.
+            boss_type_data (Dict[str, Any]): The data for this boss from config.
+            path (List[Tuple[int, int]]): The grid path for the boss to follow.
             tile_size (int): The size of each tile in pixels.
+            level (int): The level of this boss instance, used for scaling stats.
+            difficulty_modifier (float): The game's stat modifier.
         """
-        # Boss stats are absolute and defined directly in their configuration.
-        # We pass level=1 and difficulty_modifier=1.0 to the parent constructor
-        # to prevent any unwanted scaling that applies to regular enemies.
         # The boss_type_data dictionary has the same structure as enemy_type_data,
-        # so it can be passed directly to the parent initializer.
+        # so it can be passed directly to the parent initializer along with the
+        # new scaling parameters.
         super().__init__(
             enemy_type_data=boss_type_data,
-            level=1,
+            level=level,
             path=path,
             tile_size=tile_size,
-            difficulty_modifier=1.0,
+            difficulty_modifier=difficulty_modifier,
         )
 
         self.is_boss = True  # A simple flag to identify this entity as a boss.
-        logger.info(f"A fearsome Boss has been spawned: {self.name} ({self.entity_id})")
+        logger.info(
+            f"A fearsome Boss has been spawned: {self.name} (Level {self.level}, ID: {self.entity_id})"
+        )
