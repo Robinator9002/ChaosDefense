@@ -29,7 +29,7 @@
   "phase_striker": {
     "type": "runner",
     "boss_difficulty": 10,
-    "spawn_difficulty": 13,
+    "spawn_difficulty": 14,
     "name": "Phase Striker",
     "render_props": { "size": 40, "color": [255, 200, 200] },
     "base_stats": {
@@ -53,8 +53,8 @@
 
   "hyperion_vanguard": {
     "type": "guardian",
-    "boss_difficulty": 12,
-    "spawn_difficulty": 15,
+    "boss_difficulty": 13,
+    "spawn_difficulty": 17,
     "name": "Hyperion Vanguard",
     "render_props": { "size": 52, "color": [220, 220, 255] },
     "base_stats": {
@@ -79,8 +79,8 @@
 
   "demolisher": {
     "type": "bomber",
-    "boss_difficulty": 15,
-    "spawn_difficulty": 18,
+    "boss_difficulty": 19,
+    "spawn_difficulty": 23,
     "name": "Demolisher",
     "render_props": { "size": 50, "color": [255, 180, 80] },
     "base_stats": {
