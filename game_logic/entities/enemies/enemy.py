@@ -33,6 +33,11 @@ class Enemy(Entity):
         scaling = enemy_type_data.get("scaling_per_level", {})
         render_props = enemy_type_data.get("render_props", {})
 
+        # --- BUG FIX: Assign the name attribute ---
+        # The 'name' is loaded from the config data. This was missing, causing
+        # a crash in the BossEnemy's logging statement upon initialization.
+        self.name = enemy_type_data.get("name", "Unknown Enemy")
+
         self.level = level
         level_scaled_hp = base_stats.get("hp", 1) * (
             scaling.get("hp", 1.0) ** (level - 1)
@@ -52,9 +57,6 @@ class Enemy(Entity):
         )
         self.damage_to_base = int(base_stats.get("damage", 1) * difficulty_modifier)
 
-        # --- NEW: Immunity System ---
-        # Loads a list of status effect IDs (e.g., ["slow", "stun"]) from the
-        # config. The enemy will be completely immune to these effects.
         self.immunities: List[str] = base_stats.get("immunities", [])
 
         self.path = path
@@ -107,22 +109,17 @@ class Enemy(Entity):
         Applies a new status effect to the enemy, checking for immunities first,
         and then handling stacking logic.
         """
-        # --- NEW: Immunity Check ---
-        # Before any logic is processed, check if the enemy is immune to this
-        # specific effect type. If so, the effect is completely ignored.
         if new_effect.effect_id in self.immunities:
             logger.debug(
                 f"Enemy {self.entity_id} resisted effect '{new_effect.effect_id}' due to immunity."
             )
             return
 
-        # Check for an existing effect of the same type to stack with.
         for existing_effect in self.status_effects:
             if existing_effect.effect_id == new_effect.effect_id:
                 existing_effect.stack_with(new_effect)
                 return
 
-        # If no existing effect was found, add the new one to the list.
         self.status_effects.append(new_effect)
 
     def _update_status_effects(self, dt: float):
@@ -130,7 +127,6 @@ class Enemy(Entity):
         if not self.status_effects:
             return
 
-        # Iterate backwards to safely remove items from the list.
         for i in range(len(self.status_effects) - 1, -1, -1):
             effect = self.status_effects[i]
             dot_damage = effect.update(dt)
@@ -193,7 +189,7 @@ class Enemy(Entity):
     def _on_reach_end(self, game_state: "GameState"):
         """Handles logic for when the enemy reaches the end of its path."""
         logger.warning(
-            f"Enemy {self.entity_id} reached the end. Dealing {self.damage_to_base} damage."
+            f"Enemy {self.name} ({self.entity_id}) reached the end. Dealing {self.damage_to_base} damage."
         )
         game_state.base_hp -= self.damage_to_base
         if game_state.base_hp <= 0:
