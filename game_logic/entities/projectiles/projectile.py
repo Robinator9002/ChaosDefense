@@ -5,12 +5,12 @@ import uuid
 import random
 from typing import TYPE_CHECKING, Optional, List, Dict, Any
 
-from .entity import Entity
-from ..effects.status_effect import StatusEffect
+from ..entity import Entity
+from ...effects.status_effect import StatusEffect
 
 if TYPE_CHECKING:
-    from .enemies.enemy import Enemy
-    from ..game_state import GameState
+    from ..enemies.enemy import Enemy
+    from ...game_state import GameState
 
 logger = logging.getLogger(__name__)
 
