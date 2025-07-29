@@ -1,0 +1,103 @@
+{
+  "path_a": {
+    "name": "Heavy Ordinance",
+    "description": "Focuses on making each explosion as devastating as possible.",
+    "upgrades": [
+      {
+        "id": "mortar_a1",
+        "name": "Bigger Booms",
+        "cost": 90,
+        "description": "Increases the blast radius of each shell.",
+        "effects": [{ "type": "multiply_blast_radius", "value": 1.25 }]
+      },
+      {
+        "id": "mortar_a2",
+        "name": "High-Explosive Payload",
+        "cost": 130,
+        "description": "Increases shell damage by 15.",
+        "effects": [{ "type": "add_damage", "value": 15 }]
+      },
+      {
+        "id": "mortar_a3",
+        "name": "Cluster Bombs",
+        "cost": 200,
+        "description": "Shells release smaller bombs on impact, increasing the effective blast radius.",
+        "effects": [{ "type": "multiply_blast_radius", "value": 1.3 }]
+      },
+      {
+        "id": "mortar_a4",
+        "name": "The Big One",
+        "cost": 280,
+        "description": "Massively increases shell damage by 40.",
+        "effects": [{ "type": "add_damage", "value": 40 }]
+      },
+      {
+        "id": "mortar_a5",
+        "name": "Napalm",
+        "cost": 350,
+        "description": "Explosions leave a patch of fire on the ground, burning enemies who walk through it.",
+        "effects": [
+          {
+            "type": "add_blast_effect",
+            "value": { "id": "fire", "potency": 20, "duration": 5 }
+          }
+        ]
+      }
+    ]
+  },
+  "path_b": {
+    "name": "Rapid Deployment",
+    "description": "Turns the mortar into a suppression tool with faster firing and utility shells.",
+    "upgrades": [
+      {
+        "id": "mortar_b1",
+        "name": "Improved Loading",
+        "cost": 100,
+        "description": "Increases fire rate by 25%.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.25 }]
+      },
+      {
+        "id": "mortar_b2",
+        "name": "Concussion Shells",
+        "cost": 150,
+        "description": "Explosions now briefly stun enemies.",
+        "effects": [
+          {
+            "type": "add_blast_effect",
+            "value": { "id": "stun", "potency": 0, "duration": 0.75 }
+          }
+        ]
+      },
+      {
+        "id": "mortar_b3",
+        "name": "Autoloader",
+        "cost": 210,
+        "description": "Increases fire rate by another 35%.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.35 }]
+      },
+      {
+        "id": "mortar_b4",
+        "name": "Corrosion Agent",
+        "cost": 260,
+        "description": "Shells release a gas that corrodes armor.",
+        "effects": [
+          {
+            "type": "add_blast_effect",
+            "value": {
+              "id": "armor_break",
+              "potency": 10,
+              "duration": 6
+            }
+          }
+        ]
+      },
+      {
+        "id": "mortar_b5",
+        "name": "Orbital Targeting",
+        "cost": 340,
+        "description": "Final upgrade. Grants a massive boost to fire rate.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.5 }]
+      }
+    ]
+  }
+}
