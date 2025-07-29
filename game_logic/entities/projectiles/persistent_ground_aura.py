@@ -47,6 +47,10 @@ class PersistentGroundAura(Entity):
         self.tick_rate = aura_data.get("tick_rate", 4)  # Ticks per second
         self.effects_data = aura_data.get("effects", {})
         self.status_effects_config = status_effects_config
+        # NEU: Bonus Schaden gegen Rüstung Multiplikator für Auren
+        self.bonus_dmg_vs_armor_mult = aura_data.get(
+            "bonus_damage_vs_armor_multiplier", 0
+        )
 
         # --- Internal State ---
         self.tick_interval = (
@@ -102,7 +106,17 @@ class PersistentGroundAura(Entity):
             if enemy.is_alive and self.pos.distance_to(enemy.pos) <= self.radius:
                 # Apply damage per tick
                 if self.damage_per_tick > 0:
-                    enemy.take_damage(self.damage_per_tick, ignores_armor=True)
+                    calculated_damage = self.damage_per_tick
+                    # NEUE LOGIK: Anwenden des bonus_damage_vs_armor_multiplier
+                    if self.bonus_dmg_vs_armor_mult != 0:
+                        calculated_damage += int(
+                            enemy.armor * self.bonus_dmg_vs_armor_mult
+                        )
+                        calculated_damage = max(
+                            0, calculated_damage
+                        )  # Sicherstellen, dass Schaden nicht negativ wird
+
+                    enemy.take_damage(calculated_damage, ignores_armor=True)
 
                 # Apply status effects
                 for effect_id, params in self.effects_data.items():

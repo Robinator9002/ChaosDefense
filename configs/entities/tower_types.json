@@ -108,10 +108,10 @@
       "type": "persistent_ground_aura",
       "data": {
         "range": 80,
-        "fire_rate": 2,
+        "fire_rate": 1,
         "radius": 60,
-        "duration": 2,
-        "dps": 5,
+        "duration": 1,
+        "dps": 20,
         "tick_rate": 10,
         "bonus_damage_vs_armor_multiplier": -0.5,
         "effects": {
