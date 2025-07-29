@@ -52,9 +52,21 @@ class WaveGenerator:
                                   is a spawn job for a single enemy.
         """
         spawn_jobs = []
-        if not available_enemies:
+
+        # --- BUG FIX: Create a filtered pool of valid enemy types ---
+        # This list comprehension iterates through the available_enemies dictionary
+        # and only includes the keys (enemy IDs) where the corresponding value is
+        # a dictionary. This gracefully ignores any comments ("//") or other
+        # non-dictionary entries in the config files.
+        enemy_pool = [
+            enemy_id
+            for enemy_id, enemy_data in available_enemies.items()
+            if isinstance(enemy_data, dict)
+        ]
+
+        if not enemy_pool:
             logger.error(
-                "Cannot generate wave: No enemies available for current difficulty!"
+                "Cannot generate wave: No valid enemies available in the pool!"
             )
             return spawn_jobs
 
@@ -70,15 +82,11 @@ class WaveGenerator:
         )
         total_enemies = int(total_enemies)
 
-        # 2. Create the list of spawn jobs.
-        enemy_pool = list(available_enemies.keys())
+        # 2. Create the list of spawn jobs from the filtered pool.
         for _ in range(total_enemies):
             enemy_type_id = random.choice(enemy_pool)
 
-            # Enemies gain a level every few waves to keep them relevant.
             enemy_level = 1 + (wave_state.current_wave_number // 5)
-
-            # Assign the enemy to a random path.
             path_index = random.randint(0, num_paths - 1)
 
             spawn_jobs.append(
@@ -86,7 +94,7 @@ class WaveGenerator:
                     "type": enemy_type_id,
                     "level": enemy_level,
                     "path_index": path_index,
-                    "is_boss": False,  # Flag to distinguish from boss spawns
+                    "is_boss": False,
                 }
             )
 
