@@ -26,6 +26,31 @@
     ]
   },
 
+  "phase_striker": {
+    "type": "runner",
+    "boss_difficulty": 10,
+    "spawn_difficulty": 13,
+    "name": "Phase Striker",
+    "render_props": { "size": 40, "color": [255, 200, 200] },
+    "base_stats": {
+      "hp": 700,
+      "speed": 200,
+      "bounty": 350,
+      "damage": 15,
+      "armor": 5,
+      "immunities": ["slow"]
+    },
+    "scaling_per_level": {
+      "hp": 1.2,
+      "bounty": 1.0
+    },
+    "phalanx": [
+      { "type": "runner", "count": 12 },
+      { "type": "runner", "count": 12 },
+      { "type": "scout", "count": 20 }
+    ]
+  },
+
   "hyperion_vanguard": {
     "type": "guardian",
     "boss_difficulty": 12,
@@ -49,31 +74,6 @@
       { "type": "guardian", "count": 4 },
       { "type": "guardian", "count": 4 },
       { "type": "tank", "count": 6 }
-    ]
-  },
-
-  "phase_striker": {
-    "type": "runner",
-    "boss_difficulty": 10,
-    "spawn_difficulty": 13,
-    "name": "Phase Striker",
-    "render_props": { "size": 40, "color": [255, 200, 200] },
-    "base_stats": {
-      "hp": 700,
-      "speed": 200,
-      "bounty": 350,
-      "damage": 15,
-      "armor": 5,
-      "immunities": ["slow"]
-    },
-    "scaling_per_level": {
-      "hp": 1.2,
-      "bounty": 1.0
-    },
-    "phalanx": [
-      { "type": "runner", "count": 12 },
-      { "type": "runner", "count": 12 },
-      { "type": "scout", "count": 20 }
     ]
   },
 
