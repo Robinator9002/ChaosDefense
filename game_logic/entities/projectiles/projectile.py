@@ -1,12 +1,19 @@
-# game_logic/entities/projectile.py
+# game_logic/entities/projectiles/projectile.py
 import pygame
 import logging
 import uuid
 import random
 from typing import TYPE_CHECKING, Optional, List, Dict, Any
 
+# --- MODIFIED: Adjust relative import path ---
+# Since this file is now in a subdirectory, we use '..' to go up one level
+# to the 'entities' directory to import the base Entity class.
 from ..entity import Entity
 from ...effects.status_effect import StatusEffect
+
+# --- MODIFIED: Import the new ProjectileData DTO ---
+# This is the new "work order" that the projectile will receive.
+from .projectile_data import ProjectileData
 
 if TYPE_CHECKING:
     from ..enemies.enemy import Enemy
@@ -17,57 +24,66 @@ logger = logging.getLogger(__name__)
 
 class Projectile(Entity):
     """
-    Represents a projectile fired from a tower.
+    Represents a projectile fired from a tower. Its behavior and properties
+    are defined by a ProjectileData object provided on creation.
     """
 
+    # --- REFACTORED: The constructor is now dramatically simplified ---
+    # Instead of a long list of 17 parameters, it now takes a starting position,
+    # a target, and a single 'data' object that contains all other properties.
+    # This decouples the Projectile from the Tower and makes the system
+    # far more maintainable and extensible.
     def __init__(
         self,
         x: float,
         y: float,
-        damage: int,
         target: "Enemy",
-        effects_to_apply: List[StatusEffect],
-        pierce_count: int,
-        blast_radius: float,
-        on_blast_effects_data: List[Dict[str, Any]],
-        status_effects_config: Dict[str, Any],
-        armor_shred: int,
-        execute_threshold: Optional[Dict[str, float]],
-        on_apply_damage: int,
-        bonus_damage_per_debuff: int,
-        conditional_effects: List[Dict[str, Any]],
-        on_hit_area_effects: List[Dict[str, Any]],
+        data: ProjectileData,
     ):
         """
-        Initializes a new, more complex Projectile.
+        Initializes a new Projectile based on a ProjectileData object.
+
+        Args:
+            x (float): The starting x-coordinate.
+            y (float): The starting y-coordinate.
+            target (Enemy): The initial enemy target.
+            data (ProjectileData): The data object containing all behavioral
+                                   and statistical properties for this projectile.
         """
         super().__init__(x, y, max_hp=1)
-        self.damage = damage
-        self.target = target
-        self.speed = 450
-        self.effects_to_apply = effects_to_apply
-        self.pierce_count = pierce_count
-        self.blast_radius = blast_radius
-        self.on_blast_effects_data = on_blast_effects_data
-        self.status_effects_config = status_effects_config
-        self.armor_shred = armor_shred
-        self.execute_threshold = execute_threshold
-        self.on_apply_damage = on_apply_damage
-        self.bonus_damage_per_debuff = bonus_damage_per_debuff
-        self.conditional_effects = conditional_effects
-        self.on_hit_area_effects = on_hit_area_effects
 
+        # --- Unpack all properties from the ProjectileData object ---
+        # This is the core of the new design. The projectile configures itself
+        # based on the data it receives, rather than having its attributes
+        # set one-by-one by an external class.
+        self.damage = data.damage
+        self.effects_to_apply = data.effects_to_apply
+        self.status_effects_config = data.status_effects_config
+        self.pierce_count = data.pierce_count
+        self.blast_radius = data.blast_radius
+        self.armor_shred = data.armor_shred
+        self.on_blast_effects_data = data.on_blast_effects_data
+        self.conditional_effects = data.conditional_effects
+        self.on_hit_area_effects = data.on_hit_area_effects
+        self.execute_threshold = data.execute_threshold
+        self.on_apply_damage = data.on_apply_damage
+        self.bonus_damage_per_debuff = data.bonus_damage_per_debuff
+
+        # --- Standard Projectile State ---
+        self.target = target
+        self.speed = 450  # This could also be moved into ProjectileData if needed
         self.last_known_target_pos = target.pos.copy()
         self.retarget_radius = 120
         self.enemies_hit: List[uuid.UUID] = []
 
-        color = (255, 255, 0)
+        # --- Dynamic Sprite Creation based on properties ---
+        color = (255, 255, 0)  # Default yellow
         if self.blast_radius > 0:
-            color = (255, 165, 0)
+            color = (255, 165, 0)  # Orange for AoE
         elif self.pierce_count > 0:
-            color = (255, 255, 255)
+            color = (255, 255, 255)  # White for piercing
         elif any(e.effect_id == "slow" for e in self.effects_to_apply):
-            color = (173, 216, 230)
+            color = (173, 216, 230)  # Light blue for slow
         self.sprite = pygame.Surface((8, 8), pygame.SRCALPHA)
         pygame.draw.circle(self.sprite, color, (4, 4), 4)
         self.rect = self.sprite.get_rect(center=(x, y))
@@ -75,6 +91,7 @@ class Projectile(Entity):
     def update(self, dt: float, game_state: "GameState", all_enemies: List["Enemy"]):
         """
         Updates the projectile's position, handling target loss and retargeting.
+        (No changes to this method's logic are needed for this refactor).
         """
         if not self.is_alive:
             return
@@ -125,6 +142,7 @@ class Projectile(Entity):
     ):
         """
         Handles all logic for when the projectile hits an enemy.
+        (No changes to this method's logic are needed for this refactor).
         """
         if not hit_enemy.is_alive or hit_enemy.entity_id in self.enemies_hit:
             return
