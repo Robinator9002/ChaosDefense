@@ -6,9 +6,6 @@ from pathlib import Path
 from typing import Dict
 
 from rendering.game_window import Game
-
-# --- MODIFIED: Import the new upgrade loader function ---
-# We now import our specialized function for loading the modular upgrade files.
 from game_logic.upgrades.upgrade_loader import load_all_upgrades
 
 # --- Constants ---
@@ -42,16 +39,14 @@ def main():
     """Main function to set up and run the game."""
     logger.info("--- Loading All Game Configurations ---")
     try:
-        # --- MODIFIED: Use the new upgrade loader ---
-        # 1. Define the directory (or directories) where upgrade files are located.
-        #    This list is easily expandable for future tower categories.
-        upgrade_dirs = [CONFIG_PATH / "upgrades"]
+        # --- MODIFIED: Automated Upgrade Discovery ---
+        # We now point our loader to the root 'upgrades' directory.
+        # The loader's recursive search will automatically find all upgrade
+        # files in any subdirectories (e.g., 'military', 'support'), making
+        # the system plug-and-play for new tower categories.
+        upgrade_root_dir = CONFIG_PATH / "upgrades"
+        all_upgrade_defs = load_all_upgrades([upgrade_root_dir])
 
-        # 2. Call our new loader to scan the directories and build the complete
-        #    upgrade definitions dictionary.
-        all_upgrade_defs = load_all_upgrades(upgrade_dirs)
-
-        # 3. Assemble the final `all_configs` dictionary.
         all_configs: Dict[str, Dict] = {
             "game_settings": load_config(CONFIG_PATH / "gameplay/game_settings.json"),
             "level_styles": load_config(CONFIG_PATH / "levels/level_styles.json"),
@@ -60,7 +55,7 @@ def main():
             ),
             "boss_types": load_config(CONFIG_PATH / "entities/enemies/boss_types.json"),
             "tower_types": load_config(CONFIG_PATH / "entities/tower_types.json"),
-            # The old, single file load is replaced with our fully assembled dictionary.
+            # Use the dynamically loaded definitions from our loader.
             "upgrade_definitions": all_upgrade_defs,
             "difficulty_scaling": load_config(
                 CONFIG_PATH / "scaling/difficulty_scaling.json"
@@ -68,9 +63,10 @@ def main():
             "wave_scaling": load_config(CONFIG_PATH / "scaling/wave_scaling.json"),
             "status_effects": load_config(CONFIG_PATH / "gameplay/status_effects.json"),
         }
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (FileNotFoundError, json.JSONDecodeError) as e:
         logger.critical(
-            "A required configuration file was missing or corrupt. Cannot start."
+            f"A required configuration file was missing or corrupt. Error: {e}",
+            exc_info=True,
         )
         return
 
