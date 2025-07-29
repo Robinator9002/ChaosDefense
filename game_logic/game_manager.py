@@ -57,7 +57,7 @@ class GameManager:
         logger.info("--- Setting up new game via Game Manager ---")
 
         try:
-            preset_to_load = "Forest"
+            preset_to_load = "Volcanic"
             self.grid, self.paths, style_config = (
                 self.level_manager.build_level_from_preset(preset_to_load)
             )
@@ -186,31 +186,26 @@ class GameManager:
         new_enemy = None
         difficulty_mod = self.wave_manager.difficulty_settings.get("stat_modifier", 1.0)
 
-        # --- REFACTORED: Bosses now use scaling logic ---
-        # We check if the entity to be spawned is defined in the boss_types config.
-        # This is more robust than relying on an 'is_boss' flag.
+        # NEU: Das Level für alle gespawnten Gegner wird basierend auf der aktuellen Wellennummer berechnet.
+        # Dies stellt sicher, dass die Skalierung korrekt angewendet wird.
+        # Das Level sollte immer mindestens 1 sein.
+        enemy_spawn_level = max(1, self.game_state.current_wave_number)
+
         if entity_id in self.configs["boss_types"]:
             boss_config = self.configs["boss_types"][entity_id]
-
-            # Calculate the boss's level based on the current wave, just like a regular enemy.
-            # This ensures they scale up when appearing in later random waves.
-            current_wave = self.wave_manager.wave_state.current_wave_number
-            level = 1 + (current_wave // 5)
-
             new_enemy = BossEnemy(
                 boss_type_data=boss_config,
                 path=path,
                 tile_size=self.tile_size,
-                level=level,  # Pass the calculated level
-                difficulty_modifier=difficulty_mod,  # Pass the difficulty modifier
+                level=enemy_spawn_level, # Verwende das berechnete Level
+                difficulty_modifier=difficulty_mod,
             )
 
-        # --- Standard enemy spawning logic remains the same ---
         elif entity_id in self.configs["enemy_types"]:
             enemy_config = self.configs["enemy_types"][entity_id]
             new_enemy = Enemy(
                 enemy_type_data=enemy_config,
-                level=spawn_job["level"],
+                level=enemy_spawn_level, # Verwende das berechnete Level
                 path=path,
                 tile_size=self.tile_size,
                 difficulty_modifier=difficulty_mod,
@@ -294,3 +289,4 @@ class GameManager:
 
         target_tower.kill()
         self.game_state.clear_selection()
+

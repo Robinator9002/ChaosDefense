@@ -48,8 +48,14 @@ class Enemy(Entity):
             scaling.get("speed", 1.0) ** (level - 1)
         )
         self.speed = self.base_speed
-        self.base_armor = base_stats.get("armor", 0)
-        self.armor = self.base_armor
+
+        # --- FIX: Armor scaling was missing here! ---
+        level_scaled_armor = base_stats.get("armor", 0) * (
+            scaling.get("armor", 1.0) ** (level - 1)  # Apply armor scaling
+        )
+        self.base_armor = int(level_scaled_armor)  # Cast to int
+        self.armor = self.base_armor  # Initialize current armor with scaled base armor
+
         self.damage_taken_multiplier = 1.0
 
         self.bounty = int(
@@ -143,7 +149,7 @@ class Enemy(Entity):
         Resets stats to base values first, then applies all active modifiers.
         """
         self.speed = self.base_speed
-        self.armor = self.base_armor
+        self.armor = self.base_armor  # Now correctly initialized with scaled base_armor
         self.damage_taken_multiplier = 1.0
 
         for effect in self.status_effects:

@@ -8,7 +8,7 @@
     "name": "Grunt Colossus",
     "render_props": { "size": 48, "color": [220, 100, 100] },
     "base_stats": {
-      "hp": 400,
+      "hp": 250,
       "speed": 80,
       "bounty": 200,
       "damage": 10,
@@ -33,7 +33,7 @@
     "name": "Phase Striker",
     "render_props": { "size": 40, "color": [255, 200, 200] },
     "base_stats": {
-      "hp": 700,
+      "hp": 500,
       "speed": 200,
       "bounty": 350,
       "damage": 15,
@@ -58,7 +58,7 @@
     "name": "Hyperion Vanguard",
     "render_props": { "size": 52, "color": [220, 220, 255] },
     "base_stats": {
-      "hp": 1000,
+      "hp": 800,
       "speed": 50,
       "bounty": 500,
       "damage": 20,
@@ -84,7 +84,7 @@
     "name": "Demolisher",
     "render_props": { "size": 50, "color": [255, 180, 80] },
     "base_stats": {
-      "hp": 1000,
+      "hp": 800,
       "speed": 90,
       "bounty": 400,
       "damage": 100,
