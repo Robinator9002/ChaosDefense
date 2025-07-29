@@ -1,9 +1,10 @@
 {
   "//": "TOWER ROSTER REBALANCE: Overhauled base stats to align towers with their intended roles (early-game vs. late-game) and create more distinct strategic choices.",
+  "//": "REFACTOR: Added a 'category' key to each tower to support a new tab-based UI and for future organizational logic.",
 
   "turret": {
-    "//": "ROLE: Early-game workhorse. Increased base damage to make it a reliable starting tower.",
     "name": "Basic Turret",
+    "category": "military",
     "cost": 40,
     "damage": 10,
     "range": 160,
@@ -12,8 +13,8 @@
     "placeholder_color": [150, 150, 150]
   },
   "freezer": {
-    "//": "ROLE: Early-game utility. Cost reduced to make it an accessible support option from the very beginning.",
     "name": "Freezer",
+    "category": "support",
     "cost": 50,
     "damage": 2,
     "range": 140,
@@ -28,8 +29,8 @@
     }
   },
   "cannon": {
-    "//": "ROLE: Early-game AoE powerhouse. Damage increased to make it effective against early swarms, with piercing shifted to its upgrades.",
     "name": "Cannon Tower",
+    "category": "military",
     "cost": 80,
     "damage": 22,
     "range": 200,
@@ -39,8 +40,8 @@
     "placeholder_color": [80, 80, 100]
   },
   "energy_beacon": {
-    "//": "ROLE: Late-game debuff specialist. Innate slow drastically reduced to prevent it from outclassing the Freezer early on. Its power now comes almost exclusively from upgrades.",
     "name": "Energy Beacon",
+    "category": "elemental",
     "cost": 100,
     "damage": 2,
     "range": 170,
@@ -55,8 +56,8 @@
     }
   },
   "mortar": {
-    "//": "ROLE: Ultimate late-game artillery. Fire rate reduced and range increased to solidify its role as a strategic, long-range weapon that is weak to fast, early enemies.",
     "name": "Mortar",
+    "category": "artillery",
     "cost": 120,
     "damage": 25,
     "range": 500,
