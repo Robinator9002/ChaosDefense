@@ -8,6 +8,11 @@ from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from .buttons.tower_button import TowerButton
 from .panels.upgrade_panel import UpgradePanel
 
+# --- MODIFIED: Import the new structured action classes ---
+# We now import our action vocabulary to process the structured commands
+# received from all other UI elements.
+from .ui_action import UIAction, ActionType
+
 # Use TYPE_CHECKING for type hinting to avoid circular imports at runtime.
 if TYPE_CHECKING:
     from game_logic.game_state import GameState
@@ -20,8 +25,8 @@ logger = logging.getLogger(__name__)
 class UIManager:
     """
     Manages all UI elements, including the static build panel and the dynamic
-    tower upgrade panel. It now also assigns and tracks hotkeys for the
-    tower build buttons.
+    tower upgrade panel. It processes structured UIAction objects to modify
+    the game state, providing a robust and decoupled event system.
     """
 
     def __init__(
@@ -34,11 +39,8 @@ class UIManager:
         self.game_manager = game_manager
         self.assets_path = assets_path
 
-        # --- UI Component Storage ---
         self.build_buttons: List[TowerButton] = []
         self.upgrade_panel: Optional[UpgradePanel] = None
-
-        # An ordered list to map hotkey numbers (index + 1) to tower_type_ids.
         self.hotkey_map: List[str] = []
 
         self._create_tower_build_panel()
@@ -54,10 +56,11 @@ class UIManager:
         spacing = 10
         tower_types = self.game_manager.configs.get("tower_types", {})
 
-        valid_tower_items = []
-        for tower_id, tower_data in tower_types.items():
-            if isinstance(tower_data, dict):
-                valid_tower_items.append((tower_id, tower_data))
+        valid_tower_items = [
+            (tower_id, tower_data)
+            for tower_id, tower_data in tower_types.items()
+            if isinstance(tower_data, dict)
+        ]
 
         num_buttons = len(valid_tower_items)
         total_width = (num_buttons * button_size) + ((num_buttons - 1) * spacing)
@@ -88,6 +91,9 @@ class UIManager:
         The UI has priority; if it handles an event, it returns True to stop
         further processing by the main game window.
         """
+        # --- MODIFIED: Event handling now expects UIAction objects ---
+        # The logic remains the same, but the 'action' variable is now a
+        # structured UIAction object, not a string.
         if self.upgrade_panel:
             action = self.upgrade_panel.handle_event(event, game_state)
             if action:
@@ -110,44 +116,46 @@ class UIManager:
 
         return False
 
-    def _process_ui_action(self, action: str, game_state: "GameState"):
+    def _process_ui_action(self, action: UIAction, game_state: "GameState"):
         """
-        Updates the game state based on a string command from a UI element.
+        Updates the game state based on a structured UIAction command.
+        This method is now much cleaner and more robust than its string-based
+        predecessor, using pattern matching on the action type.
         """
-        if action.startswith("select_tower_"):
-            tower_id = action.replace("select_tower_", "")
-            if game_state.selected_tower_to_build == tower_id:
+        # --- MODIFIED: Replaced string parsing with a match statement ---
+        match action.type:
+            case ActionType.SELECT_TOWER:
+                tower_id = action.entity_id
+                if game_state.selected_tower_to_build == tower_id:
+                    game_state.clear_selection()
+                else:
+                    game_state.selected_tower_to_build = tower_id
+                    logger.info(f"Player selected '{tower_id}' for building.")
+
+            case ActionType.PURCHASE_UPGRADE:
+                upgrade_id = action.entity_id
+                tower_id = game_state.selected_entity_id
+
+                if tower_id and upgrade_id:
+                    # Note: Game logic is untouched as per the rules.
+                    path_char = upgrade_id.split("_")[-1][0]
+                    path_id = f"path_{path_char}"
+                    self.game_manager.purchase_tower_upgrade(tower_id, path_id)
+                    self.upgrade_panel = None  # Close panel after upgrade
+                else:
+                    logger.warning(
+                        "Upgrade action received but missing tower or upgrade ID."
+                    )
+
+            case ActionType.CLOSE_PANEL:
                 game_state.clear_selection()
-            else:
-                game_state.selected_tower_to_build = tower_id
-                logger.info(f"Player selected '{tower_id}' for building.")
 
-        elif action.startswith("purchase_upgrade_"):
-            upgrade_id = action.replace("purchase_upgrade_", "")
-            tower_id = game_state.selected_entity_id
-
-            if tower_id:
-                path_char = upgrade_id.split("_")[-1][0]
-                path_id = f"path_{path_char}"
-
-                self.game_manager.purchase_tower_upgrade(tower_id, path_id)
-
-                if self.upgrade_panel:
-                    self.upgrade_panel = None
-            else:
-                logger.warning(
-                    "Upgrade purchased but no tower was selected in GameState."
-                )
-
-        elif action == "close_panel":
-            game_state.clear_selection()
-
-        elif action == "salvage_tower":
-            tower_id = game_state.selected_entity_id
-            if tower_id:
-                self.game_manager.salvage_tower(tower_id)
-            else:
-                logger.warning("Salvage action received but no tower was selected.")
+            case ActionType.SALVAGE_TOWER:
+                tower_id = game_state.selected_entity_id
+                if tower_id:
+                    self.game_manager.salvage_tower(tower_id)
+                else:
+                    logger.warning("Salvage action received but no tower was selected.")
 
     def update(self, dt: float, game_state: "GameState"):
         """
@@ -172,9 +180,6 @@ class UIManager:
 
                     salvage_rate = 0.0
                     if self.game_manager.wave_manager:
-                        # --- BUG FIX: Use the correct attribute name ---
-                        # The 'settings' attribute was renamed to 'difficulty_settings'
-                        # during the WaveManager refactor. This updates the reference.
                         salvage_rate = (
                             self.game_manager.wave_manager.difficulty_settings.get(
                                 "salvage_refund_percentage", 0.0

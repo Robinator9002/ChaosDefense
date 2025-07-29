@@ -6,6 +6,11 @@ from typing import Optional, List, TYPE_CHECKING
 from ..ui_element import UIElement
 from ..buttons.upgrade_button import UpgradeButton
 
+# --- MODIFIED: Import the new structured action classes ---
+# We import our action vocabulary to create and handle structured,
+# type-safe commands instead of relying on fragile strings.
+from ..ui_action import UIAction, ActionType
+
 # Use TYPE_CHECKING to avoid circular imports for type hinting.
 if TYPE_CHECKING:
     from game_logic.entities.tower import Tower
@@ -18,7 +23,8 @@ logger = logging.getLogger(__name__)
 class UpgradePanel(UIElement):
     """
     A UI panel that displays detailed stats and upgrade options for a selected tower.
-    This panel now also includes a button for salvaging the tower.
+    This panel now also includes a button for salvaging the tower and communicates
+    all actions via structured UIAction objects.
     """
 
     def __init__(
@@ -27,7 +33,6 @@ class UpgradePanel(UIElement):
         tower: "Tower",
         upgrade_manager: "UpgradeManager",
         game_state: "GameState",
-        # NEW: The panel now needs to know the current refund rate to display it.
         salvage_refund_percentage: float,
     ):
         """
@@ -49,7 +54,7 @@ class UpgradePanel(UIElement):
         )
         self.is_close_hovered = False
 
-        # --- NEW: Salvage Button Attributes ---
+        # --- Salvage Button Attributes ---
         self.salvage_button_rect = pygame.Rect(
             self.rect.x + 15, self.rect.bottom - 55, self.rect.width - 30, 40
         )
@@ -61,7 +66,6 @@ class UpgradePanel(UIElement):
         self.font_header = pygame.font.SysFont("segoeui", 18, bold=True)
         self.font_stat = pygame.font.SysFont("segoeui", 16)
         self.font_close = pygame.font.SysFont("segoeui", 20, bold=True)
-        # NEW: Font for the salvage button.
         self.font_salvage = pygame.font.SysFont("segoeui", 16, bold=True)
         self.colors = {
             "bg": (25, 30, 40, 230),
@@ -72,7 +76,6 @@ class UpgradePanel(UIElement):
             "stat_value": (220, 220, 230),
             "close_default": (150, 150, 160),
             "close_hover": (255, 80, 80),
-            # NEW: Colors for the salvage button.
             "salvage_bg_default": (80, 40, 40),
             "salvage_bg_hover": (110, 50, 50),
             "salvage_border": (150, 80, 80),
@@ -89,7 +92,6 @@ class UpgradePanel(UIElement):
         button_spacing = 10
         stats_start_y = self.rect.y + 80
 
-        # --- Upgrade Path A ---
         next_upgrade_a = self.upgrade_manager.get_next_upgrade(self.tower, "path_a")
         if next_upgrade_a:
             can_afford_a = self.game_state.gold >= next_upgrade_a.cost
@@ -103,7 +105,6 @@ class UpgradePanel(UIElement):
                 UpgradeButton(button_rect_a, next_upgrade_a, can_afford_a)
             )
 
-        # --- Upgrade Path B ---
         next_upgrade_b = self.upgrade_manager.get_next_upgrade(self.tower, "path_b")
         if next_upgrade_b:
             can_afford_b = self.game_state.gold >= next_upgrade_b.cost
@@ -120,9 +121,9 @@ class UpgradePanel(UIElement):
 
     def handle_event(
         self, event: pygame.event.Event, game_state: "GameState"
-    ) -> Optional[str]:
+    ) -> Optional[UIAction]:  # --- MODIFIED: Return type is now UIAction ---
         """
-        Delegates event handling to all interactive elements on the panel.
+        Delegates event handling and returns a structured UIAction if triggered.
         """
         mouse_pos = pygame.mouse.get_pos()
         if not self.rect.collidepoint(mouse_pos):
@@ -132,25 +133,26 @@ class UpgradePanel(UIElement):
                 button.is_hovered = False
             return None
 
-        # --- Handle Hover States ---
         if event.type == pygame.MOUSEMOTION:
             self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
             self.is_salvage_hovered = self.salvage_button_rect.collidepoint(mouse_pos)
 
-        # --- Handle Click Events ---
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_close_hovered:
                 logger.debug("Upgrade panel close button clicked.")
-                return "close_panel"
-            # NEW: Handle salvage button click.
+                # --- MODIFIED: Return a structured UIAction object ---
+                return UIAction(type=ActionType.CLOSE_PANEL)
             if self.is_salvage_hovered:
                 logger.info(f"Player clicked salvage for tower {self.tower.entity_id}.")
-                return "salvage_tower"
+                # --- MODIFIED: Return a structured UIAction object ---
+                return UIAction(type=ActionType.SALVAGE_TOWER)
 
-        # Pass the event to each upgrade button.
+        # Pass the event to each upgrade button and propagate its action.
         for button in self.upgrade_buttons:
+            # The button's handle_event now returns an Optional[UIAction].
             action = button.handle_event(event, game_state)
             if action:
+                # If the button returned an action, we propagate it up the chain.
                 return action
         return None
 
@@ -163,7 +165,7 @@ class UpgradePanel(UIElement):
 
         self._draw_text(screen)
         self._draw_close_button(screen)
-        self._draw_salvage_button(screen)  # NEW
+        self._draw_salvage_button(screen)
 
         for button in self.upgrade_buttons:
             button.draw(screen, self.game_state)
@@ -180,7 +182,7 @@ class UpgradePanel(UIElement):
         screen.blit(text_surf, text_rect)
 
     def _draw_salvage_button(self, screen: pygame.Surface):
-        """NEW: Draws the salvage button at the bottom of the panel."""
+        """Draws the salvage button at the bottom of the panel."""
         bg_color = (
             self.colors["salvage_bg_hover"]
             if self.is_salvage_hovered
@@ -195,7 +197,6 @@ class UpgradePanel(UIElement):
             border_radius=5,
         )
 
-        # Calculate the refund amount to display on the button.
         refund_amount = int(
             self.tower.total_investment * self.salvage_refund_percentage
         )
