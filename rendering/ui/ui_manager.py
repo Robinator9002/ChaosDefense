@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 class UIManager:
     """
     Manages all UI elements, featuring a dynamic, tab-based interface for
-    tower selection that is automatically generated from game configurations.
+    tower selection that is automatically generated and fully navigable
+    via keyboard shortcuts.
     """
 
     def __init__(
@@ -33,7 +34,6 @@ class UIManager:
         self.game_manager = game_manager
         self.assets_path = assets_path
 
-        # --- UI State and Component Storage ---
         self.upgrade_panel: Optional[UpgradePanel] = None
         self.tower_categories: Dict[str, List[Dict[str, Any]]] = OrderedDict()
         self.category_tabs: List[TabButton] = []
@@ -41,21 +41,73 @@ class UIManager:
         self.hotkey_map: List[str] = []
         self.active_category: Optional[str] = None
 
-        # --- Build the UI ---
         self._discover_and_group_towers()
         self._build_dynamic_ui()
 
+    # --- NEW: Public methods for keyboard navigation ---
+
+    def set_active_category_by_index(self, index: int):
+        """
+        Sets the active tower category tab by its numerical index.
+        Called by the Game class in response to F-key or Ctrl+Num hotkeys.
+        """
+        category_keys = list(self.tower_categories.keys())
+        if 0 <= index < len(category_keys):
+            new_category = category_keys[index]
+            if self.active_category != new_category:
+                self.active_category = new_category
+                self._update_tabs_and_buttons()
+                logger.debug(f"Switched to category '{new_category}' via hotkey.")
+
+    def cycle_category(self):
+        """
+        Cycles to the next available tower category.
+        Called by the Game class in response to Ctrl+Tab.
+        """
+        if not self.active_category or len(self.tower_categories) < 2:
+            return
+
+        category_keys = list(self.tower_categories.keys())
+        current_index = category_keys.index(self.active_category)
+        next_index = (current_index + 1) % len(category_keys)
+        self.active_category = category_keys[next_index]
+        self._update_tabs_and_buttons()
+        logger.debug(f"Cycled to category '{self.active_category}'.")
+
+    def cycle_tower_selection(self, game_state: "GameState"):
+        """
+        Cycles the selected tower within the currently active category.
+        Called by the Game class in response to Tab.
+        """
+        if not self.active_category or not self.hotkey_map:
+            return
+
+        current_selection = game_state.selected_tower_to_build
+        try:
+            current_index = self.hotkey_map.index(current_selection)
+        except ValueError:
+            current_index = -1  # Nothing is selected, so start from the beginning
+
+        next_index = (current_index + 1) % len(self.hotkey_map)
+        new_tower_id = self.hotkey_map[next_index]
+        game_state.selected_tower_to_build = new_tower_id
+        logger.debug(f"Cycled to select tower '{new_tower_id}'.")
+
+    # --- Internal UI building and handling methods ---
+
+    def _update_tabs_and_buttons(self):
+        """A helper method to update tab visuals and rebuild tower buttons."""
+        for t in self.category_tabs:
+            t.is_active = t.category_name == self.active_category
+        self._rebuild_tower_buttons()
+
     def _discover_and_group_towers(self):
         """
-        Scans tower configs, discovers unique categories in their order of
-        appearance in the config file, and groups the tower data accordingly.
+        Scans tower configs, discovers unique categories in order, and groups towers.
         """
         logger.info("Discovering tower categories from configuration...")
         tower_types = self.game_manager.configs.get("tower_types", {})
 
-        # --- MODIFIED: Logic for predictable ordering ---
-        # We build a list of categories, adding a category only the first
-        # time we see it. This preserves the order from the JSON file.
         ordered_categories = []
         if isinstance(tower_types, dict):
             for data in tower_types.values():
@@ -64,11 +116,9 @@ class UIManager:
                     if category not in ordered_categories:
                         ordered_categories.append(category)
 
-        # Initialize the ordered dictionary with empty lists for each category.
         for category in ordered_categories:
             self.tower_categories[category] = []
 
-        # Now, populate the lists with the corresponding tower data.
         if isinstance(tower_types, dict):
             for tower_id, tower_data in tower_types.items():
                 if isinstance(tower_data, dict):
@@ -83,9 +133,7 @@ class UIManager:
         )
 
     def _build_dynamic_ui(self):
-        """
-        Constructs the entire tabbed UI layout, including tabs and tower buttons.
-        """
+        """Constructs the tabbed UI layout."""
         self.category_tabs.clear()
         tab_height = 35
         tab_width = 120
@@ -102,52 +150,39 @@ class UIManager:
         self._rebuild_tower_buttons()
 
     def _rebuild_tower_buttons(self):
-        """
-        Clears and rebuilds the tower buttons based on the active category.
-        """
+        """Rebuilds tower buttons based on the active category."""
         self.build_buttons.clear()
         self.hotkey_map.clear()
-
         if not self.active_category or not self.tower_categories.get(
             self.active_category
         ):
             return
 
-        logger.debug(f"Rebuilding tower buttons for category: '{self.active_category}'")
-        button_size = 64
-        panel_height = 80
-        spacing = 10
-
+        button_size, panel_height, spacing = 64, 80, 10
         towers_in_category = self.tower_categories[self.active_category]
         num_buttons = len(towers_in_category)
-
         total_width = (num_buttons * button_size) + ((num_buttons - 1) * spacing)
         start_x = self.screen_rect.centerx - (total_width / 2)
         start_y = (
             self.screen_rect.bottom - panel_height + (panel_height - button_size) / 2
         )
 
-        current_x = start_x
         for index, tower_data in enumerate(towers_in_category):
-            hotkey = index + 1
             tower_id = tower_data["id"]
             self.hotkey_map.append(tower_id)
-
-            button_rect = pygame.Rect(current_x, start_y, button_size, button_size)
+            rect = pygame.Rect(
+                start_x + (button_size + spacing) * index,
+                start_y,
+                button_size,
+                button_size,
+            )
             button = TowerButton(
-                rect=button_rect,
-                tower_type_id=tower_id,
-                tower_data=tower_data,
-                assets_path=self.assets_path,
-                hotkey_number=hotkey,
+                rect, tower_id, tower_data, self.assets_path, index + 1
             )
             self.build_buttons.append(button)
-            current_x += button_size + spacing
 
     def handle_event(self, event: pygame.event.Event, game_state: "GameState") -> bool:
-        """
-        Handles events for all UI elements, prioritizing tabs, then buttons.
-        """
+        """Handles events for all UI elements."""
         if self.upgrade_panel:
             action = self.upgrade_panel.handle_event(event, game_state)
             if action:
@@ -156,14 +191,11 @@ class UIManager:
 
         if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN):
             for tab in self.category_tabs:
-                if tab.rect.collidepoint(event.pos):
-                    if tab.handle_event(event):
-                        if self.active_category != tab.category_name:
-                            self.active_category = tab.category_name
-                            for t in self.category_tabs:
-                                t.is_active = t.category_name == self.active_category
-                            self._rebuild_tower_buttons()
-                        return True
+                if tab.rect.collidepoint(event.pos) and tab.handle_event(event):
+                    if self.active_category != tab.category_name:
+                        self.active_category = tab.category_name
+                        self._update_tabs_and_buttons()
+                    return True
 
             for button in self.build_buttons:
                 if button.rect.collidepoint(event.pos):
@@ -171,7 +203,6 @@ class UIManager:
                     if action:
                         self._process_ui_action(action, game_state)
                         return True
-
         return False
 
     def _process_ui_action(self, action: UIAction, game_state: "GameState"):
@@ -179,13 +210,12 @@ class UIManager:
         match action.type:
             case ActionType.SELECT_TOWER:
                 tower_id = action.entity_id
-                if game_state.selected_tower_to_build == tower_id:
-                    game_state.clear_selection()
-                else:
-                    game_state.selected_tower_to_build = tower_id
+                game_state.selected_tower_to_build = (
+                    None if game_state.selected_tower_to_build == tower_id else tower_id
+                )
             case ActionType.PURCHASE_UPGRADE:
-                upgrade_id = action.entity_id
                 tower_id = game_state.selected_entity_id
+                upgrade_id = action.entity_id
                 if tower_id and upgrade_id:
                     path_char = upgrade_id.split("_")[-1][0]
                     path_id = f"path_{path_char}"
@@ -194,9 +224,8 @@ class UIManager:
             case ActionType.CLOSE_PANEL:
                 game_state.clear_selection()
             case ActionType.SALVAGE_TOWER:
-                tower_id = game_state.selected_entity_id
-                if tower_id:
-                    self.game_manager.salvage_tower(tower_id)
+                if game_state.selected_entity_id:
+                    self.game_manager.salvage_tower(game_state.selected_entity_id)
 
     def update(self, dt: float, game_state: "GameState"):
         """Updates the state of the upgrade panel."""
@@ -240,9 +269,7 @@ class UIManager:
 
         for tab in self.category_tabs:
             tab.draw(screen)
-
         for button in self.build_buttons:
             button.draw(screen, game_state)
-
         if self.upgrade_panel:
             self.upgrade_panel.draw(screen)
