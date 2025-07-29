@@ -73,6 +73,8 @@ class PersistentGroundAura(Entity):
         """
         Ticks down duration and applies effects to enemies in the area.
         """
+        # The GameManager's main loop passes all_enemies to every entity's
+        # update method, so we accept it here even if game_state isn't used.
         if not self.is_alive:
             return
 
@@ -116,7 +118,7 @@ class PersistentGroundAura(Entity):
 
     def draw(self, screen: pygame.Surface, camera_offset: pygame.Vector2, zoom: float):
         """
-        Draws the aura's visual effect. Overrides base Entity draw for custom visuals.
+        Draws the aura's visual effect.
         """
-        # We call the parent draw method which handles scaling and camera offset.
+        # The base Entity.draw method handles camera offset and zooming perfectly.
         super().draw(screen, camera_offset, zoom)
