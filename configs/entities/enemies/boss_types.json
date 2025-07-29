@@ -8,7 +8,7 @@
     "name": "Grunt Colossus",
     "render_props": { "size": 48, "color": [220, 100, 100] },
     "base_stats": {
-      "hp": 850,
+      "hp": 400,
       "speed": 80,
       "bounty": 200,
       "damage": 10,
@@ -16,8 +16,8 @@
       "immunities": ["slow"]
     },
     "scaling_per_level": {
-      "hp": 1.22,
-      "bounty": 1.15
+      "hp": 1.2,
+      "bounty": 1.0
     },
     "phalanx": [
       { "type": "grunt", "count": 8 },
@@ -33,7 +33,7 @@
     "name": "Hyperion Vanguard",
     "render_props": { "size": 52, "color": [220, 220, 255] },
     "base_stats": {
-      "hp": 2200,
+      "hp": 1000,
       "speed": 50,
       "bounty": 500,
       "damage": 20,
@@ -41,8 +41,9 @@
       "immunities": ["slow", "stun"]
     },
     "scaling_per_level": {
-      "hp": 1.25,
-      "bounty": 1.18
+      "hp": 1.1,
+      "bounty": 1.0,
+      "armor": 1.1
     },
     "phalanx": [
       { "type": "guardian", "count": 4 },
@@ -58,7 +59,7 @@
     "name": "Phase Striker",
     "render_props": { "size": 40, "color": [255, 200, 200] },
     "base_stats": {
-      "hp": 1100,
+      "hp": 700,
       "speed": 200,
       "bounty": 350,
       "damage": 15,
@@ -67,7 +68,7 @@
     },
     "scaling_per_level": {
       "hp": 1.2,
-      "bounty": 1.16
+      "bounty": 1.0
     },
     "phalanx": [
       { "type": "runner", "count": 12 },
@@ -83,7 +84,7 @@
     "name": "Demolisher",
     "render_props": { "size": 50, "color": [255, 180, 80] },
     "base_stats": {
-      "hp": 1800,
+      "hp": 1000,
       "speed": 90,
       "bounty": 400,
       "damage": 100,
@@ -91,8 +92,8 @@
       "immunities": ["slow", "stun"]
     },
     "scaling_per_level": {
-      "hp": 1.28,
-      "bounty": 1.2
+      "hp": 1.25,
+      "bounty": 1.0
     },
     "phalanx": [
       { "type": "bomber", "count": 2 },
