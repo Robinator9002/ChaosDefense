@@ -53,20 +53,23 @@ class WaveGenerator:
         """
         spawn_jobs = []
 
-        # --- BUG FIX: Create a filtered pool of valid enemy types ---
-        # This list comprehension iterates through the available_enemies dictionary
-        # and only includes the keys (enemy IDs) where the corresponding value is
-        # a dictionary. This gracefully ignores any comments ("//") or other
-        # non-dictionary entries in the config files.
+        # --- BUG FIX: Create a fully filtered pool of valid enemy types ---
+        # This process now involves two crucial filtering steps:
+        # 1. It ensures the enemy_data is a dictionary, gracefully ignoring comments.
+        # 2. It checks if the enemy's 'min_level_difficulty' is less than or
+        #    equal to the current 'effective_level_difficulty' from the wave state.
+        # This prevents late-game enemies from appearing in early waves.
         enemy_pool = [
             enemy_id
             for enemy_id, enemy_data in available_enemies.items()
             if isinstance(enemy_data, dict)
+            and enemy_data.get("min_level_difficulty", 999)
+            <= wave_state.effective_level_difficulty
         ]
 
         if not enemy_pool:
             logger.error(
-                "Cannot generate wave: No valid enemies available in the pool!"
+                f"Cannot generate wave: No valid enemies available for effective difficulty {wave_state.effective_level_difficulty}!"
             )
             return spawn_jobs
 
@@ -82,7 +85,7 @@ class WaveGenerator:
         )
         total_enemies = int(total_enemies)
 
-        # 2. Create the list of spawn jobs from the filtered pool.
+        # 2. Create the list of spawn jobs from the correctly filtered pool.
         for _ in range(total_enemies):
             enemy_type_id = random.choice(enemy_pool)
 
@@ -99,6 +102,6 @@ class WaveGenerator:
             )
 
         logger.info(
-            f"Generated standard wave {wave_state.current_wave_number} with {len(spawn_jobs)} enemies."
+            f"Generated standard wave {wave_state.current_wave_number} with {len(spawn_jobs)} enemies from a pool of {len(enemy_pool)} types."
         )
         return spawn_jobs
