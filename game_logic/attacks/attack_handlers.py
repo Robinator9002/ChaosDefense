@@ -22,24 +22,27 @@ logger = logging.getLogger(__name__)
 
 # --- Attack Handler Functions ---
 # Each function in this module is a "factory" for a specific attack type.
-# It takes the firing tower and a target, reads the tower's attack data,
-# and is responsible for creating and returning one or more Entity objects
-# that represent the attack. This decouples the Tower from the implementation
-# details of its various attacks.
+# It takes the firing tower and a target, reads the tower's live stats and
+# attack data, and is responsible for creating and returning one or more
+# Entity objects that represent the attack.
 
 
 def create_standard_projectile(tower: "Tower", target: "Enemy") -> List[Entity]:
     """
     Handles the creation of one or more standard, traveling projectiles.
-    This function encapsulates the logic that was previously in Tower._fire.
-    """
-    attack_data = tower.attack_data
-    projectiles_to_fire = []
-    num_shots = attack_data.get("projectiles_per_shot", 1)
 
-    # Assemble the status effect instances first.
+    BUGFIX: This function has been refactored to read its core stats (damage,
+    pierce, etc.) directly from the live Tower object's attributes, rather
+    than re-reading the base config data. This ensures that all upgrades
+    applied by the UpgradeManager are correctly reflected in the projectile.
+    """
+    attack_specific_data = tower.attack_data.get("data", {})
+    projectiles_to_fire = []
+    num_shots = tower.projectiles_per_shot
+
+    # Assemble the status effect instances first, using the tower's live multipliers.
     effect_instances = []
-    effects_to_apply_data = attack_data.get("effects", {})
+    effects_to_apply_data = attack_specific_data.get("effects", {})
     for effect_id, params in effects_to_apply_data.items():
         if random.random() <= params.get("chance", 1.0):
             if effect_id in tower.status_effects_config:
@@ -56,20 +59,20 @@ def create_standard_projectile(tower: "Tower", target: "Enemy") -> List[Entity]:
                     )
                 )
 
-    # Assemble the ProjectileData payload.
+    # Assemble the ProjectileData payload using the tower's current, live stats.
     projectile_payload = ProjectileData(
-        damage=attack_data.get("damage", 0),
+        damage=tower.damage,
         effects_to_apply=effect_instances,
         status_effects_config=tower.status_effects_config,
-        pierce_count=attack_data.get("pierce", 0),
-        blast_radius=attack_data.get("blast_radius", 0),
-        armor_shred=attack_data.get("armor_shred", 0),
-        on_blast_effects_data=attack_data.get("on_blast_effects", []),
-        conditional_effects=attack_data.get("conditional_effects", []),
-        on_hit_area_effects=attack_data.get("on_hit_area_effects", []),
-        execute_threshold=attack_data.get("execute_threshold"),
-        on_apply_damage=attack_data.get("on_apply_damage", 0),
-        bonus_damage_per_debuff=attack_data.get("bonus_damage_per_debuff", 0),
+        pierce_count=tower.pierce_count,
+        blast_radius=tower.blast_radius,
+        armor_shred=tower.armor_shred,
+        on_blast_effects_data=tower.on_blast_effects,
+        conditional_effects=tower.conditional_effects,
+        on_hit_area_effects=tower.on_hit_area_effects,
+        execute_threshold=tower.execute_threshold,
+        on_apply_damage=tower.on_apply_damage,
+        bonus_damage_per_debuff=tower.bonus_damage_per_debuff,
     )
 
     for i in range(num_shots):
@@ -102,11 +105,15 @@ def create_persistent_ground_aura(tower: "Tower", target: "Enemy") -> List[Entit
     """
     Handles the creation of a stationary, persistent ground effect at the
     target's location.
+
+    BUGFIX: This function now correctly passes the 'data' sub-object from the
+    tower's attack configuration to the aura's constructor, ensuring the
+    aura is created with the correct stats (dps, radius, etc.).
     """
     aura = PersistentGroundAura(
         x=target.pos.x,
         y=target.pos.y,
-        aura_data=tower.attack_data,
+        aura_data=tower.attack_data.get("data", {}),
         status_effects_config=tower.status_effects_config,
     )
     return [aura]
@@ -116,10 +123,14 @@ def create_persistent_attached_aura(tower: "Tower", target: "Enemy") -> List[Ent
     """
     Handles the creation of a persistent effect that attaches to and follows
     the primary target.
+
+    BUGFIX: This function now correctly passes the 'data' sub-object from the
+    tower's attack configuration to the aura's constructor, ensuring the
+    aura is created with the correct stats (dps, radius, etc.).
     """
     aura = PersistentAttachedAura(
         target=target,
-        aura_data=tower.attack_data,
+        aura_data=tower.attack_data.get("data", {}),
         status_effects_config=tower.status_effects_config,
     )
     return [aura]
