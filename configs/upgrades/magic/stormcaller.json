@@ -11,7 +11,7 @@
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "dps", "operation": "add", "amount": 8 }
+            "value": { "key": "dps", "operation": "add", "amount": 3 }
           }
         ]
       },
@@ -63,7 +63,7 @@
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "dps", "operation": "add", "amount": 20 }
+            "value": { "key": "dps", "operation": "add", "amount": 8 }
           },
           {
             "type": "modify_attack_data",
@@ -95,8 +95,8 @@
               "effect": {
                 "id": "stun",
                 "potency": 0.0,
-                "duration": 0.2,
-                "chance": 0.1
+                "duration": 0.15,
+                "chance": 0.08
               }
             }
           }
@@ -110,7 +110,7 @@
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "tick_rate", "operation": "add", "amount": 2 }
+            "value": { "key": "tick_rate", "operation": "add", "amount": 1 }
           }
         ]
       },
@@ -143,7 +143,7 @@
               "operation": "set",
               "params": {
                 "chance": 0.25,
-                "damage": 20,
+                "damage": 15,
                 "range": 100,
                 "bounces": 1
               }
@@ -154,7 +154,7 @@
       {
         "id": "stormcaller_b5",
         "name": "System Shock",
-        "cost": 550,
+        "cost": 600,
         "description": "Enemies affected by the storm become vulnerable, taking increased damage from all sources.",
         "effects": [
           {
@@ -174,3 +174,4 @@
     ]
   }
 }
+

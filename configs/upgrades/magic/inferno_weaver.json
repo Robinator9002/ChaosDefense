@@ -39,7 +39,7 @@
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "dps", "operation": "add", "amount": 20 }
+            "value": { "key": "dps", "operation": "add", "amount": 10 }
           }
         ]
       },
@@ -67,7 +67,7 @@
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "dps", "operation": "add", "amount": 55 }
+            "value": { "key": "dps", "operation": "add", "amount": 30 }
           },
           {
             "type": "modify_attack_data",
@@ -101,11 +101,11 @@
         "id": "inferno_b2",
         "name": "Fuel Air Mixture",
         "cost": 160,
-        "description": "Increases damage per second by 10.",
+        "description": "Increases damage per second by 5.",
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "dps", "operation": "add", "amount": 10 }
+            "value": { "key": "dps", "operation": "add", "amount": 5 }
           }
         ]
       },
