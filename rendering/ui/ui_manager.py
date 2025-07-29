@@ -142,12 +142,9 @@ class UIManager:
         elif action == "close_panel":
             game_state.clear_selection()
 
-        # --- NEW: Handle the salvage button action ---
         elif action == "salvage_tower":
             tower_id = game_state.selected_entity_id
             if tower_id:
-                # The UIManager tells the GameManager WHICH tower to salvage.
-                # The GameManager handles all the underlying logic.
                 self.game_manager.salvage_tower(tower_id)
             else:
                 logger.warning("Salvage action received but no tower was selected.")
@@ -173,15 +170,17 @@ class UIManager:
                 if selected_tower:
                     panel_rect = pygame.Rect(self.screen_rect.width - 270, 10, 260, 400)
 
-                    # --- NEW: Get the current salvage rate from the game logic ---
-                    # This ensures the UI always displays the correct value based on difficulty.
                     salvage_rate = 0.0
                     if self.game_manager.wave_manager:
-                        salvage_rate = self.game_manager.wave_manager.settings.get(
-                            "salvage_refund_percentage", 0.0
+                        # --- BUG FIX: Use the correct attribute name ---
+                        # The 'settings' attribute was renamed to 'difficulty_settings'
+                        # during the WaveManager refactor. This updates the reference.
+                        salvage_rate = (
+                            self.game_manager.wave_manager.difficulty_settings.get(
+                                "salvage_refund_percentage", 0.0
+                            )
                         )
 
-                    # Create the panel, now passing the salvage rate to it.
                     self.upgrade_panel = UpgradePanel(
                         rect=panel_rect,
                         tower=selected_tower,
