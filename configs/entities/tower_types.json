@@ -46,10 +46,10 @@
     "attack": {
       "type": "standard_projectile",
       "data": {
-        "damage": 22,
+        "damage": 25,
         "range": 200,
-        "fire_rate": 0.6,
-        "blast_radius": 75
+        "fire_rate": 0.4,
+        "blast_radius": 40
       }
     }
   },
