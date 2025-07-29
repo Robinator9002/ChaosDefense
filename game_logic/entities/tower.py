@@ -7,7 +7,7 @@ import math
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 
 from .entity import Entity
-from .projectile import Projectile
+from .projectiles.projectile import Projectile
 from ..effects.status_effect import StatusEffect
 
 # Use TYPE_CHECKING to avoid circular imports at runtime.

@@ -17,7 +17,7 @@ from .entities.enemies.enemy import Enemy
 
 # NEW: Import the BossEnemy class.
 from .entities.enemies.boss_enemy import BossEnemy
-from .entities.projectile import Projectile
+from .entities.projectiles.projectile import Projectile
 from .upgrades.upgrade_manager import UpgradeManager
 from .effects.status_effect import StatusEffect
 
