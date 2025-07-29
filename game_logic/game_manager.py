@@ -59,7 +59,7 @@ class GameManager:
         logger.info("--- Setting up new game via Game Manager ---")
 
         try:
-            preset_to_load = "Volcanic"
+            preset_to_load = "Forest"
             self.grid, self.paths, style_config = (
                 self.level_manager.build_level_from_preset(preset_to_load)
             )
