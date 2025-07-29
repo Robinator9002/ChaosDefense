@@ -49,7 +49,7 @@ def main():
             "boss_types": load_config(CONFIG_PATH / "entities/enemies/boss_types.json"),
             "tower_types": load_config(CONFIG_PATH / "entities/tower_types.json"),
             "upgrade_definitions": load_config(
-                CONFIG_PATH / "gameplay/upgrade_definitions.json"
+                CONFIG_PATH / "upgrades/upgrade_definitions.json"
             ),
             "difficulty_scaling": load_config(
                 CONFIG_PATH / "scaling/difficulty_scaling.json"
