@@ -4,10 +4,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-# --- Game Logic Imports ---
 from game_logic.game_manager import GameManager
-
-# --- Rendering Imports ---
 from rendering.sprite_renderer import SpriteRenderer
 from rendering.ui.ui_manager import UIManager
 
@@ -36,7 +33,6 @@ class Game:
         self.game_settings = all_configs["game_settings"]
         self.assets_path = assets_path
 
-        # --- Screen and Display Setup ---
         self.screen_width = self.game_settings.get("screen_width", 1280)
         self.screen_height = self.game_settings.get("screen_height", 720)
         self.screen = pygame.display.set_mode(
@@ -48,13 +44,11 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
 
-        # --- Core System Initialization ---
         self.game_manager = GameManager(all_configs)
         self.ui_manager = UIManager(
             self.screen.get_rect(), self.game_manager, assets_path
         )
 
-        # --- Rendering and Camera State ---
         self.sprite_renderer: Optional[SpriteRenderer] = None
         self.background_color = (0, 0, 0)
         self.gui_font = pygame.font.SysFont("segoeui", 22, bold=True)
@@ -74,9 +68,7 @@ class Game:
         logger.info("--- Initializing Rendering Components ---")
         grid = self.game_manager.grid
         if not grid:
-            logger.critical(
-                "GameManager failed to provide a grid. Cannot setup rendering."
-            )
+            logger.critical("GameManager failed to provide a grid.")
             self.running = False
             return
 
@@ -119,131 +111,137 @@ class Game:
                 self.running = False
                 return
 
-            # Give the UI the first chance to handle any event.
             ui_handled_event = self.ui_manager.handle_event(
                 event, self.game_manager.game_state
             )
 
-            # If the UI did not consume the event, process it for game world interaction.
             if not ui_handled_event:
                 if event.type == pygame.VIDEORESIZE:
                     self._on_resize(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # Route mouse clicks to a dedicated handler for clarity.
                     self._handle_mouse_down(event)
                 elif event.type == pygame.MOUSEBUTTONUP:
-                    # Stop panning when the middle mouse button is released.
                     if event.button == 2:
                         self.is_panning = False
                 elif event.type == pygame.MOUSEMOTION:
                     if self.is_panning:
                         self._handle_pan(event)
                 elif event.type == pygame.KEYDOWN:
-                    self._handle_keyboard_input(event.key)
+                    self._handle_keyboard_input(event)  # MODIFIED: Pass the whole event
 
     def _handle_mouse_down(self, event):
-        """
-        Handles all mouse down events, routing them based on the button.
-        This is the core of the new input remapping.
-        """
-        # --- Left Click (Action Button) ---
+        """Handles all mouse down events, routing them based on the button."""
         if event.button == 1:
             self._handle_map_click(event)
-
-        # --- Middle Click (Pan Camera) ---
         elif event.button == 2:
             self.is_panning = True
             self.pan_start_mouse_pos = pygame.Vector2(event.pos)
             self.pan_start_camera_offset = self.camera_offset.copy()
-
-        # --- Right Click (Cancel / Deselect) ---
         elif event.button == 3:
             game_state = self.game_manager.game_state
-            # If the player is trying to build a tower OR has a tower selected,
-            # right-clicking will cancel that action and clear the selection.
             if game_state.selected_tower_to_build or game_state.selected_entity_id:
                 game_state.clear_selection()
-                logger.debug("Player cancelled action with right-click.")
-
-        # --- Scroll Wheel Up (Zoom In) ---
         elif event.button == 4:
             self.zoom = min(self.zoom + ZOOM_INCREMENT, MAX_ZOOM)
             self._clamp_camera_offset()
-
-        # --- Scroll Wheel Down (Zoom Out) ---
         elif event.button == 5:
             self.zoom = max(self.zoom - ZOOM_INCREMENT, self.min_zoom)
             self._clamp_camera_offset()
 
-    def _handle_keyboard_input(self, key):
-        """Handles keyboard presses for game actions, like tower selection."""
-        key_to_number = {
-            pygame.K_1: 1,
-            pygame.K_2: 2,
-            pygame.K_3: 3,
-            pygame.K_4: 4,
-            pygame.K_5: 5,
-            pygame.K_6: 6,
-            pygame.K_7: 7,
-            pygame.K_8: 8,
-            pygame.K_9: 9,
+    def _handle_keyboard_input(self, event: pygame.event.Event):
+        """
+        Handles all keyboard presses, routing them to the appropriate system.
+        This is now the central hub for all keyboard-based UI and game control.
+        """
+        mods = pygame.key.get_mods()
+        is_ctrl_pressed = mods & pygame.KMOD_CTRL
+
+        # --- NEW: UI Navigation Hotkeys ---
+        # These keys are for navigating the UI and are processed first.
+
+        # Cycle through tower categories (e.g., Ctrl+Tab)
+        if event.key == pygame.K_TAB and is_ctrl_pressed:
+            self.ui_manager.cycle_category()
+            return  # Consume the event
+
+        # Cycle through towers in the current category (e.g., Tab)
+        if event.key == pygame.K_TAB and not is_ctrl_pressed:
+            self.ui_manager.cycle_tower_selection(self.game_manager.game_state)
+            return  # Consume the event
+
+        # --- NEW: Direct Category Selection (F-Keys and Ctrl+Numbers) ---
+        f_key_map = {
+            pygame.K_F1: 0,
+            pygame.K_F2: 1,
+            pygame.K_F3: 2,
+            pygame.K_F4: 3,
+            pygame.K_F5: 4,
+            pygame.K_F6: 5,
+            pygame.K_F7: 6,
+            pygame.K_F8: 7,
+            pygame.K_F9: 8,
+            pygame.K_F10: 9,
         }
 
-        if key in key_to_number:
-            number_pressed = key_to_number[key]
-            hotkey_index = number_pressed - 1
+        if event.key in f_key_map:
+            self.ui_manager.set_active_category_by_index(f_key_map[event.key])
+            return
 
+        num_key_map = {
+            pygame.K_1: 0,
+            pygame.K_2: 1,
+            pygame.K_3: 2,
+            pygame.K_4: 3,
+            pygame.K_5: 4,
+            pygame.K_6: 5,
+            pygame.K_7: 6,
+            pygame.K_8: 7,
+            pygame.K_9: 8,
+            pygame.K_0: 9,
+        }
+
+        if is_ctrl_pressed and event.key in num_key_map:
+            self.ui_manager.set_active_category_by_index(num_key_map[event.key])
+            return
+
+        # --- Tower Build Hotkeys (Number keys without Ctrl) ---
+        # This is the original functionality.
+        if not is_ctrl_pressed and event.key in num_key_map:
+            hotkey_index = num_key_map[event.key]
             if 0 <= hotkey_index < len(self.ui_manager.hotkey_map):
                 tower_id = self.ui_manager.hotkey_map[hotkey_index]
                 game_state = self.game_manager.game_state
-                # Toggle selection logic
                 if game_state.selected_tower_to_build == tower_id:
                     game_state.clear_selection()
                 else:
                     game_state.selected_tower_to_build = tower_id
                     logger.info(
-                        f"Player selected '{tower_id}' for building via hotkey {number_pressed}."
+                        f"Player selected '{tower_id}' via hotkey {hotkey_index + 1}."
                     )
 
     def _handle_map_click(self, event):
-        """
-        Handles left-clicks that occur on the game map (not the UI).
-        """
+        """Handles left-clicks that occur on the game map (not the UI)."""
         game_state = self.game_manager.game_state
-
-        # --- Action 1: Place a selected tower ---
         if game_state.selected_tower_to_build:
             world_pos = self._screen_to_world(pygame.Vector2(event.pos))
             tile_x = int(world_pos.x // self.tile_size)
             tile_y = int(world_pos.y // self.tile_size)
-
-            # The game manager now returns True on successful placement
             self.game_manager.place_tower(
                 game_state.selected_tower_to_build, tile_x, tile_y
             )
-
-            # MODIFICATION: The selection is NO LONGER cleared automatically.
-            # This allows the player to place multiple towers of the same type
-            # without re-selecting from the UI. The action is cancelled via
-            # Right-Click or by selecting another tower.
             return
 
-        # --- Action 2: Select an existing tower on the map ---
         world_pos = self._screen_to_world(pygame.Vector2(event.pos))
         clicked_on_tower = False
         for tower in self.game_manager.towers:
             if tower.rect.collidepoint(world_pos):
-                # If we click the same tower that is already selected, deselect it.
                 if game_state.selected_entity_id == tower.entity_id:
                     game_state.clear_selection()
-                # Otherwise, select the new tower.
                 else:
                     game_state.selected_entity_id = tower.entity_id
-                    logger.info(f"Player selected tower {tower.entity_id} for upgrade.")
                 clicked_on_tower = True
                 break
 
-        # If we clicked on the empty map, clear any selection.
         if not clicked_on_tower:
             game_state.clear_selection()
 
@@ -296,23 +294,19 @@ class Game:
         colors = {"gold": (255, 215, 0), "hp": (220, 20, 60), "wave": (0, 191, 255)}
         padding, y_pos = 20, 15
         wave_text = f"Wave: {state.current_wave_number} / {wave_mgr.max_waves}"
-
         surfaces = [
             self.gui_font.render(f"Gold: {state.gold}", True, colors["gold"]),
             self.gui_font.render(f"Base HP: {state.base_hp}", True, colors["hp"]),
             self.gui_font.render(wave_text, True, colors["wave"]),
         ]
-
         panel_width = sum(s.get_width() for s in surfaces) + (
             padding * (len(surfaces) + 1)
         )
         panel_height = max(s.get_height() for s in surfaces) + (padding / 2)
         panel_rect = pygame.Rect(5, 5, panel_width, panel_height)
-
         panel_surf = pygame.Surface(panel_rect.size, pygame.SRCALPHA)
         panel_surf.fill((0, 0, 0, 150))
         self.screen.blit(panel_surf, panel_rect.topleft)
-
         current_x = panel_rect.left + padding
         for surf in surfaces:
             self.screen.blit(surf, (current_x, y_pos))
