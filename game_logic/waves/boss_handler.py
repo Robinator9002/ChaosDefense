@@ -50,6 +50,13 @@ class BossHandler:
         level and schedules their special waves.
         """
         for boss_id, boss_data in self.all_bosses.items():
+            # --- BUG FIX: VALIDATION STEP ---
+            # This check ensures that we only process entries that are dictionaries.
+            # It gracefully skips any top-level keys in the JSON file that are
+            # not boss definitions, such as comments (e.g., "//": "comment text").
+            if not isinstance(boss_data, dict):
+                continue
+
             if boss_data.get("type") in allowed_boss_types:
                 wave_num = boss_data.get("boss_difficulty")
                 if wave_num:
@@ -77,14 +84,13 @@ class BossHandler:
         boss_data = self.all_bosses[boss_id]
         spawn_jobs = []
 
-        # The boss always spawns on a random path.
         boss_path_index = random.randint(0, num_paths - 1)
 
         # 1. Create the spawn job for the boss itself.
         spawn_jobs.append(
             {
                 "type": boss_id,
-                "level": 1,  # Bosses don't use the level system
+                "level": 1,
                 "path_index": boss_path_index,
                 "is_boss": True,
             }
@@ -94,12 +100,10 @@ class BossHandler:
         phalanx_data = boss_data.get("phalanx", [])
         for group in phalanx_data:
             for _ in range(group["count"]):
-                # For simplicity, escorts spawn on the same path as the boss.
-                # More complex formations could be added later.
                 spawn_jobs.append(
                     {
                         "type": group["type"],
-                        "level": 1 + (wave_num // 5),  # Escorts scale with the wave
+                        "level": 1 + (wave_num // 5),
                         "path_index": boss_path_index,
                         "is_boss": False,
                     }
@@ -108,7 +112,6 @@ class BossHandler:
         logger.warning(
             f"Generating special BOSS WAVE {wave_num} featuring '{boss_data['name']}'!"
         )
-        # Shuffle the list so the boss doesn't always appear first.
         random.shuffle(spawn_jobs)
         return spawn_jobs
 
@@ -121,7 +124,9 @@ class BossHandler:
         """
         updated_pool = current_enemy_pool.copy()
         for boss_id, boss_data in self.all_bosses.items():
-            # Check if the boss is allowed on this level and hasn't been added yet.
+            if not isinstance(boss_data, dict):
+                continue
+
             if (
                 boss_id not in updated_pool
                 and boss_id in self.scheduled_boss_waves.values()
