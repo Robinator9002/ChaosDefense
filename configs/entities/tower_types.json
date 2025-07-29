@@ -107,14 +107,15 @@
     "attack": {
       "type": "persistent_ground_aura",
       "data": {
-        "range": 150,
-        "fire_rate": 0.4,
+        "range": 80,
+        "fire_rate": 2,
         "radius": 60,
-        "duration": 3.5,
-        "dps": 25,
-        "tick_rate": 5,
+        "duration": 2,
+        "dps": 5,
+        "tick_rate": 10,
+        "bonus_damage_vs_armor_multiplier": -0.5,
         "effects": {
-          "fire": { "potency": 5, "duration": 2.0 }
+          "fire": { "potency": 10, "duration": 2.0 }
         }
       }
     }
@@ -129,11 +130,11 @@
       "type": "persistent_attached_aura",
       "data": {
         "range": 180,
-        "fire_rate": 0.3,
+        "fire_rate": 0.1,
         "radius": 80,
         "duration": 4.0,
-        "dps": 12,
-        "tick_rate": 4,
+        "dps": 20,
+        "tick_rate": 3,
         "bonus_damage_vs_armor_multiplier": 0.5
       }
     }
@@ -145,14 +146,16 @@
     "sprite_key": "towers/curse_weaver.png",
     "placeholder_color": [140, 0, 255],
     "attack": {
-      "type": "standard_projectile",
+      "type": "persistent_attached_aura",
       "data": {
         "damage": 5,
         "range": 220,
-        "fire_rate": 0.8,
+        "fire_rate": 2,
         "effects": {
           "elemental_vulnerability": { "potency": 1.5, "duration": 5.0 }
-        }
+        },
+        "tick_rate": 10,
+        "duration": 0.6
       }
     }
   }
