@@ -49,7 +49,7 @@
         "damage": 25,
         "range": 200,
         "fire_rate": 0.4,
-        "blast_radius": 40
+        "blast_radius": 30
       }
     }
   },

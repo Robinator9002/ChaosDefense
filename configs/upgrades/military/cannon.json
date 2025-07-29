@@ -7,8 +7,8 @@
         "id": "cannon_a1",
         "name": "High-Explosive Shells",
         "cost": 70,
-        "description": "Increases blast radius by 15%.",
-        "effects": [{ "type": "multiply_blast_radius", "value": 1.15 }]
+        "description": "Increases blast radius by 20%.",
+        "effects": [{ "type": "multiply_blast_radius", "value": 1.2 }]
       },
       {
         "id": "cannon_a2",
