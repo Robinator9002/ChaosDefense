@@ -126,16 +126,21 @@ class UpgradePanel(UIElement):
         Delegates event handling and returns a structured UIAction if triggered.
         """
         mouse_pos = pygame.mouse.get_pos()
-        if not self.rect.collidepoint(mouse_pos):
-            self.is_close_hovered = False
-            self.is_salvage_hovered = False
-            for button in self.upgrade_buttons:
-                button.is_hovered = False
-            return None
 
-        if event.type == pygame.MOUSEMOTION:
-            self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
-            self.is_salvage_hovered = self.salvage_button_rect.collidepoint(mouse_pos)
+        # --- NEU: Hover-Zustände für alle Elemente im Panel aktualisieren ---
+        # Dies muss immer geschehen, unabhängig davon, ob die Maus im Panel ist,
+        # damit der Hover-Zustand korrekt zurückgesetzt wird, wenn die Maus das Panel verlässt.
+        self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
+        self.is_salvage_hovered = self.salvage_button_rect.collidepoint(mouse_pos)
+        for button in self.upgrade_buttons:
+            # `handle_event` in `UpgradeButton` aktualisiert `is_hovered` basierend auf `mouse_pos`
+            button.handle_event(
+                event, game_state
+            )  # Pass the event to update hover state
+
+        # Nur Klicks verarbeiten, wenn die Maus im Panel ist
+        if not self.rect.collidepoint(mouse_pos):
+            return None
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_close_hovered:
@@ -147,12 +152,12 @@ class UpgradePanel(UIElement):
                 # --- MODIFIED: Return a structured UIAction object ---
                 return UIAction(type=ActionType.SALVAGE_TOWER)
 
-        # Pass the event to each upgrade button and propagate its action.
+        # Klicks an Upgrade-Buttons weiterleiten und deren Aktion propagieren.
         for button in self.upgrade_buttons:
-            # The button's handle_event now returns an Optional[UIAction].
+            # Die `handle_event`-Methode des Buttons gibt jetzt eine `Optional[UIAction]` zurück.
             action = button.handle_event(event, game_state)
             if action:
-                # If the button returned an action, we propagate it up the chain.
+                # Wenn der Button eine Aktion zurückgegeben hat, propagieren wir sie.
                 return action
         return None
 

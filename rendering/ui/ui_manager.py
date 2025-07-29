@@ -183,27 +183,48 @@ class UIManager:
 
     def handle_event(self, event: pygame.event.Event, game_state: "GameState") -> bool:
         """Handles events for all UI elements."""
+        # Handle upgrade panel events first, as it's typically on top
         if self.upgrade_panel:
             action = self.upgrade_panel.handle_event(event, game_state)
             if action:
                 self._process_ui_action(action, game_state)
-                return True
+                return True  # Event handled by panel, no need to process further
 
-        if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN):
+        # --- NEU: MOUSEMOTION für ALLE Elemente verarbeiten, um den Hover-Zustand zu aktualisieren ---
+        # Dies muss VOR jeglicher Klick-Logik geschehen, die die Verarbeitung abbrechen könnte.
+        if event.type == pygame.MOUSEMOTION:
             for tab in self.category_tabs:
-                if tab.rect.collidepoint(event.pos) and tab.handle_event(event):
+                # `handle_event` in `TabButton` aktualisiert `is_hovered` basierend auf `event.pos`
+                tab.handle_event(event, game_state)
+            for button in self.build_buttons:
+                # `handle_event` in `TowerButton` aktualisiert `is_hovered` basierend auf `event.pos`
+                button.handle_event(event, game_state)
+            # Hier kein `return True`, da wir wollen, dass alle Elemente ihren Hover-Zustand aktualisieren.
+
+        # --- MOUSEBUTTONDOWN-Ereignisse separat verarbeiten ---
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Tabs auf Klicks prüfen
+            for tab in self.category_tabs:
+                # `handle_event` in `TabButton` gibt True zurück, wenn geklickt
+                if tab.handle_event(
+                    event
+                ):  # Kein `collidepoint` hier, da `handle_event` das intern macht
                     if self.active_category != tab.category_name:
                         self.active_category = tab.category_name
                         self._update_tabs_and_buttons()
-                    return True
+                    return True  # Ereignis behandelt
 
+            # Bau-Buttons auf Klicks prüfen
             for button in self.build_buttons:
-                if button.rect.collidepoint(event.pos):
-                    action = button.handle_event(event, game_state)
-                    if action:
-                        self._process_ui_action(action, game_state)
-                        return True
-        return False
+                # `handle_event` in `TowerButton` gibt eine `UIAction` zurück, wenn geklickt
+                action = button.handle_event(
+                    event, game_state
+                )  # Kein `collidepoint` hier
+                if action:
+                    self._process_ui_action(action, game_state)
+                    return True  # Ereignis behandelt
+
+        return False  # Ereignis wurde von keinem UI-Element behandelt
 
     def _process_ui_action(self, action: UIAction, game_state: "GameState"):
         """Processes a structured UIAction from any UI element."""
