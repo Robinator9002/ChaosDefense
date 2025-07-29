@@ -8,10 +8,15 @@ from typing import Dict, List, Any, Tuple, Optional
 from .game_state import GameState
 from .levels.level_manager import LevelManager
 from .level_generation.grid import Grid
+
+# The WaveManager import remains the same, but its internal logic is now refactored.
 from .waves.wave_manager import WaveManager
 from .entities.entity import Entity
 from .entities.tower import Tower
 from .entities.enemies.enemy import Enemy
+
+# NEW: Import the BossEnemy class.
+from .entities.enemies.boss_enemy import BossEnemy
 from .entities.projectile import Projectile
 from .upgrades.upgrade_manager import UpgradeManager
 from .effects.status_effect import StatusEffect
@@ -54,8 +59,7 @@ class GameManager:
         logger.info("--- Setting up new game via Game Manager ---")
 
         try:
-            # In a full game, this might be selectable from a menu.
-            preset_to_load = "Forest"
+            preset_to_load = "Volcanic"
             self.grid, self.paths, style_config = (
                 self.level_manager.build_level_from_preset(preset_to_load)
             )
@@ -74,13 +78,17 @@ class GameManager:
             return
 
         player_difficulty = self.configs["game_settings"].get("difficulty", 1)
-        level_difficulty = style_config.get("generation_params", {}).get(
-            "level_difficulty", 1
-        )
+        level_difficulty = gen_params.get("level_difficulty", 1)
+
+        # --- MODIFIED: Initialize the new, refactored WaveManager ---
+        # It now requires the boss configurations and the list of allowed boss
+        # types for the current level.
         self.wave_manager = WaveManager(
             difficulty_config=self.configs["difficulty_scaling"],
             wave_scaling_config=self.configs["wave_scaling"],
             enemy_types=self.configs["enemy_types"],
+            boss_types=self.configs["boss_types"],
+            allowed_boss_types=gen_params.get("allowed_boss_types", []),
             player_difficulty=player_difficulty,
             initial_level_difficulty=level_difficulty,
             num_paths=len(self.paths),
@@ -92,10 +100,14 @@ class GameManager:
         if self.game_state.game_over:
             return
         if self.wave_manager:
+            # The update call remains the same, returning one spawn job at a time.
             spawn_job = self.wave_manager.update(dt, len(self.enemies))
             if spawn_job:
                 self._spawn_enemy(spawn_job)
-            self.game_state.current_wave_number = self.wave_manager.current_wave_number
+            # MODIFIED: Access the wave number from the new WaveState object.
+            self.game_state.current_wave_number = (
+                self.wave_manager.wave_state.current_wave_number
+            )
 
         newly_fired_projectiles: List[Projectile] = []
         for tower in self.towers:
@@ -104,6 +116,7 @@ class GameManager:
                 newly_fired_projectiles.extend(projectiles)
         self.projectiles.extend(newly_fired_projectiles)
 
+        # Update all active enemies (both regular and bosses).
         for enemy in self.enemies:
             enemy.update(dt, self.game_state)
 
@@ -114,26 +127,22 @@ class GameManager:
 
     def _cleanup_dead_entities(self):
         """
-        Removes all dead entities (enemies, projectiles, and now salvaged towers)
+        Removes all dead entities (enemies, projectiles, and salvaged towers)
         from the game lists and processes any on-death effects.
         """
-        # Check for dead enemies to process their bounties and on-death effects.
         dead_enemies = [e for e in self.enemies if not e.is_alive]
         if dead_enemies:
             for dead_enemy in dead_enemies:
                 self.game_state.add_gold(dead_enemy.bounty)
                 self._handle_on_death_effects(dead_enemy)
 
-        # Filter all entity lists to remove any entity where is_alive is False.
         self.enemies = [e for e in self.enemies if e.is_alive]
         self.projectiles = [p for p in self.projectiles if p.is_alive]
-        # NEW: Ensure salvaged towers are removed from the active list.
         self.towers = [t for t in self.towers if t.is_alive]
 
     def _handle_on_death_effects(self, dead_enemy: Enemy):
         """
-        Checks a dead enemy for effects that trigger an action from their source,
-        like the Frost Tower's "Shatter" explosion.
+        Checks a dead enemy for effects that trigger an action from their source.
         """
         for effect in dead_enemy.status_effects:
             if effect.source_entity_id:
@@ -142,9 +151,6 @@ class GameManager:
                     None,
                 )
                 if source_tower and source_tower.on_death_explosion:
-                    logger.info(
-                        f"Triggering 'on_death_explosion' from tower {source_tower.entity_id}"
-                    )
                     self._create_explosion(
                         dead_enemy.pos, source_tower.on_death_explosion
                     )
@@ -154,8 +160,7 @@ class GameManager:
         self, position: pygame.Vector2, explosion_data: Dict[str, Any]
     ):
         """
-        Creates an instantaneous area-of-effect explosion that damages and
-        applies effects to nearby enemies.
+        Creates an instantaneous area-of-effect explosion.
         """
         radius = explosion_data.get("radius", 0)
         damage = explosion_data.get("damage", 0)
@@ -178,47 +183,70 @@ class GameManager:
                         enemy.apply_status_effect(effect_instance)
 
     def _spawn_enemy(self, spawn_job: Dict[str, Any]):
-        """Creates an Enemy instance based on data from the WaveManager."""
-        enemy_type_id = spawn_job["type"]
-        enemy_types_config = self.configs["enemy_types"]
-        if enemy_type_id not in enemy_types_config:
-            return
-
+        """
+        MODIFIED: Creates an Enemy or BossEnemy instance based on the spawn job.
+        This method now intelligently handles different types of spawn requests.
+        """
+        entity_id = spawn_job["type"]
         path_index = spawn_job["path_index"]
         if not (0 <= path_index < len(self.paths)):
+            logger.error(f"Invalid path index {path_index} in spawn job.")
             return
 
-        enemy = Enemy(
-            enemy_type_data=enemy_types_config[enemy_type_id],
-            level=spawn_job["level"],
-            path=self.paths[path_index],
-            tile_size=self.tile_size,
-            difficulty_modifier=self.wave_manager.settings.get("stat_modifier", 1.0),
-        )
-        self.enemies.append(enemy)
+        path = self.paths[path_index]
+        new_enemy = None
+
+        # --- Decision: Is this a special boss wave spawn? ---
+        if spawn_job.get("is_boss", False):
+            boss_config = self.configs["boss_types"].get(entity_id)
+            if boss_config:
+                new_enemy = BossEnemy(
+                    boss_type_data=boss_config, path=path, tile_size=self.tile_size
+                )
+            else:
+                logger.error(f"Could not find boss definition for ID: {entity_id}")
+                return
+
+        # --- Otherwise, it's a standard enemy (or a boss in a regular wave) ---
+        else:
+            # The WaveManager might add bosses to the regular pool, so we check both configs.
+            enemy_config = self.configs["enemy_types"].get(entity_id)
+            if not enemy_config:
+                enemy_config = self.configs["boss_types"].get(entity_id)
+
+            if enemy_config:
+                new_enemy = Enemy(
+                    enemy_type_data=enemy_config,
+                    level=spawn_job["level"],
+                    path=path,
+                    tile_size=self.tile_size,
+                    difficulty_modifier=self.wave_manager.difficulty_settings.get(
+                        "stat_modifier", 1.0
+                    ),
+                )
+            else:
+                logger.error(
+                    f"Could not find any enemy/boss definition for ID: {entity_id}"
+                )
+                return
+
+        if new_enemy:
+            self.enemies.append(new_enemy)
 
     def place_tower(self, tower_type_id: str, tile_x: int, tile_y: int) -> bool:
         """
         Handles the logic for a player attempting to place a new tower.
-        Returns True if the tower was successfully placed, False otherwise.
         """
         tower_types_config = self.configs["tower_types"]
         if tower_type_id not in tower_types_config:
-            logger.warning(f"Attempted to place unknown tower type: {tower_type_id}")
             return False
 
         tile = self.grid.get_tile(tile_x, tile_y)
         if not tile or tile.tile_key != "BUILDABLE":
-            logger.debug(
-                f"Tower placement failed: Tile ({tile_x}, {tile_y}) is not BUILDABLE."
-            )
             return False
 
         tower_data = tower_types_config[tower_type_id]
         if not self.game_state.spend_gold(tower_data.get("cost", 9999)):
-            logger.info(
-                f"Tower placement failed: Not enough gold for '{tower_type_id}'."
-            )
             return False
 
         new_tower = Tower(
@@ -231,15 +259,11 @@ class GameManager:
         )
         self.towers.append(new_tower)
         self.grid.set_tile_type(tile_x, tile_y, "TOWER_OCCUPIED")
-        logger.info(
-            f"Successfully placed '{tower_type_id}' at grid ({tile_x}, {tile_y})."
-        )
         return True
 
     def purchase_tower_upgrade(self, tower_id: uuid.UUID, path_id: str):
         """
         Handles a request from the UI to purchase an upgrade for a specific tower.
-        Now also updates the tower's total investment value.
         """
         target_tower = next((t for t in self.towers if t.entity_id == tower_id), None)
         if not target_tower:
@@ -252,60 +276,32 @@ class GameManager:
         if not self.game_state.spend_gold(upgrade.cost):
             return
 
-        # Apply the upgrade's effects to the tower.
         self.upgrade_manager.apply_upgrade(target_tower, upgrade)
-
-        # NEW: Add the cost of this upgrade to the tower's total investment.
         target_tower.total_investment += upgrade.cost
 
-        # Update the tower's tier for the specified path.
         if path_id == "path_a":
             target_tower.path_a_tier += 1
         elif path_id == "path_b":
             target_tower.path_b_tier += 1
 
-        logger.info(
-            f"Successfully purchased upgrade '{upgrade.id}' for tower {tower_id}. "
-            f"New total investment: {target_tower.total_investment}G."
-        )
-
     def salvage_tower(self, tower_id: uuid.UUID):
         """
-        NEW: Handles all logic for salvaging a tower.
-        Calculates refund, restores gold, frees the tile, and removes the tower.
+        Handles all logic for salvaging a tower.
         """
         target_tower = next((t for t in self.towers if t.entity_id == tower_id), None)
-        if not target_tower:
-            logger.error(f"Attempted to salvage non-existent tower with ID: {tower_id}")
+        if not target_tower or not self.wave_manager:
             return
 
-        if not self.wave_manager:
-            logger.error("Cannot salvage tower: WaveManager is not available.")
-            return
-
-        # 1. Get the refund percentage from the current difficulty settings.
-        refund_percentage = self.wave_manager.settings.get(
+        refund_percentage = self.wave_manager.difficulty_settings.get(
             "salvage_refund_percentage", 0.0
         )
-
-        # 2. Calculate the refund amount.
         refund_amount = int(target_tower.total_investment * refund_percentage)
-
-        # 3. Add the gold back to the player's total.
         self.game_state.add_gold(refund_amount)
-        logger.info(
-            f"Salvaged tower {tower_id} for {refund_amount}G "
-            f"({target_tower.total_investment}G * {refund_percentage * 100}%)."
-        )
 
-        # 4. Free up the grid tile where the tower was located.
         tile_x = int(target_tower.pos.x // self.tile_size)
         tile_y = int(target_tower.pos.y // self.tile_size)
         if self.grid.is_valid_coord(tile_x, tile_y):
             self.grid.set_tile_type(tile_x, tile_y, "BUILDABLE")
 
-        # 5. Mark the tower as not alive. It will be removed by _cleanup_dead_entities.
         target_tower.kill()
-
-        # 6. Clear the player's selection to close the UI.
         self.game_state.clear_selection()
