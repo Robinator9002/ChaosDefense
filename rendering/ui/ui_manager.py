@@ -3,66 +3,109 @@ import pygame
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
+from collections import OrderedDict
 
-# --- New, Structured Imports ---
 from .buttons.tower_button import TowerButton
 from .panels.upgrade_panel import UpgradePanel
-
-# --- MODIFIED: Import the new structured action classes ---
-# We now import our action vocabulary to process the structured commands
-# received from all other UI elements.
 from .ui_action import UIAction, ActionType
 
-# Use TYPE_CHECKING for type hinting to avoid circular imports at runtime.
 if TYPE_CHECKING:
     from game_logic.game_state import GameState
     from game_logic.game_manager import GameManager
-    from game_logic.entities.tower import Tower
 
 logger = logging.getLogger(__name__)
 
 
 class UIManager:
     """
-    Manages all UI elements, including the static build panel and the dynamic
-    tower upgrade panel. It processes structured UIAction objects to modify
-    the game state, providing a robust and decoupled event system.
+    Manages all UI elements. This version has been refactored to dynamically
+    discover and group towers by category, preparing for a tab-based UI.
     """
 
     def __init__(
         self, screen_rect: pygame.Rect, game_manager: "GameManager", assets_path: Path
     ):
         """
-        Initializes the UIManager.
+        Initializes the UIManager, discovering tower categories automatically.
         """
         self.screen_rect = screen_rect
         self.game_manager = game_manager
         self.assets_path = assets_path
 
+        # --- UI Component Storage ---
         self.build_buttons: List[TowerButton] = []
         self.upgrade_panel: Optional[UpgradePanel] = None
         self.hotkey_map: List[str] = []
 
+        # --- NEW: Automated Category Discovery and Storage ---
+        # This dictionary will store towers grouped by their category.
+        # e.g., {"military": [turret_data, cannon_data], "support": [...]}
+        self.tower_categories: Dict[str, List[Dict[str, Any]]] = OrderedDict()
+        self._discover_and_group_towers()
+
+        # The active category determines which tower buttons are shown.
+        self.active_category: Optional[str] = (
+            next(iter(self.tower_categories)) if self.tower_categories else None
+        )
+
+        # This method will be completely replaced in the next phase, but for
+        # now, we call it to maintain existing functionality.
         self._create_tower_build_panel()
+
+    def _discover_and_group_towers(self):
+        """
+        Scans the loaded tower configurations, discovers all unique categories,
+        and groups the tower data accordingly. This is the core of the
+        automated UI system.
+        """
+        logger.info("Discovering tower categories from configuration...")
+        tower_types = self.game_manager.configs.get("tower_types", {})
+
+        # First, find all unique categories to establish a consistent order.
+        # Using a set handles uniqueness automatically.
+        categories = sorted(
+            list(
+                {
+                    data.get("category", "uncategorized")
+                    for data in tower_types.values()
+                    if isinstance(data, dict)
+                }
+            )
+        )
+
+        # Initialize the ordered dictionary with empty lists for each category.
+        for category in categories:
+            self.tower_categories[category] = []
+
+        # Now, populate the lists with the corresponding tower data.
+        for tower_id, tower_data in tower_types.items():
+            if isinstance(tower_data, dict):
+                category = tower_data.get("category", "uncategorized")
+                # Add the tower's ID to its data dict for easy access.
+                tower_data_with_id = {"id": tower_id, **tower_data}
+                if category in self.tower_categories:
+                    self.tower_categories[category].append(tower_data_with_id)
+
+        logger.info(f"Discovered categories: {list(self.tower_categories.keys())}")
 
     def _create_tower_build_panel(self):
         """
-        Creates and positions the tower selection buttons, assigning them
-        numeric hotkeys based on their order in the config file.
+        Creates and positions the tower selection buttons.
+        NOTE: This method will be completely overhauled in the next phase to
+        create tabs and dynamically display buttons for the active category.
+        For now, it just loads all towers to keep the game running.
         """
-        logger.info("Creating tower build UI panel with hotkeys.")
+        logger.info("Creating temporary tower build UI panel.")
         button_size = 64
         panel_height = 80
         spacing = 10
-        tower_types = self.game_manager.configs.get("tower_types", {})
 
-        valid_tower_items = [
-            (tower_id, tower_data)
-            for tower_id, tower_data in tower_types.items()
-            if isinstance(tower_data, dict)
+        # Temporary: Flatten all towers from all categories for display.
+        all_towers = [
+            tower for towers in self.tower_categories.values() for tower in towers
         ]
+        num_buttons = len(all_towers)
 
-        num_buttons = len(valid_tower_items)
         total_width = (num_buttons * button_size) + ((num_buttons - 1) * spacing)
         start_x = self.screen_rect.centerx - (total_width / 2)
         start_y = (
@@ -70,8 +113,9 @@ class UIManager:
         )
 
         current_x = start_x
-        for index, (tower_id, tower_data) in enumerate(valid_tower_items):
+        for index, tower_data in enumerate(all_towers):
             hotkey = index + 1
+            tower_id = tower_data["id"]
             self.hotkey_map.append(tower_id)
 
             button_rect = pygame.Rect(current_x, start_y, button_size, button_size)
@@ -88,12 +132,7 @@ class UIManager:
     def handle_event(self, event: pygame.event.Event, game_state: "GameState") -> bool:
         """
         Passes events to UI elements and handles resulting actions.
-        The UI has priority; if it handles an event, it returns True to stop
-        further processing by the main game window.
         """
-        # --- MODIFIED: Event handling now expects UIAction objects ---
-        # The logic remains the same, but the 'action' variable is now a
-        # structured UIAction object, not a string.
         if self.upgrade_panel:
             action = self.upgrade_panel.handle_event(event, game_state)
             if action:
@@ -119,10 +158,7 @@ class UIManager:
     def _process_ui_action(self, action: UIAction, game_state: "GameState"):
         """
         Updates the game state based on a structured UIAction command.
-        This method is now much cleaner and more robust than its string-based
-        predecessor, using pattern matching on the action type.
         """
-        # --- MODIFIED: Replaced string parsing with a match statement ---
         match action.type:
             case ActionType.SELECT_TOWER:
                 tower_id = action.entity_id
@@ -137,11 +173,10 @@ class UIManager:
                 tower_id = game_state.selected_entity_id
 
                 if tower_id and upgrade_id:
-                    # Note: Game logic is untouched as per the rules.
                     path_char = upgrade_id.split("_")[-1][0]
                     path_id = f"path_{path_char}"
                     self.game_manager.purchase_tower_upgrade(tower_id, path_id)
-                    self.upgrade_panel = None  # Close panel after upgrade
+                    self.upgrade_panel = None
                 else:
                     logger.warning(
                         "Upgrade action received but missing tower or upgrade ID."
