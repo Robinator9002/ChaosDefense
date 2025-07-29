@@ -1,0 +1,134 @@
+{
+  "path_a": {
+    "name": "Deep Curse",
+    "description": "Focuses on intensifying the curse on a single target.",
+    "upgrades": [
+      {
+        "id": "curse_a1",
+        "name": "Lasting Hex",
+        "cost": 110,
+        "description": "Increases the duration of the vulnerability curse by 2 seconds.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "effects",
+              "operation": "modify_nested",
+              "nested_key": "elemental_vulnerability.duration",
+              "nested_op": "add",
+              "amount": 2.0
+            }
+          }
+        ]
+      },
+      {
+        "id": "curse_a2",
+        "name": "Potent Curse",
+        "cost": 170,
+        "description": "Increases the damage amplification of the curse.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "effects",
+              "operation": "modify_nested",
+              "nested_key": "elemental_vulnerability.potency",
+              "nested_op": "add",
+              "amount": 0.25
+            }
+          }
+        ]
+      },
+      {
+        "id": "curse_a3",
+        "name": "Enfeeble",
+        "cost": 240,
+        "description": "Cursed enemies are also slowed.",
+        "effects": [
+          {
+            "type": "add_effect",
+            "value": { "id": "slow", "potency": 0.2, "duration": 3.0 }
+          }
+        ]
+      },
+      {
+        "id": "curse_a4",
+        "name": "Armor Wrack",
+        "cost": 300,
+        "description": "The curse now also breaks enemy armor.",
+        "effects": [
+          {
+            "type": "add_effect",
+            "value": { "id": "armor_break", "potency": 10, "duration": 5.0 }
+          }
+        ]
+      },
+      {
+        "id": "curse_a5",
+        "name": "Doom",
+        "cost": 500,
+        "description": "Cursed enemies that die will explode, dealing damage to nearby foes.",
+        "effects": [
+          {
+            "type": "add_on_death_explosion",
+            "value": { "radius": 80, "damage": 100 }
+          }
+        ]
+      }
+    ]
+  },
+  "path_b": {
+    "name": "Spreading Plague",
+    "description": "Focuses on applying the curse to as many enemies as possible.",
+    "upgrades": [
+      {
+        "id": "curse_b1",
+        "name": "Faster Casting",
+        "cost": 100,
+        "description": "Increases fire rate by 30%.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.3 }]
+      },
+      {
+        "id": "curse_b2",
+        "name": "Piercing Hex",
+        "cost": 180,
+        "description": "Cursing bolts now pierce through one additional enemy.",
+        "effects": [{ "type": "set_pierce", "value": 1 }]
+      },
+      {
+        "id": "curse_b3",
+        "name": "Curse Miasma",
+        "cost": 260,
+        "description": "Cursing bolts now explode in a small area, cursing multiple enemies.",
+        "effects": [
+          { "type": "multiply_blast_radius", "value": 50 },
+          {
+            "type": "add_blast_effect",
+            "value": {
+              "id": "elemental_vulnerability",
+              "potency": 1.25,
+              "duration": 3.0
+            }
+          }
+        ]
+      },
+      {
+        "id": "curse_b4",
+        "name": "Accelerated Casting",
+        "cost": 320,
+        "description": "Further increases fire rate by 40%.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.4 }]
+      },
+      {
+        "id": "curse_b5",
+        "name": "Epidemic",
+        "cost": 550,
+        "description": "The curse can now pierce through two enemies and has a larger blast radius.",
+        "effects": [
+          { "type": "set_pierce", "value": 2 },
+          { "type": "multiply_blast_radius", "value": 1.5 }
+        ]
+      }
+    ]
+  }
+}

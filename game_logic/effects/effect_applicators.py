@@ -25,9 +25,7 @@ def modify_attack_data(tower: "Tower", value: Dict[str, Any]):
 
     The 'value' dictionary should contain:
     - 'key' (str): The key of the attribute to modify.
-    - 'operation' (str): 'add', 'multiply', 'set', or 'add_effect'.
-    - 'amount' (any): The value for numeric operations.
-    - 'effect' (dict): The effect object for the 'add_effect' operation.
+    - 'operation' (str): 'add', 'multiply', 'set', 'add_effect', or 'modify_nested'.
     """
     key = value.get("key")
     operation = value.get("operation")
@@ -38,7 +36,6 @@ def modify_attack_data(tower: "Tower", value: Dict[str, Any]):
 
     attack_specifics = tower.attack_data.get("data", {})
 
-    # --- REFACTORED: Expanded logic for complex operations ---
     if operation in ["add", "multiply"]:
         amount = value.get("amount")
         if amount is None or key not in attack_specifics:
@@ -54,8 +51,6 @@ def modify_attack_data(tower: "Tower", value: Dict[str, Any]):
         )
 
     elif operation == "set":
-        # Can set any type of value: numbers, strings, dicts, lists.
-        # The 'amount' key is used for numeric values, 'effect' for dicts, etc.
         new_value = value.get("amount") or value.get("effect") or value.get("params")
         if new_value is None:
             logger.error(f"Invalid 'set' operation for modify_attack_data: {value}")
@@ -70,7 +65,6 @@ def modify_attack_data(tower: "Tower", value: Dict[str, Any]):
                 f"Invalid 'add_effect' operation for modify_attack_data: {value}"
             )
             return
-        # Ensure the target key exists and is a dictionary.
         if key not in attack_specifics or not isinstance(attack_specifics[key], dict):
             attack_specifics[key] = {}
 
@@ -80,6 +74,44 @@ def modify_attack_data(tower: "Tower", value: Dict[str, Any]):
             logger.debug(f"Applied 'add_effect' to '{key}'. Added effect: {effect_id}.")
         else:
             logger.error(f"Effect for 'add_effect' is missing an 'id': {effect_to_add}")
+
+    # --- NEW: Handler for modifying deeply nested values ---
+    elif operation == "modify_nested":
+        nested_key_str = value.get("nested_key")
+        nested_op = value.get("nested_op")
+        amount = value.get("amount")
+
+        if not all([nested_key_str, nested_op, amount is not None]):
+            logger.error(f"Invalid 'modify_nested' payload: {value}")
+            return
+
+        try:
+            # e.g., nested_key_str = "elemental_vulnerability.duration"
+            keys = nested_key_str.split(".")
+            # current_level will point to attack_specifics['effects']
+            current_level = attack_specifics.get(key, {})
+
+            # Traverse down to the second-to-last key
+            for k in keys[:-1]:
+                current_level = current_level[k]
+
+            final_key = keys[-1]
+            original_value = current_level[final_key]
+
+            if nested_op == "add":
+                current_level[final_key] += amount
+            elif nested_op == "multiply":
+                current_level[final_key] *= amount
+            else:
+                logger.error(f"Unsupported nested_op '{nested_op}'")
+                return
+
+            logger.debug(
+                f"Applied 'modify_nested': {nested_key_str} {nested_op} {amount}. "
+                f"Value: {original_value} -> {current_level[final_key]}."
+            )
+        except (KeyError, TypeError) as e:
+            logger.error(f"Could not resolve nested key '{nested_key_str}': {e}")
 
     else:
         logger.error(f"Unknown operation '{operation}' in 'modify_attack_data'")
