@@ -48,7 +48,7 @@
       "data": {
         "damage": 25,
         "range": 200,
-        "fire_rate": 0.4,
+        "fire_rate": 0.3,
         "blast_radius": 30
       }
     }
