@@ -72,7 +72,7 @@
       "bounty": 25,
       "damage": 3,
       "armor": 30,
-      "immunities": ["slow"]
+      "immunities": ["slow", "stun"]
     },
     "scaling_per_level": { "hp": 1.15, "speed": 1.05, "bounty": 1.2 }
   },
