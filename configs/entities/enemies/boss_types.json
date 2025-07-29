@@ -1,0 +1,87 @@
+{
+  "//": "BOSS DEFINITIONS: Each boss has a unique ID, a general 'type' for level assignment, and two difficulty triggers. 'boss_difficulty' is for its one-time special wave. 'spawn_difficulty' is when it enters the regular random spawn pool.",
+
+  "grunt_colossus": {
+    "type": "soldier",
+    "boss_difficulty": 6,
+    "spawn_difficulty": 8,
+    "name": "Grunt Colossus",
+    "render_props": { "size": 48, "color": [220, 100, 100] },
+    "base_stats": {
+      "hp": 2500,
+      "speed": 80,
+      "bounty": 200,
+      "damage": 10,
+      "armor": 15,
+      "immunities": ["slow"]
+    },
+    "phalanx": [
+      { "type": "grunt", "count": 8, "offset": { "x": -60, "y": 0 } },
+      { "type": "grunt", "count": 8, "offset": { "x": 60, "y": 0 } },
+      { "type": "tank", "count": 2, "offset": { "x": 0, "y": -50 } }
+    ]
+  },
+
+  "hyperion_vanguard": {
+    "type": "guardian",
+    "boss_difficulty": 12,
+    "spawn_difficulty": 15,
+    "name": "Hyperion Vanguard",
+    "render_props": { "size": 52, "color": [220, 220, 255] },
+    "base_stats": {
+      "hp": 5000,
+      "speed": 50,
+      "bounty": 500,
+      "damage": 20,
+      "armor": 50,
+      "immunities": ["slow", "stun"]
+    },
+    "phalanx": [
+      { "type": "guardian", "count": 4, "offset": { "x": -80, "y": 0 } },
+      { "type": "guardian", "count": 4, "offset": { "x": 80, "y": 0 } },
+      { "type": "tank", "count": 6, "offset": { "x": 0, "y": 50 } }
+    ]
+  },
+
+  "phase_striker": {
+    "type": "runner",
+    "boss_difficulty": 10,
+    "spawn_difficulty": 13,
+    "name": "Phase Striker",
+    "render_props": { "size": 40, "color": [255, 200, 200] },
+    "base_stats": {
+      "hp": 1800,
+      "speed": 200,
+      "bounty": 350,
+      "damage": 15,
+      "armor": 5,
+      "immunities": ["slow"]
+    },
+    "phalanx": [
+      { "type": "runner", "count": 12, "offset": { "x": -50, "y": 0 } },
+      { "type": "runner", "count": 12, "offset": { "x": 50, "y": 0 } },
+      { "type": "scout", "count": 20, "offset": { "x": 0, "y": 40 } }
+    ]
+  },
+
+  "demolisher": {
+    "type": "bomber",
+    "boss_difficulty": 15,
+    "spawn_difficulty": 18,
+    "name": "Demolisher",
+    "render_props": { "size": 50, "color": [255, 180, 80] },
+    "base_stats": {
+      "hp": 3000,
+      "speed": 90,
+      "bounty": 400,
+      "damage": 100,
+      "armor": 30,
+      "immunities": ["slow", "stun"]
+    },
+    "phalanx": [
+      { "type": "bomber", "count": 2, "offset": { "x": -70, "y": 0 } },
+      { "type": "bomber", "count": 2, "offset": { "x": 70, "y": 0 } },
+      { "type": "guardian", "count": 3, "offset": { "x": 0, "y": 60 } }
+    ]
+  }
+}
