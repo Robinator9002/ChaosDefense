@@ -1,0 +1,125 @@
+{
+  "path_a": {
+    "name": "Debuff Cascade",
+    "description": "Adds a new, stacking status effect with each upgrade.",
+    "upgrades": [
+      {
+        "id": "beacon_a1",
+        "name": "Corrosive Particles",
+        "cost": 80,
+        "description": "Beacon now applies a potent, stacking armor break effect.",
+        "effects": [
+          {
+            "type": "add_effect",
+            "value": { "id": "armor_break", "potency": 3, "duration": 4 }
+          }
+        ]
+      },
+      {
+        "id": "beacon_a2",
+        "name": "Vulnerability Scan",
+        "cost": 110,
+        "description": "Beacon now also makes targets vulnerable, taking 20% more damage.",
+        "effects": [
+          {
+            "type": "add_effect",
+            "value": {
+              "id": "vulnerability",
+              "potency": 1.2,
+              "duration": 3
+            }
+          }
+        ]
+      },
+      {
+        "id": "beacon_a3",
+        "name": "Long-Range Emitter",
+        "cost": 140,
+        "description": "Increases range and fire rate to apply effects more reliably.",
+        "effects": [
+          { "type": "add_range", "value": 50 },
+          { "type": "multiply_fire_rate", "value": 1.25 }
+        ]
+      },
+      {
+        "id": "beacon_a4",
+        "name": "Hemorrhage Signal",
+        "cost": 220,
+        "description": "Beacon now also applies a powerful stacking bleed effect.",
+        "effects": [
+          {
+            "type": "add_effect",
+            "value": { "id": "bleed", "potency": 12, "duration": 4 }
+          }
+        ]
+      },
+      {
+        "id": "beacon_a5",
+        "name": "System Shock",
+        "cost": 400,
+        "description": "Beacon deals massive bonus damage for each unique status effect on the target.",
+        "effects": [{ "type": "add_bonus_damage_per_debuff", "value": 12 }]
+      }
+    ]
+  },
+  "path_b": {
+    "name": "Focused Intensity",
+    "description": "Dramatically enhances the beacon's primary slow effect.",
+    "upgrades": [
+      {
+        "id": "beacon_b1",
+        "name": "Lingering Field",
+        "cost": 70,
+        "description": "Greatly increases the duration of the slow effect.",
+        "effects": [{ "type": "multiply_effect_duration", "value": 2.5 }]
+      },
+      {
+        "id": "beacon_b2",
+        "name": "Deep Chill",
+        "cost": 100,
+        "description": "Greatly increases the potency of the slow effect.",
+        "effects": [{ "type": "multiply_effect_potency", "value": 1.8 }]
+      },
+      {
+        "id": "beacon_b3",
+        "name": "Cryo-Shock",
+        "cost": 130,
+        "description": "Deals a burst of 25 damage when the slow is first applied.",
+        "effects": [{ "type": "add_on_apply_damage", "value": 25 }]
+      },
+      {
+        "id": "beacon_b4",
+        "name": "Flash Freeze",
+        "cost": 240,
+        "description": "Has a chance to briefly stun targets already affected by the beacon's slow.",
+        "effects": [
+          {
+            "type": "add_conditional_effect",
+            "value": {
+              "if_target_has": "slow",
+              "chance": 0.25,
+              "effect": { "id": "stun", "potency": 0, "duration": 0.35 }
+            }
+          }
+        ]
+      },
+      {
+        "id": "beacon_b5",
+        "name": "Absolute Zero",
+        "cost": 420,
+        "description": "The beam periodically releases a frost nova, slowing and damaging nearby enemies.",
+        "effects": [
+          {
+            "type": "add_area_effect_on_hit",
+            "value": {
+              "chance": 0.3,
+              "radius": 80,
+              "damage": 25,
+              "effect": { "id": "slow", "potency": 0.5, "duration": 3.0 }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
