@@ -2,6 +2,11 @@
 import pygame
 from typing import Optional, Any
 
+# --- MODIFIED: Import the new UIAction class ---
+# By importing our structured action class, we can enforce a more robust
+# and type-safe communication protocol between UI elements and the manager.
+from .ui_action import UIAction
+
 # Using Any for game_state to avoid circular dependencies
 if "GameState" not in globals():
     from typing import Any as GameState
@@ -28,9 +33,9 @@ class UIElement:
 
     def handle_event(
         self, event: pygame.event.Event, game_state: GameState
-    ) -> Optional[str]:
+    ) -> Optional[UIAction]:  # --- MODIFIED: Return type is now UIAction ---
         """
-        Processes a Pygame event and returns an action string if triggered.
+        Processes a Pygame event and returns an action object if triggered.
 
         This base implementation handles hover detection. Subclasses should
         extend this to handle clicks and other interactions.
@@ -40,8 +45,9 @@ class UIElement:
             game_state (GameState): The current state of the game logic.
 
         Returns:
-            An optional string representing an action to be taken,
-            e.g., "select_tower_turret".
+            An optional UIAction object representing a command to be
+            processed by the UIManager. Returning None indicates that the
+            event was not handled by this element.
         """
         if event.type == pygame.MOUSEMOTION:
             self.is_hovered = self.rect.collidepoint(event.pos)

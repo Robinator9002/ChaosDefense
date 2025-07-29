@@ -6,6 +6,11 @@ from typing import Optional, TYPE_CHECKING
 # Import the base class from the parent directory using '..'
 from ..ui_element import UIElement
 
+# --- MODIFIED: Import the new structured action classes ---
+# We now import the specific, well-defined action types and the dataclass
+# that will carry our event information.
+from ..ui_action import UIAction, ActionType
+
 # Use TYPE_CHECKING to avoid circular imports for type hinting.
 if TYPE_CHECKING:
     from game_logic.upgrades.upgrade import Upgrade
@@ -20,7 +25,7 @@ class UpgradeButton(UIElement):
 
     This button displays the upgrade's name, cost, and description. It visually
     changes based on whether the player can afford the upgrade and handles
-    click events to initiate a purchase.
+    click events to initiate a purchase by emitting a structured UIAction.
     """
 
     def __init__(self, rect: pygame.Rect, upgrade: "Upgrade", can_afford: bool):
@@ -56,30 +61,30 @@ class UpgradeButton(UIElement):
         }
 
         # --- BUG FIX: Proactive Hover Check ---
-        # Immediately check if the mouse is already over this button the moment
-        # it's created. This solves the race condition where a button appears
-        # under a static cursor and doesn't register as 'hovered' until the
-        # mouse moves, causing spam-clicks to fail.
         if self.rect.collidepoint(pygame.mouse.get_pos()):
             self.is_hovered = True
 
     def handle_event(
         self, event: pygame.event.Event, game_state: "GameState"
-    ) -> Optional[str]:
+    ) -> Optional[UIAction]:  # --- MODIFIED: Return type is now UIAction ---
         """
         Handles mouse clicks on the button.
 
         If the button is clicked and the player can afford the upgrade, it
-        returns a unique action string to be processed by the UIManager.
+        returns a structured UIAction to be processed by the UIManager.
         """
-        # The base class handle_event updates the hover state on MOUSEMOTION.
-        # We must call it to ensure the button de-hovers when the mouse moves away.
         super().handle_event(event, game_state)
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered and self.can_afford:
                 logger.info(f"Player clicked to purchase upgrade: {self.upgrade.id}")
-                return f"purchase_upgrade_{self.upgrade.id}"
+                # --- MODIFIED: Return a structured UIAction object ---
+                # This replaces the old string-based action, making the system
+                # more robust and easier to debug. The UIManager will now receive
+                # a clear, unambiguous command.
+                return UIAction(
+                    type=ActionType.PURCHASE_UPGRADE, entity_id=self.upgrade.id
+                )
 
         return None
 
