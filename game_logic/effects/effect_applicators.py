@@ -18,44 +18,71 @@ logger = logging.getLogger(__name__)
 
 def modify_attack_data(tower: "Tower", value: Dict[str, Any]):
     """
-    A generic handler to modify a numeric value within the tower's attack_data.
-    This is essential for upgrading aura-based towers whose stats (like dps,
-    duration, radius) are not top-level attributes of the Tower class.
+    A generic handler to modify any value within the tower's attack_data['data'].
+    This has been expanded to handle not just numeric operations but also complex
+    data manipulations like adding effects to a dictionary or setting entirely
+    new parameters.
 
     The 'value' dictionary should contain:
-    - 'key' (str): The key of the attribute to modify inside attack_data['data'].
-    - 'operation' (str): 'add', 'multiply', or 'set'.
-    - 'amount' (float/int): The value to use for the operation.
+    - 'key' (str): The key of the attribute to modify.
+    - 'operation' (str): 'add', 'multiply', 'set', or 'add_effect'.
+    - 'amount' (any): The value for numeric operations.
+    - 'effect' (dict): The effect object for the 'add_effect' operation.
     """
     key = value.get("key")
     operation = value.get("operation")
-    amount = value.get("amount")
 
-    if not all([key, operation, amount is not None]):
-        logger.error(f"Invalid 'modify_attack_data' payload: {value}")
+    if not all([key, operation]):
+        logger.error(f"Invalid 'modify_attack_data' payload (missing key/op): {value}")
         return
 
-    # We modify the value directly in the tower's attack_data dictionary.
     attack_specifics = tower.attack_data.get("data", {})
-    if key not in attack_specifics:
-        logger.warning(f"Key '{key}' not found in attack_data for tower '{tower.name}'")
-        return
 
-    original_value = attack_specifics[key]
-    if operation == "add":
-        attack_specifics[key] += amount
-    elif operation == "multiply":
-        attack_specifics[key] *= amount
+    # --- REFACTORED: Expanded logic for complex operations ---
+    if operation in ["add", "multiply"]:
+        amount = value.get("amount")
+        if amount is None or key not in attack_specifics:
+            logger.warning(f"Invalid numeric operation for modify_attack_data: {value}")
+            return
+        original_value = attack_specifics[key]
+        if operation == "add":
+            attack_specifics[key] += amount
+        elif operation == "multiply":
+            attack_specifics[key] *= amount
+        logger.debug(
+            f"Applied '{key} {operation} {amount}'. Value: {original_value} -> {attack_specifics[key]}."
+        )
+
     elif operation == "set":
-        attack_specifics[key] = amount
+        # Can set any type of value: numbers, strings, dicts, lists.
+        # The 'amount' key is used for numeric values, 'effect' for dicts, etc.
+        new_value = value.get("amount") or value.get("effect") or value.get("params")
+        if new_value is None:
+            logger.error(f"Invalid 'set' operation for modify_attack_data: {value}")
+            return
+        attack_specifics[key] = new_value
+        logger.debug(f"Applied 'set {key}'. New value: {attack_specifics[key]}.")
+
+    elif operation == "add_effect":
+        effect_to_add = value.get("effect")
+        if not effect_to_add or not isinstance(effect_to_add, dict):
+            logger.error(
+                f"Invalid 'add_effect' operation for modify_attack_data: {value}"
+            )
+            return
+        # Ensure the target key exists and is a dictionary.
+        if key not in attack_specifics or not isinstance(attack_specifics[key], dict):
+            attack_specifics[key] = {}
+
+        effect_id = effect_to_add.get("id")
+        if effect_id:
+            attack_specifics[key][effect_id] = effect_to_add
+            logger.debug(f"Applied 'add_effect' to '{key}'. Added effect: {effect_id}.")
+        else:
+            logger.error(f"Effect for 'add_effect' is missing an 'id': {effect_to_add}")
+
     else:
         logger.error(f"Unknown operation '{operation}' in 'modify_attack_data'")
-        return
-
-    logger.debug(
-        f"Applied 'modify_attack_data': {key} {operation} {amount}. "
-        f"Value changed from {original_value} to {attack_specifics[key]}."
-    )
 
 
 def add_damage(tower: "Tower", value: int):
