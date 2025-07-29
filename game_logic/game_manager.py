@@ -8,15 +8,13 @@ from typing import Dict, List, Any, Tuple, Optional
 from .game_state import GameState
 from .levels.level_manager import LevelManager
 from .level_generation.grid import Grid
-
-# The WaveManager import remains the same, but its internal logic is now refactored.
 from .waves.wave_manager import WaveManager
 from .entities.entity import Entity
 from .entities.tower import Tower
 from .entities.enemies.enemy import Enemy
-
-# NEW: Import the BossEnemy class.
 from .entities.enemies.boss_enemy import BossEnemy
+
+# --- MODIFIED: Corrected import path for Projectile ---
 from .entities.projectiles.projectile import Projectile
 from .upgrades.upgrade_manager import UpgradeManager
 from .effects.status_effect import StatusEffect
@@ -40,6 +38,7 @@ class GameManager:
         self.tile_size = self.configs["game_settings"].get("tile_size", 32)
         self.game_state: GameState = GameState()
         self.level_manager: LevelManager = LevelManager(self.configs["level_styles"])
+        # --- MODIFIED: Pass the loaded upgrade definitions to the manager ---
         self.upgrade_manager: UpgradeManager = UpgradeManager(
             self.configs.get("upgrade_definitions", {})
         )
@@ -54,7 +53,6 @@ class GameManager:
     def _setup_new_game(self):
         """
         Sets up all necessary objects for a new game session.
-        This now reads starting gold and HP from the loaded level's style config.
         """
         logger.info("--- Setting up new game via Game Manager ---")
 
@@ -68,7 +66,6 @@ class GameManager:
             start_gold = gen_params.get("starting_gold", 150)
             start_hp = gen_params.get("base_hp", 20)
             self.game_state = GameState(gold=start_gold, base_hp=start_hp)
-
             self.game_state.level_grid = self.grid
 
         except (KeyError, ValueError) as e:
@@ -80,9 +77,6 @@ class GameManager:
         player_difficulty = self.configs["game_settings"].get("difficulty", 1)
         level_difficulty = gen_params.get("level_difficulty", 1)
 
-        # --- MODIFIED: Initialize the new, refactored WaveManager ---
-        # It now requires the boss configurations and the list of allowed boss
-        # types for the current level.
         self.wave_manager = WaveManager(
             difficulty_config=self.configs["difficulty_scaling"],
             wave_scaling_config=self.configs["wave_scaling"],
@@ -100,11 +94,9 @@ class GameManager:
         if self.game_state.game_over:
             return
         if self.wave_manager:
-            # The update call remains the same, returning one spawn job at a time.
             spawn_job = self.wave_manager.update(dt, len(self.enemies))
             if spawn_job:
                 self._spawn_enemy(spawn_job)
-            # MODIFIED: Access the wave number from the new WaveState object.
             self.game_state.current_wave_number = (
                 self.wave_manager.wave_state.current_wave_number
             )
@@ -116,7 +108,6 @@ class GameManager:
                 newly_fired_projectiles.extend(projectiles)
         self.projectiles.extend(newly_fired_projectiles)
 
-        # Update all active enemies (both regular and bosses).
         for enemy in self.enemies:
             enemy.update(dt, self.game_state)
 
@@ -127,8 +118,7 @@ class GameManager:
 
     def _cleanup_dead_entities(self):
         """
-        Removes all dead entities (enemies, projectiles, and salvaged towers)
-        from the game lists and processes any on-death effects.
+        Removes all dead entities from the game lists.
         """
         dead_enemies = [e for e in self.enemies if not e.is_alive]
         if dead_enemies:
@@ -184,51 +174,50 @@ class GameManager:
 
     def _spawn_enemy(self, spawn_job: Dict[str, Any]):
         """
-        MODIFIED: Creates an Enemy or BossEnemy instance based on the spawn job.
-        This method now intelligently handles different types of spawn requests.
+        Creates an Enemy or BossEnemy instance based on the spawn job,
+        now applying scaling to bosses.
         """
         entity_id = spawn_job["type"]
         path_index = spawn_job["path_index"]
-        if not (0 <= path_index < len(self.paths)):
-            logger.error(f"Invalid path index {path_index} in spawn job.")
+        if not (0 <= path_index < len(self.paths)) or not self.wave_manager:
             return
 
         path = self.paths[path_index]
         new_enemy = None
+        difficulty_mod = self.wave_manager.difficulty_settings.get("stat_modifier", 1.0)
 
-        # --- Decision: Is this a special boss wave spawn? ---
-        if spawn_job.get("is_boss", False):
-            boss_config = self.configs["boss_types"].get(entity_id)
-            if boss_config:
-                new_enemy = BossEnemy(
-                    boss_type_data=boss_config, path=path, tile_size=self.tile_size
-                )
-            else:
-                logger.error(f"Could not find boss definition for ID: {entity_id}")
-                return
+        # --- REFACTORED: Bosses now use scaling logic ---
+        # We check if the entity to be spawned is defined in the boss_types config.
+        # This is more robust than relying on an 'is_boss' flag.
+        if entity_id in self.configs["boss_types"]:
+            boss_config = self.configs["boss_types"][entity_id]
 
-        # --- Otherwise, it's a standard enemy (or a boss in a regular wave) ---
+            # Calculate the boss's level based on the current wave, just like a regular enemy.
+            # This ensures they scale up when appearing in later random waves.
+            current_wave = self.wave_manager.wave_state.current_wave_number
+            level = 1 + (current_wave // 5)
+
+            new_enemy = BossEnemy(
+                boss_type_data=boss_config,
+                path=path,
+                tile_size=self.tile_size,
+                level=level,  # Pass the calculated level
+                difficulty_modifier=difficulty_mod,  # Pass the difficulty modifier
+            )
+
+        # --- Standard enemy spawning logic remains the same ---
+        elif entity_id in self.configs["enemy_types"]:
+            enemy_config = self.configs["enemy_types"][entity_id]
+            new_enemy = Enemy(
+                enemy_type_data=enemy_config,
+                level=spawn_job["level"],
+                path=path,
+                tile_size=self.tile_size,
+                difficulty_modifier=difficulty_mod,
+            )
         else:
-            # The WaveManager might add bosses to the regular pool, so we check both configs.
-            enemy_config = self.configs["enemy_types"].get(entity_id)
-            if not enemy_config:
-                enemy_config = self.configs["boss_types"].get(entity_id)
-
-            if enemy_config:
-                new_enemy = Enemy(
-                    enemy_type_data=enemy_config,
-                    level=spawn_job["level"],
-                    path=path,
-                    tile_size=self.tile_size,
-                    difficulty_modifier=self.wave_manager.difficulty_settings.get(
-                        "stat_modifier", 1.0
-                    ),
-                )
-            else:
-                logger.error(
-                    f"Could not find any enemy/boss definition for ID: {entity_id}"
-                )
-                return
+            logger.error(f"Could not find any definition for entity ID: {entity_id}")
+            return
 
         if new_enemy:
             self.enemies.append(new_enemy)
@@ -263,7 +252,7 @@ class GameManager:
 
     def purchase_tower_upgrade(self, tower_id: uuid.UUID, path_id: str):
         """
-        Handles a request from the UI to purchase an upgrade for a specific tower.
+        Handles a request to purchase an upgrade for a specific tower.
         """
         target_tower = next((t for t in self.towers if t.entity_id == tower_id), None)
         if not target_tower:
