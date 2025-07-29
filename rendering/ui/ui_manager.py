@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from collections import OrderedDict
 
-# --- MODIFIED: Import the new TabButton class ---
 from .buttons.tower_button import TowerButton
 from .buttons.tab_button import TabButton
 from .panels.upgrade_panel import UpgradePanel
@@ -48,33 +47,40 @@ class UIManager:
 
     def _discover_and_group_towers(self):
         """
-        Scans tower configs, discovers unique categories, and groups towers.
+        Scans tower configs, discovers unique categories in their order of
+        appearance in the config file, and groups the tower data accordingly.
         """
         logger.info("Discovering tower categories from configuration...")
         tower_types = self.game_manager.configs.get("tower_types", {})
 
-        categories = sorted(
-            list(
-                {
-                    data.get("category", "uncategorized")
-                    for data in tower_types.values()
-                    if isinstance(data, dict)
-                }
-            )
-        )
+        # --- MODIFIED: Logic for predictable ordering ---
+        # We build a list of categories, adding a category only the first
+        # time we see it. This preserves the order from the JSON file.
+        ordered_categories = []
+        if isinstance(tower_types, dict):
+            for data in tower_types.values():
+                if isinstance(data, dict):
+                    category = data.get("category", "uncategorized")
+                    if category not in ordered_categories:
+                        ordered_categories.append(category)
 
-        for category in categories:
+        # Initialize the ordered dictionary with empty lists for each category.
+        for category in ordered_categories:
             self.tower_categories[category] = []
 
-        for tower_id, tower_data in tower_types.items():
-            if isinstance(tower_data, dict):
-                category = tower_data.get("category", "uncategorized")
-                tower_data_with_id = {"id": tower_id, **tower_data}
-                if category in self.tower_categories:
-                    self.tower_categories[category].append(tower_data_with_id)
+        # Now, populate the lists with the corresponding tower data.
+        if isinstance(tower_types, dict):
+            for tower_id, tower_data in tower_types.items():
+                if isinstance(tower_data, dict):
+                    category = tower_data.get("category", "uncategorized")
+                    tower_data_with_id = {"id": tower_id, **tower_data}
+                    if category in self.tower_categories:
+                        self.tower_categories[category].append(tower_data_with_id)
 
-        self.active_category = categories[0] if categories else None
-        logger.info(f"Discovered categories: {list(self.tower_categories.keys())}")
+        self.active_category = ordered_categories[0] if ordered_categories else None
+        logger.info(
+            f"Discovered categories in order: {list(self.tower_categories.keys())}"
+        )
 
     def _build_dynamic_ui(self):
         """
@@ -93,13 +99,11 @@ class UIManager:
             self.category_tabs.append(TabButton(tab_rect, category_name, is_active))
             start_x += tab_width + tab_spacing
 
-        # Initial build of tower buttons for the default active category.
         self._rebuild_tower_buttons()
 
     def _rebuild_tower_buttons(self):
         """
         Clears and rebuilds the tower buttons based on the active category.
-        This is the core of the dynamic UI.
         """
         self.build_buttons.clear()
         self.hotkey_map.clear()
@@ -144,31 +148,23 @@ class UIManager:
         """
         Handles events for all UI elements, prioritizing tabs, then buttons.
         """
-        # 1. Handle Upgrade Panel first, as it's an overlay.
         if self.upgrade_panel:
             action = self.upgrade_panel.handle_event(event, game_state)
             if action:
                 self._process_ui_action(action, game_state)
                 return True
 
-        # --- BUG FIX: Guard against non-mouse events ---
-        # Only check for mouse collisions if the event is a mouse event.
-        # This prevents the AttributeError when trying to access 'event.pos'
-        # on events like KEYDOWN, which have no mouse position.
         if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN):
-            # 2. Handle Tab Buttons.
             for tab in self.category_tabs:
                 if tab.rect.collidepoint(event.pos):
-                    if tab.handle_event(event):  # handle_event returns True on click
+                    if tab.handle_event(event):
                         if self.active_category != tab.category_name:
                             self.active_category = tab.category_name
-                            # Update active state for all tabs
                             for t in self.category_tabs:
                                 t.is_active = t.category_name == self.active_category
                             self._rebuild_tower_buttons()
-                        return True  # Consume the event
+                        return True
 
-            # 3. Handle Tower Buttons.
             for button in self.build_buttons:
                 if button.rect.collidepoint(event.pos):
                     action = button.handle_event(event, game_state)
@@ -235,7 +231,6 @@ class UIManager:
 
     def draw(self, screen: pygame.Surface, game_state: "GameState"):
         """Draws all UI components in the correct order."""
-        # Draw main panel background
         panel_rect = pygame.Rect(
             0, self.screen_rect.bottom - 80, self.screen_rect.width, 80
         )
@@ -243,14 +238,11 @@ class UIManager:
         panel_surf.fill((20, 25, 30, 200))
         screen.blit(panel_surf, panel_rect.topleft)
 
-        # Draw category tabs
         for tab in self.category_tabs:
             tab.draw(screen)
 
-        # Draw tower buttons for the active category
         for button in self.build_buttons:
             button.draw(screen, game_state)
 
-        # Draw upgrade panel if one is active
         if self.upgrade_panel:
             self.upgrade_panel.draw(screen)
