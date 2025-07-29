@@ -7,8 +7,8 @@
         "id": "cannon_a1",
         "name": "High-Explosive Shells",
         "cost": 70,
-        "description": "Increases blast radius by 20%.",
-        "effects": [{ "type": "multiply_blast_radius", "value": 1.2 }]
+        "description": "Increases blast radius by 15%.",
+        "effects": [{ "type": "multiply_blast_radius", "value": 1.15 }]
       },
       {
         "id": "cannon_a2",
@@ -32,14 +32,14 @@
       {
         "id": "cannon_a4",
         "name": "Reinforced Cannon",
-        "cost": 170,
+        "cost": 185,
         "description": "Greatly increases projectile damage by 25.",
         "effects": [{ "type": "add_damage", "value": 25 }]
       },
       {
         "id": "cannon_a5",
         "name": "Earthshaker",
-        "cost": 220,
+        "cost": 250,
         "description": "Explosions now also daze enemies, slowing them significantly.",
         "effects": [
           {
@@ -74,7 +74,7 @@
       },
       {
         "id": "cannon_b3",
-        "cost": 200,
+        "cost": 220,
         "name": "Corrosive Payload",
         "description": "Shells corrode armor, making targets take more damage from all sources.",
         "effects": [
@@ -94,7 +94,7 @@
       {
         "id": "cannon_b5",
         "name": "High-Velocity Autoloader",
-        "cost": 280,
+        "cost": 320,
         "description": "Greatly increases fire rate and adds a significant amount of bonus damage.",
         "effects": [
           { "type": "multiply_fire_rate", "value": 1.1 },
