@@ -48,21 +48,17 @@ class Tower(Entity):
         self.status_effects_config = status_effects_config
         self.attack_data = tower_type_data.get("attack", {})
 
-        # --- NEW: Base vs. Dynamic Stats for Buffs ---
         attack_specific_data = self.attack_data.get("data", {})
 
-        # 'base' stats represent the tower's permanent, upgraded state.
+        # --- Base vs. Dynamic Stats for Buffs ---
         self.base_damage = attack_specific_data.get("damage", 0)
         self.base_range = attack_specific_data.get("range", 100)
         self.base_fire_rate = attack_specific_data.get("fire_rate", 1.0)
 
-        # 'Live' stats are reset to base stats each frame by the EffectHandler,
-        # then modified by active buffs/debuffs.
         self.damage = self.base_damage
         self.range = self.base_range
         self.fire_rate = self.base_fire_rate
 
-        # This stat is not buffable and is read directly by attack handlers.
         self.blast_radius = attack_specific_data.get("blast_radius", 0)
 
         self.path_a_tier = 0
@@ -71,15 +67,20 @@ class Tower(Entity):
         self.fire_cooldown = 0.0
         self.current_targets: List["Enemy"] = []
 
-        # Attributes Modified by Upgrades
+        # --- Attributes Modified by Upgrades ---
         self.projectiles_per_shot = 1
         self.pierce_count = 0
         self.armor_shred = 0
         self.execute_threshold: Optional[Dict[str, float]] = None
         self.on_apply_damage = 0
         self.on_death_explosion: Optional[Dict[str, Any]] = None
-        self.base_effect_duration_multiplier = 1.0
+
+        # --- NEW: Add base and live stats for Arch-Mage buffs ---
         self.base_effect_potency_multiplier = 1.0
+        self.effect_potency_multiplier = self.base_effect_potency_multiplier
+        self.base_aura_size_multiplier = 1.0
+        self.aura_size_multiplier = self.base_aura_size_multiplier
+
         self.on_hit_effects: List[Dict[str, Any]] = []
         self.on_blast_effects: List[Dict[str, Any]] = []
         self.bonus_damage_per_debuff = 0
@@ -120,7 +121,6 @@ class Tower(Entity):
         """
         Updates the tower's logic, finds targets, and fires.
         """
-        # The parent update call now handles all status effect logic (buffs/debuffs).
         super().update(dt, game_state, all_enemies, all_towers)
 
         if self.fire_cooldown > 0:
