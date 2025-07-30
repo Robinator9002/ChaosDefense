@@ -4,7 +4,7 @@ from typing import List, TYPE_CHECKING, Tuple
 import pygame
 
 if TYPE_CHECKING:
-    from ..entities.enemies.enemy import Enemy
+    from ...game_logic.entities.enemies import Enemy
 
 logger = logging.getLogger(__name__)
 

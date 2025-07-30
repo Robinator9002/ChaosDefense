@@ -6,9 +6,9 @@ from typing import List, Dict, Tuple, TYPE_CHECKING
 import pygame
 
 if TYPE_CHECKING:
-    from ..entities.entity import Entity
-    from ..entities.tower import Tower
-    from ..entities.enemies.enemy import Enemy
+    from ...game_logic.entities.entity import Entity
+    from ...game_logic.entities.tower import Tower
+    from ...game_logic.entities.enemies.enemy import Enemy
 
 logger = logging.getLogger(__name__)
 
