@@ -2,14 +2,16 @@
 import pygame
 import uuid
 import logging
+import random
 from typing import TYPE_CHECKING, List
 
-# --- NEW: Import the EffectHandler component and StatusEffect for type hinting ---
 from ..effects.effect_handler import EffectHandler
 from ..effects.status_effect import StatusEffect
 
 if TYPE_CHECKING:
     from ..game_state import GameState
+    from ..game_ai.targeting.targeting_manager import TargetingManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +20,9 @@ class Entity:
     """
     The base class for all game objects that exist on the map.
 
-    REFACTORED: This class now owns an EffectHandler component, making it the
-    universal foundation for the buff and debuff system. Any class that
-    inherits from Entity automatically gains the ability to have status
-    effects applied to it.
+    REFACTORED: Now includes the logic to broadcast auras, allowing any
+    subclass (Tower or Enemy) to buff nearby allies in a data-driven and
+    performant way by leveraging the TargetingManager.
     """
 
     def __init__(self, x: float, y: float, max_hp: int, sprite: pygame.Surface = None):
@@ -33,10 +34,11 @@ class Entity:
         self.current_hp = max_hp
         self.is_alive = True
         self.entity_id = uuid.uuid4()
-
-        # --- NEW: Every entity now owns an EffectHandler ---
-        # This component manages all status effect logic for this entity.
         self.effect_handler = EffectHandler(self)
+
+        # --- NEW: Aura properties will be set by subclasses ---
+        self.auras = []
+        self.status_effects_config = {}  # Subclasses must populate this
 
         if sprite:
             self.sprite = sprite
@@ -51,21 +53,60 @@ class Entity:
         )
 
     def update(
-        self,
-        dt: float,
-        game_state: "GameState",
-        all_enemies: List["Entity"] = [],
-        all_towers: List["Entity"] = [],
+        self, dt: float, game_state: "GameState", targeting_manager: "TargetingManager"
     ):
         """
-        Updates the entity's logic, now including its status effects.
-        The signature is expanded to allow subclasses to have battlefield awareness.
+        Updates the entity's logic, including effects and aura broadcasting.
         """
-        # --- NEW: Delegate effect updates to the handler ---
-        # The handler will tick down durations, apply DoTs, and recalculate stats.
         self.effect_handler.update(dt)
 
+        # --- NEW: Aura Broadcasting Logic ---
+        self._broadcast_auras(targeting_manager)
+
         self.rect.center = self.pos
+
+    def _broadcast_auras(self, targeting_manager: "TargetingManager"):
+        """
+        Finds nearby allies and applies this entity's aura effects to them.
+        """
+        if not self.auras:
+            return
+
+        for aura_data in self.auras:
+            aura_range = aura_data.get("range", 0)
+            target_type = aura_data.get("target_type")
+            effects_to_apply = aura_data.get("effects", {})
+
+            if not all([aura_range > 0, target_type, effects_to_apply]):
+                continue
+
+            # Use the targeting manager for a performant query
+            allies_in_range = []
+            if target_type == "TOWER":
+                allies_in_range = targeting_manager.get_nearby_towers(
+                    self.pos, aura_range
+                )
+            elif target_type == "ENEMY":
+                allies_in_range = targeting_manager.get_nearby_enemies(
+                    self.pos, aura_range
+                )
+
+            for ally in allies_in_range:
+                # Don't apply aura to self
+                if ally is self:
+                    continue
+
+                for effect_id, params in effects_to_apply.items():
+                    if effect_id in self.status_effects_config:
+                        effect_def = self.status_effects_config[effect_id]
+                        effect = StatusEffect(
+                            effect_id=effect_id,
+                            effect_data=effect_def,
+                            duration=params.get("duration", 1.0),
+                            potency=params.get("potency", 1.0),
+                            source_entity_id=self.entity_id,
+                        )
+                        ally.apply_status_effect(effect)
 
     def draw(self, screen: pygame.Surface, camera_offset: pygame.Vector2, zoom: float):
         """
@@ -86,7 +127,6 @@ class Entity:
             self.rect.center = screen_pos
             screen.blit(self.sprite, self.rect)
 
-    # --- NEW: Public API for applying effects ---
     def apply_status_effect(self, new_effect: "StatusEffect"):
         """
         Applies a new status effect to this entity by passing it to the handler.
@@ -96,14 +136,9 @@ class Entity:
     def take_damage(self, amount: int, ignores_armor: bool = False):
         """
         Reduces the entity's current HP by a given amount.
-        The signature is updated to be compatible with the EffectHandler's
-        damage-over-time calls.
         """
         if not self.is_alive:
             return
-
-        # The base entity has no armor, so the 'ignores_armor' flag is not used here,
-        # but it is required for compatibility with child classes like Enemy.
         self.current_hp -= amount
         if self.current_hp <= 0:
             self.current_hp = 0

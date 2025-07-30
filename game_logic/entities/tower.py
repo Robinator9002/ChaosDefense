@@ -12,7 +12,7 @@ from ..attacks import attack_handlers
 if TYPE_CHECKING:
     from .enemies.enemy import Enemy
     from ..game_state import GameState
-    from ...game_ai.targeting.targeting_manager import TargetingManager
+    from ..game_ai.targeting.targeting_manager import TargetingManager
 
 
 logger = logging.getLogger(__name__)

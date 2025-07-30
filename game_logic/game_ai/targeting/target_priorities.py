@@ -5,8 +5,8 @@ import pygame
 
 if TYPE_CHECKING:
     # --- MODIFIED: Updated import paths for new file location ---
-    from ...game_logic.entities.tower import Tower
-    from ...game_logic.entities.enemies.enemy import Enemy
+    from game_logic.entities.tower import Tower
+    from game_logic.entities.enemies.enemy import Enemy
 
 logger = logging.getLogger(__name__)
 

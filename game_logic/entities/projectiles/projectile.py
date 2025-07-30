@@ -5,34 +5,27 @@ import uuid
 import random
 from typing import TYPE_CHECKING, Optional, List, Dict, Any
 
-# --- MODIFIED: Adjust relative import path ---
-# Since this file is now in a subdirectory, we use '..' to go up one level
-# to the 'entities' directory to import the base Entity class.
 from ..entity import Entity
 from ...effects.status_effect import StatusEffect
-
-# --- MODIFIED: Import the new ProjectileData DTO ---
-# This is the new "work order" that the projectile will receive.
 from .projectile_data import ProjectileData
 
 if TYPE_CHECKING:
     from ..enemies.enemy import Enemy
     from ...game_state import GameState
+    from ...game_ai.targeting.targeting_manager import TargetingManager
+
 
 logger = logging.getLogger(__name__)
 
 
 class Projectile(Entity):
     """
-    Represents a projectile fired from a tower. Its behavior and properties
-    are defined by a ProjectileData object provided on creation.
+    Represents a projectile fired from a tower.
+
+    REFACTORED: Its update signature is now compatible with the new
+    GameManager loop, accepting the TargetingManager.
     """
 
-    # --- REFACTORED: The constructor is now dramatically simplified ---
-    # Instead of a long list of 17 parameters, it now takes a starting position,
-    # a target, and a single 'data' object that contains all other properties.
-    # This decouples the Projectile from the Tower and makes the system
-    # far more maintainable and extensible.
     def __init__(
         self,
         x: float,
@@ -42,20 +35,9 @@ class Projectile(Entity):
     ):
         """
         Initializes a new Projectile based on a ProjectileData object.
-
-        Args:
-            x (float): The starting x-coordinate.
-            y (float): The starting y-coordinate.
-            target (Enemy): The initial enemy target.
-            data (ProjectileData): The data object containing all behavioral
-                                   and statistical properties for this projectile.
         """
         super().__init__(x, y, max_hp=1)
 
-        # --- Unpack all properties from the ProjectileData object ---
-        # This is the core of the new design. The projectile configures itself
-        # based on the data it receives, rather than having its attributes
-        # set one-by-one by an external class.
         self.damage = data.damage
         self.effects_to_apply = data.effects_to_apply
         self.status_effects_config = data.status_effects_config
@@ -69,35 +51,36 @@ class Projectile(Entity):
         self.on_apply_damage = data.on_apply_damage
         self.bonus_damage_per_debuff = data.bonus_damage_per_debuff
 
-        # --- Standard Projectile State ---
         self.target = target
-        self.speed = 450  # This could also be moved into ProjectileData if needed
+        self.speed = 450
         self.last_known_target_pos = target.pos.copy()
         self.retarget_radius = 120
         self.enemies_hit: List[uuid.UUID] = []
 
-        # --- Dynamic Sprite Creation based on properties ---
-        color = (255, 255, 0)  # Default yellow
+        color = (255, 255, 0)
         if self.blast_radius > 0:
-            color = (255, 165, 0)  # Orange for AoE
+            color = (255, 165, 0)
         elif self.pierce_count > 0:
-            color = (255, 255, 255)  # White for piercing
+            color = (255, 255, 255)
         elif any(e.effect_id == "slow" for e in self.effects_to_apply):
-            color = (173, 216, 230)  # Light blue for slow
+            color = (173, 216, 230)
         self.sprite = pygame.Surface((8, 8), pygame.SRCALPHA)
         pygame.draw.circle(self.sprite, color, (4, 4), 4)
         self.rect = self.sprite.get_rect(center=(x, y))
 
-    def update(self, dt: float, game_state: "GameState", all_enemies: List["Enemy"]):
+    def update(
+        self, dt: float, game_state: "GameState", targeting_manager: "TargetingManager"
+    ):
         """
         Updates the projectile's position, handling target loss and retargeting.
-        (No changes to this method's logic are needed for this refactor).
         """
         if not self.is_alive:
             return
 
+        all_enemies = targeting_manager.enemy_grid  # A way to get all enemies for now
+
         if not self.target or not self.target.is_alive:
-            new_target = self._find_new_target_nearby(all_enemies)
+            new_target = self._find_new_target_nearby(targeting_manager)
             if new_target:
                 self.target = new_target
             else:
@@ -113,44 +96,49 @@ class Projectile(Entity):
 
         if distance_to_destination < self.speed * dt:
             if self.target:
-                self._on_impact(self.target, game_state, all_enemies)
+                self._on_impact(self.target, game_state, targeting_manager)
             else:
                 self.kill()
             return
 
         self.pos += direction.normalize() * self.speed * dt
-        super().update(dt, game_state)
+        super().update(dt, game_state, targeting_manager)
 
-    def _find_new_target_nearby(self, all_enemies: List["Enemy"]) -> Optional["Enemy"]:
-        """
-        Finds the closest living enemy to the projectile's last known target position.
-        """
-        potential_targets = []
-        for enemy in all_enemies:
-            if enemy.is_alive and enemy.entity_id not in self.enemies_hit:
-                distance = self.last_known_target_pos.distance_to(enemy.pos)
-                if distance <= self.retarget_radius:
-                    potential_targets.append((distance, enemy))
-
-        if not potential_targets:
+    def _find_new_target_nearby(
+        self, targeting_manager: "TargetingManager"
+    ) -> Optional["Enemy"]:
+        """Finds a new target using an efficient query."""
+        potential_targets = targeting_manager.get_nearby_enemies(
+            self.last_known_target_pos, self.retarget_radius
+        )
+        valid_targets = [
+            t
+            for t in potential_targets
+            if t.is_alive and t.entity_id not in self.enemies_hit
+        ]
+        if not valid_targets:
             return None
-
-        return min(potential_targets, key=lambda t: t[0])[1]
+        return min(
+            valid_targets,
+            key=lambda t: self.last_known_target_pos.distance_squared_to(t.pos),
+        )
 
     def _on_impact(
-        self, hit_enemy: "Enemy", game_state: "GameState", all_enemies: List["Enemy"]
+        self,
+        hit_enemy: "Enemy",
+        game_state: "GameState",
+        targeting_manager: "TargetingManager",
     ):
-        """
-        Handles all logic for when the projectile hits an enemy.
-        (No changes to this method's logic are needed for this refactor).
-        """
+        """Handles all logic for when the projectile hits an enemy."""
         if not hit_enemy.is_alive or hit_enemy.entity_id in self.enemies_hit:
             return
 
         final_damage = self.damage + self.on_apply_damage
 
         if self.bonus_damage_per_debuff > 0:
-            final_damage += self.bonus_damage_per_debuff * len(hit_enemy.status_effects)
+            final_damage += self.bonus_damage_per_debuff * len(
+                hit_enemy.effect_handler.status_effects
+            )
 
         if self.execute_threshold:
             hp_percent = hit_enemy.current_hp / hit_enemy.max_hp
@@ -165,7 +153,10 @@ class Projectile(Entity):
             hit_enemy.apply_status_effect(effect)
 
         for cond_effect_data in self.conditional_effects:
-            if hit_enemy.has_status_effect(cond_effect_data["if_target_has"]):
+            if any(
+                eff.effect_id == cond_effect_data["if_target_has"]
+                for eff in hit_enemy.effect_handler.status_effects
+            ):
                 if random.random() <= cond_effect_data["chance"]:
                     effect_def = cond_effect_data["effect"]
                     if effect_def["id"] in self.status_effects_config:
@@ -180,15 +171,15 @@ class Projectile(Entity):
         self.enemies_hit.append(hit_enemy.entity_id)
 
         if self.blast_radius > 0:
-            self._handle_splash_damage(self.pos, game_state, all_enemies)
+            self._handle_splash_damage(self.pos, game_state, targeting_manager)
 
         for area_effect_data in self.on_hit_area_effects:
             if random.random() <= area_effect_data["chance"]:
-                self._handle_area_effect(self.pos, area_effect_data, all_enemies)
+                self._handle_area_effect(self.pos, area_effect_data, targeting_manager)
 
         if self.pierce_count > 0:
             self.pierce_count -= 1
-            new_target = self._find_next_pierce_target(all_enemies)
+            new_target = self._find_next_pierce_target(targeting_manager)
             if new_target:
                 self.target = new_target
                 return
@@ -199,39 +190,42 @@ class Projectile(Entity):
         self,
         impact_pos: pygame.Vector2,
         game_state: "GameState",
-        all_enemies: List["Enemy"],
+        targeting_manager: "TargetingManager",
     ):
         """Applies damage and effects to all enemies within the blast radius."""
         splash_damage = int(self.damage * 0.5)
-        for enemy in all_enemies:
+        nearby_enemies = targeting_manager.get_nearby_enemies(
+            impact_pos, self.blast_radius
+        )
+        for enemy in nearby_enemies:
             if enemy.is_alive and enemy.entity_id not in self.enemies_hit:
-                if impact_pos.distance_to(enemy.pos) <= self.blast_radius:
-                    enemy.take_damage(splash_damage)
-                    for effect_data in self.on_blast_effects_data:
-                        effect_id = effect_data["id"]
-                        if effect_id in self.status_effects_config:
-                            effect_def = self.status_effects_config[effect_id]
-                            effect_instance = StatusEffect(
-                                effect_id=effect_id,
-                                effect_data=effect_def,
-                                duration=effect_data.get("duration", 1.0),
-                                potency=effect_data.get("potency", 1.0),
-                            )
-                            enemy.apply_status_effect(effect_instance)
+                enemy.take_damage(splash_damage)
+                for effect_data in self.on_blast_effects_data:
+                    effect_id = effect_data["id"]
+                    if effect_id in self.status_effects_config:
+                        effect_def = self.status_effects_config[effect_id]
+                        effect_instance = StatusEffect(
+                            effect_id=effect_id,
+                            effect_data=effect_def,
+                            duration=effect_data.get("duration", 1.0),
+                            potency=effect_data.get("potency", 1.0),
+                        )
+                        enemy.apply_status_effect(effect_instance)
 
     def _handle_area_effect(
         self,
         center_pos: pygame.Vector2,
         area_effect_data: Dict[str, Any],
-        all_enemies: List["Enemy"],
+        targeting_manager: "TargetingManager",
     ):
         """Handles generic area of effect abilities like frost nova."""
         radius = area_effect_data["radius"]
         damage = area_effect_data["damage"]
         effect_def = area_effect_data.get("effect")
+        nearby_enemies = targeting_manager.get_nearby_enemies(center_pos, radius)
 
-        for enemy in all_enemies:
-            if enemy.is_alive and center_pos.distance_to(enemy.pos) <= radius:
+        for enemy in nearby_enemies:
+            if enemy.is_alive:
                 if damage > 0:
                     enemy.take_damage(damage)
                 if effect_def and effect_def["id"] in self.status_effects_config:
@@ -243,14 +237,17 @@ class Projectile(Entity):
                     )
                     enemy.apply_status_effect(effect_instance)
 
-    def _find_next_pierce_target(self, all_enemies: List["Enemy"]) -> Optional["Enemy"]:
+    def _find_next_pierce_target(
+        self, targeting_manager: "TargetingManager"
+    ) -> Optional["Enemy"]:
         """Finds the next valid target for a piercing shot."""
-        closest_enemy: Optional["Enemy"] = None
-        min_distance = float("inf")
-        for enemy in all_enemies:
-            if enemy.is_alive and enemy.entity_id not in self.enemies_hit:
-                distance = self.pos.distance_to(enemy.pos)
-                if distance < min_distance:
-                    min_distance = distance
-                    closest_enemy = enemy
-        return closest_enemy
+        # This is a less efficient query, but acceptable for a single event.
+        all_enemies = [
+            enemy for cell in targeting_manager.enemy_grid.values() for enemy in cell
+        ]
+        valid_targets = [
+            e for e in all_enemies if e.is_alive and e.entity_id not in self.enemies_hit
+        ]
+        if not valid_targets:
+            return None
+        return min(valid_targets, key=lambda e: self.pos.distance_squared_to(e.pos))

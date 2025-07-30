@@ -18,7 +18,7 @@ from .upgrades.upgrade_manager import UpgradeManager
 from .effects.status_effect import StatusEffect
 
 # --- MODIFIED: Update import path for new file location ---
-from ..game_ai.targeting.targeting_manager import TargetingManager
+from .game_ai.targeting.targeting_manager import TargetingManager
 
 logger = logging.getLogger(__name__)
 
