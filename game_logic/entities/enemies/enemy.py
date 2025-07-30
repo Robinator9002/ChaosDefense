@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 class Enemy(Entity):
     """
     Represents an enemy unit that moves along a path.
-    Now supports immunities to certain status effects.
+
+    REFACTORED: The stat scaling system has been overhauled from a multiplicative
+    formula to an additive one. This provides a more stable and controllable
+    difficulty curve, preventing the extreme runaway stats that occurred in
+    late-game waves.
     """
 
     def __init__(
@@ -27,40 +31,36 @@ class Enemy(Entity):
         difficulty_modifier: float,
     ):
         """
-        Initializes a new Enemy.
+        Initializes a new Enemy, calculating its stats with the new additive formula.
         """
         base_stats = enemy_type_data.get("base_stats", {})
-        scaling = enemy_type_data.get("scaling_per_level", {})
+        # --- REFACTORED: Read from the new additive scaling object ---
+        scaling = enemy_type_data.get("scaling_per_level_add", {})
         render_props = enemy_type_data.get("render_props", {})
 
-        # --- BUG FIX: Assign the name attribute ---
-        # The 'name' is loaded from the config data. This was missing, causing
-        # a crash in the BossEnemy's logging statement upon initialization.
         self.name = enemy_type_data.get("name", "Unknown Enemy")
-
         self.level = level
-        level_scaled_hp = base_stats.get("hp", 1) * (
-            scaling.get("hp", 1.0) ** (level - 1)
-        )
+
+        # --- REFACTORED: New Additive Scaling Calculation ---
+        # The formula is now: base + (increase_per_level * (level - 1))
+        # This creates a linear progression instead of an exponential one.
+        hp_increase = scaling.get("hp", 0)
+        level_scaled_hp = base_stats.get("hp", 1) + (hp_increase * (level - 1))
         calculated_hp = int(level_scaled_hp * difficulty_modifier)
 
-        self.base_speed = base_stats.get("speed", 50) * (
-            scaling.get("speed", 1.0) ** (level - 1)
-        )
+        speed_increase = scaling.get("speed", 0)
+        self.base_speed = base_stats.get("speed", 50) + (speed_increase * (level - 1))
         self.speed = self.base_speed
 
-        # --- FIX: Armor scaling was missing here! ---
-        level_scaled_armor = base_stats.get("armor", 0) * (
-            scaling.get("armor", 1.0) ** (level - 1)  # Apply armor scaling
-        )
-        self.base_armor = int(level_scaled_armor)  # Cast to int
-        self.armor = self.base_armor  # Initialize current armor with scaled base armor
+        armor_increase = scaling.get("armor", 0)
+        level_scaled_armor = base_stats.get("armor", 0) + (armor_increase * (level - 1))
+        self.base_armor = int(level_scaled_armor)
+        self.armor = self.base_armor
 
         self.damage_taken_multiplier = 1.0
 
-        self.bounty = int(
-            base_stats.get("bounty", 0) * (scaling.get("bounty", 1.0) ** (level - 1))
-        )
+        bounty_increase = scaling.get("bounty", 0)
+        self.bounty = int(base_stats.get("bounty", 0) + (bounty_increase * (level - 1)))
         self.damage_to_base = int(base_stats.get("damage", 1) * difficulty_modifier)
 
         self.immunities: List[str] = base_stats.get("immunities", [])
@@ -149,7 +149,7 @@ class Enemy(Entity):
         Resets stats to base values first, then applies all active modifiers.
         """
         self.speed = self.base_speed
-        self.armor = self.base_armor  # Now correctly initialized with scaled base_armor
+        self.armor = self.base_armor
         self.damage_taken_multiplier = 1.0
 
         for effect in self.status_effects:
