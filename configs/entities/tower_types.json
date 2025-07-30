@@ -76,6 +76,29 @@
       }
     }
   },
+
+  "mortar": {
+    "name": "Mortar",
+    "category": "artillery",
+    "cost": 120,
+    "sprite_key": "towers/mortar.png",
+    "placeholder_color": [60, 80, 60],
+    "special_properties": { "minimum_range": 100 },
+    "ai_config": {
+      "default_persona": "ARTILLERY",
+      "available_personas": ["ARTILLERY", "EXECUTIONER", "SNIPER"]
+    },
+    "attack": {
+      "type": "standard_projectile",
+      "data": {
+        "damage": 25,
+        "range": 500,
+        "fire_rate": 0.3,
+        "blast_radius": 100
+      }
+    }
+  },
+
   "inferno_weaver": {
     "name": "Inferno Weaver",
     "category": "magic",

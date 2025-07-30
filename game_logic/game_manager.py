@@ -6,8 +6,6 @@ from typing import Dict, List, Any, Tuple, Optional
 
 from .game_state import GameState
 from .levels.level_manager import LevelManager
-
-# --- BUGFIX: Add missing import for Grid ---
 from .level_generation.grid import Grid
 from .waves.wave_manager import WaveManager
 from .entities.tower import Tower
@@ -16,8 +14,6 @@ from .entities.enemies.boss_enemy import BossEnemy
 from .entities.projectiles.projectile import Projectile
 from .upgrades.upgrade_manager import UpgradeManager
 from .effects.status_effect import StatusEffect
-
-# --- MODIFIED: Update import path for new file location ---
 from .game_ai.targeting.targeting_manager import TargetingManager
 
 logger = logging.getLogger(__name__)
@@ -26,10 +22,6 @@ logger = logging.getLogger(__name__)
 class GameManager:
     """
     The central "headless" engine for the game.
-
-    REFACTORED: Now owns and operates the TargetingManager, which provides
-    a highly performant way for entities to query their surroundings. This
-    resolves the N*M performance bottleneck and enables complex aura and AI systems.
     """
 
     def __init__(self, all_configs: Dict[str, Any]):
@@ -44,19 +36,16 @@ class GameManager:
         self.upgrade_manager: UpgradeManager = UpgradeManager(
             self.configs.get("upgrade_definitions", {})
         )
-        # --- NEW: Initialize the TargetingManager ---
-        # We also load the AI config which the TargetingManager will use.
         targeting_ai_config = self.configs.get("targeting_ai", {})
         self.targeting_manager: TargetingManager = TargetingManager(
             cell_size=120, targeting_ai_config=targeting_ai_config
         )
-
         self.wave_manager: Optional[WaveManager] = None
         self.grid: Optional[Grid] = None
         self.paths: List[List[Tuple[int, int]]] = []
         self.enemies: List[Enemy] = []
         self.towers: List[Tower] = []
-        self.projectiles: List[Any] = []  # Can be multiple types
+        self.projectiles: List[Any] = []
         self._setup_new_game()
 
     def _setup_new_game(self):
@@ -77,7 +66,6 @@ class GameManager:
             self.game_state = GameState(gold=0, base_hp=1)
             self.game_state.end_game()
             return
-
         player_difficulty = self.configs["game_settings"].get("difficulty", 1)
         level_difficulty = gen_params.get("level_difficulty", 1)
         self.wave_manager = WaveManager(
@@ -96,17 +84,11 @@ class GameManager:
         """The main update loop for the entire game simulation."""
         if self.game_state.game_over:
             return
-
-        # --- REFACTORED: Centralized Awareness Phase ---
-        # 1. Clear the spatial grids from the previous frame.
         self.targeting_manager.clear()
-        # 2. Populate the grids with the current positions of all entities.
         for enemy in self.enemies:
             self.targeting_manager.register_entity(enemy)
         for tower in self.towers:
             self.targeting_manager.register_entity(tower)
-
-        # --- Update Game Systems ---
         if self.wave_manager:
             spawn_job = self.wave_manager.update(dt, len(self.enemies))
             if spawn_job:
@@ -114,28 +96,18 @@ class GameManager:
             self.game_state.current_wave_number = (
                 self.wave_manager.wave_state.current_wave_number
             )
-
-        # --- Update Entities ---
         newly_created_entities: List[Any] = []
-        # BUGFIX: Pass the targeting_manager to the update methods.
-        # This provides battlefield awareness without costly full-list iterations.
         for tower in self.towers:
             new_entities = tower.update(dt, self.game_state, self.targeting_manager)
             if new_entities:
                 newly_created_entities.extend(new_entities)
-
         for enemy in self.enemies:
             enemy.update(dt, self.game_state, self.targeting_manager)
-
-        # Note: Projectiles don't currently use the targeting manager, but we pass
-        # it for consistency and future features (e.g., projectiles that retarget).
         for projectile in self.projectiles:
             projectile.update(dt, self.game_state, self.targeting_manager)
-
         self.projectiles.extend(
             p for p in newly_created_entities if p not in self.projectiles
         )
-
         self._cleanup_dead_entities()
 
     def _cleanup_dead_entities(self):
@@ -170,10 +142,7 @@ class GameManager:
         radius = explosion_data.get("radius", 0)
         damage = explosion_data.get("damage", 0)
         effect_id = explosion_data.get("effect_id")
-
-        # Use the targeting manager for an efficient query
         nearby_enemies = self.targeting_manager.get_nearby_enemies(position, radius)
-
         for enemy in nearby_enemies:
             enemy.take_damage(damage)
             if effect_id:
@@ -188,7 +157,9 @@ class GameManager:
                     enemy.apply_status_effect(effect_instance)
 
     def _spawn_enemy(self, spawn_job: Dict[str, Any]):
-        """Creates an Enemy or BossEnemy instance based on a spawn job."""
+        """
+        Creates an Enemy or BossEnemy instance based on a spawn job.
+        """
         entity_id = spawn_job["type"]
         path_index = spawn_job["path_index"]
         if not (0 <= path_index < len(self.paths)) or not self.wave_manager:
@@ -197,15 +168,28 @@ class GameManager:
         difficulty_mod = self.wave_manager.difficulty_settings.get("stat_modifier", 1.0)
         enemy_spawn_level = max(1, self.game_state.current_wave_number)
 
+        # --- BUGFIX: Provide the status effects config during creation ---
+        status_effects_cfg = self.configs.get("status_effects", {})
+
         if entity_id in self.configs["boss_types"]:
             config = self.configs["boss_types"][entity_id]
             new_enemy = BossEnemy(
-                config, path, self.tile_size, enemy_spawn_level, difficulty_mod
+                boss_type_data=config,
+                path=path,
+                tile_size=self.tile_size,
+                level=enemy_spawn_level,
+                difficulty_modifier=difficulty_mod,
+                status_effects_config=status_effects_cfg,
             )
         elif entity_id in self.configs["enemy_types"]:
             config = self.configs["enemy_types"][entity_id]
             new_enemy = Enemy(
-                config, enemy_spawn_level, path, self.tile_size, difficulty_mod
+                enemy_type_data=config,
+                level=enemy_spawn_level,
+                path=path,
+                tile_size=self.tile_size,
+                difficulty_modifier=difficulty_mod,
+                status_effects_config=status_effects_cfg,
             )
         else:
             logger.error(f"Could not find definition for entity ID: {entity_id}")

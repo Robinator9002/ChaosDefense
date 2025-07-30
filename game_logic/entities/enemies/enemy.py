@@ -7,9 +7,8 @@ from ..entity import Entity
 
 if TYPE_CHECKING:
     from ...game_state import GameState
+    from ...game_ai.targeting.targeting_manager import TargetingManager
 
-    # StatusEffect is no longer directly managed here, but is needed for type hints.
-    from ...effects.status_effect import StatusEffect
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +30,7 @@ class Enemy(Entity):
         path: List[Tuple[int, int]],
         tile_size: int,
         difficulty_modifier: float,
+        status_effects_config: Dict[str, Any],  # --- NEW: Accept the config ---
     ):
         """
         Initializes a new Enemy.
@@ -42,8 +42,6 @@ class Enemy(Entity):
         self.name = enemy_type_data.get("name", "Unknown Enemy")
         self.level = level
 
-        # --- Base Stat Calculation ---
-        # These 'base' stats are the permanent, unmodified values for the enemy.
         hp_increase = scaling.get("hp", 0)
         level_scaled_hp = base_stats.get("hp", 1) + (hp_increase * (level - 1))
         calculated_hp = int(level_scaled_hp * difficulty_modifier)
@@ -60,13 +58,10 @@ class Enemy(Entity):
         self.damage_to_base = int(base_stats.get("damage", 1) * difficulty_modifier)
         self.immunities: List[str] = base_stats.get("immunities", [])
 
-        # --- Dynamic Stat Initialization ---
-        # These are the 'live' stats that will be modified by the EffectHandler each frame.
         self.speed = self.base_speed
         self.armor = self.base_armor
         self.damage_taken_multiplier = 1.0
 
-        # --- Pathing and Position ---
         self.path = path
         self.tile_size = tile_size
         self.pixel_path = [
@@ -76,25 +71,24 @@ class Enemy(Entity):
         initial_pos = self.pixel_path[0] if self.pixel_path else pygame.Vector2(0, 0)
         self.current_waypoint_index = 1
 
-        # --- Visuals ---
         size = render_props.get("size", 24)
         color = render_props.get("color", (255, 0, 255))
         placeholder_sprite = pygame.Surface((size, size))
         placeholder_sprite.fill(color)
 
-        # Initialize the parent Entity AFTER all stats are calculated.
         super().__init__(
             initial_pos.x, initial_pos.y, calculated_hp, placeholder_sprite
         )
 
-    # The apply_status_effect method is now inherited from Entity.
+        self.auras = enemy_type_data.get("auras", [])
+        # --- BUGFIX: Use the passed-in config ---
+        self.status_effects_config = status_effects_config
 
     def take_damage(
         self, amount: int, armor_shred: int = 0, ignores_armor: bool = False
     ):
         """
-        Reduces the entity's current HP, factoring in armor. This method
-        overrides the base Entity's simpler take_damage.
+        Reduces the entity's current HP, factoring in armor.
         """
         if not self.is_alive:
             return
@@ -105,17 +99,10 @@ class Enemy(Entity):
             damage_after_armor = max(1, amount - effective_armor)
 
         final_damage = int(damage_after_armor * self.damage_taken_multiplier)
-
-        # Call the base class's take_damage to handle the HP reduction and death.
-        # We pass ignores_armor=True because we have already calculated armor here.
         super().take_damage(final_damage, ignores_armor=True)
 
     def update(
-        self,
-        dt: float,
-        game_state: "GameState",
-        all_enemies: List["Entity"] = [],
-        all_towers: List["Entity"] = [],
+        self, dt: float, game_state: "GameState", targeting_manager: "TargetingManager"
     ):
         """
         The main update loop for the enemy entity.
@@ -123,8 +110,7 @@ class Enemy(Entity):
         if not self.is_alive:
             return
 
-        # The parent update call now handles all status effect logic.
-        super().update(dt, game_state)
+        super().update(dt, game_state, targeting_manager)
 
         # --- Movement Logic ---
         if self.current_waypoint_index >= len(self.pixel_path):

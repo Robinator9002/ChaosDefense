@@ -2,7 +2,6 @@
 import pygame
 import uuid
 import logging
-import random
 from typing import TYPE_CHECKING, List
 
 from ..effects.effect_handler import EffectHandler
@@ -10,6 +9,8 @@ from ..effects.status_effect import StatusEffect
 
 if TYPE_CHECKING:
     from ..game_state import GameState
+
+    # --- MODIFIED: Update import path for new file location ---
     from ..game_ai.targeting.targeting_manager import TargetingManager
 
 
@@ -36,9 +37,10 @@ class Entity:
         self.entity_id = uuid.uuid4()
         self.effect_handler = EffectHandler(self)
 
-        # --- NEW: Aura properties will be set by subclasses ---
-        self.auras = []
-        self.status_effects_config = {}  # Subclasses must populate this
+        # These attributes will be populated by subclasses (Tower, Enemy)
+        # based on their specific configuration data.
+        self.auras: List[dict] = []
+        self.status_effects_config: dict = {}
 
         if sprite:
             self.sprite = sprite
@@ -60,7 +62,6 @@ class Entity:
         """
         self.effect_handler.update(dt)
 
-        # --- NEW: Aura Broadcasting Logic ---
         self._broadcast_auras(targeting_manager)
 
         self.rect.center = self.pos
