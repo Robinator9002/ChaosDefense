@@ -19,9 +19,8 @@ class UpgradePanel(UIElement):
     """
     A UI panel that displays stats and upgrade options for a selected tower.
 
-    REFACTORED: The panel now dynamically lays out its upgrade buttons, stacking
-    them vertically based on their individual calculated heights. This ensures
-    that all content, regardless of text length, is displayed correctly.
+    REFACTORED: The panel now dynamically lays out its upgrade buttons and
+    can be explicitly told to rebuild its layout to reflect the latest game state.
     """
 
     def __init__(
@@ -55,6 +54,18 @@ class UpgradePanel(UIElement):
         )
         self.is_salvage_hovered = False
 
+    # --- NEW: Public method to trigger a UI refresh ---
+    def rebuild_layout(self):
+        """
+        Public method to force the panel to discard its old buttons and
+        re-create them based on the current game state. This is called by
+        the UIManager immediately after an upgrade is purchased.
+        """
+        logger.debug(
+            f"Rebuilding layout for tower {self.tower.entity_id}'s upgrade panel."
+        )
+        self._create_layout()
+
     def _setup_fonts_and_colors(self):
         """Initializes fonts and color constants for drawing."""
         self.font_title = pygame.font.SysFont("segoeui", 22, bold=True)
@@ -85,22 +96,19 @@ class UpgradePanel(UIElement):
         self.upgrade_buttons.clear()
         padding = 15
         button_spacing = 10
-        # This starting Y position is calculated to be just below the stats section.
         current_y = self.rect.y + 210
 
         next_upgrade_a = self.upgrade_manager.get_next_upgrade(self.tower, "path_a")
         if next_upgrade_a:
             can_afford = self.game_state.gold >= next_upgrade_a.cost
-            # Create a placeholder rect; the button's __init__ will calculate the true height.
             button_rect = pygame.Rect(
                 self.rect.x + padding,
                 current_y,
                 self.rect.width - (padding * 2),
-                0,  # Height is determined by the button itself.
+                0,
             )
             button_a = UpgradeButton(button_rect, next_upgrade_a, can_afford)
             self.upgrade_buttons.append(button_a)
-            # Update the Y position for the next button based on the actual height of this one.
             current_y += button_a.rect.height + button_spacing
 
         next_upgrade_b = self.upgrade_manager.get_next_upgrade(self.tower, "path_b")
@@ -108,7 +116,7 @@ class UpgradePanel(UIElement):
             can_afford = self.game_state.gold >= next_upgrade_b.cost
             button_rect = pygame.Rect(
                 self.rect.x + padding,
-                current_y,  # Use the updated Y position.
+                current_y,
                 self.rect.width - (padding * 2),
                 0,
             )
