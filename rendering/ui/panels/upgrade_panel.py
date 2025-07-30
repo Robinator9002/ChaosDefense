@@ -5,13 +5,8 @@ from typing import Optional, List, TYPE_CHECKING
 
 from ..ui_element import UIElement
 from ..buttons.upgrade_button import UpgradeButton
-
-# --- MODIFIED: Import the new structured action classes ---
-# We import our action vocabulary to create and handle structured,
-# type-safe commands instead of relying on fragile strings.
 from ..ui_action import UIAction, ActionType
 
-# Use TYPE_CHECKING to avoid circular imports for type hinting.
 if TYPE_CHECKING:
     from game_logic.entities.tower import Tower
     from game_logic.upgrades.upgrade_manager import UpgradeManager
@@ -22,9 +17,11 @@ logger = logging.getLogger(__name__)
 
 class UpgradePanel(UIElement):
     """
-    A UI panel that displays detailed stats and upgrade options for a selected tower.
-    This panel now also includes a button for salvaging the tower and communicates
-    all actions via structured UIAction objects.
+    A UI panel that displays stats and upgrade options for a selected tower.
+
+    REFACTORED: The panel now dynamically lays out its upgrade buttons, stacking
+    them vertically based on their individual calculated heights. This ensures
+    that all content, regardless of text length, is displayed correctly.
     """
 
     def __init__(
@@ -48,13 +45,11 @@ class UpgradePanel(UIElement):
         self._setup_fonts_and_colors()
         self._create_layout()
 
-        # --- Close Button Attributes ---
         self.close_button_rect = pygame.Rect(
             self.rect.right - 28, self.rect.y + 8, 20, 20
         )
         self.is_close_hovered = False
 
-        # --- Salvage Button Attributes ---
         self.salvage_button_rect = pygame.Rect(
             self.rect.x + 15, self.rect.bottom - 55, self.rect.width - 30, 40
         )
@@ -84,80 +79,65 @@ class UpgradePanel(UIElement):
 
     def _create_layout(self):
         """
-        Creates and positions all the sub-elements within the panel.
+        Creates and positions upgrade buttons dynamically, stacking them
+        vertically based on their individual calculated heights.
         """
         self.upgrade_buttons.clear()
         padding = 15
-        button_height = 60
         button_spacing = 10
-        stats_start_y = self.rect.y + 80
+        # This starting Y position is calculated to be just below the stats section.
+        current_y = self.rect.y + 210
 
         next_upgrade_a = self.upgrade_manager.get_next_upgrade(self.tower, "path_a")
         if next_upgrade_a:
-            can_afford_a = self.game_state.gold >= next_upgrade_a.cost
-            button_rect_a = pygame.Rect(
+            can_afford = self.game_state.gold >= next_upgrade_a.cost
+            # Create a placeholder rect; the button's __init__ will calculate the true height.
+            button_rect = pygame.Rect(
                 self.rect.x + padding,
-                stats_start_y + 120,
-                self.rect.width - padding * 2,
-                button_height,
+                current_y,
+                self.rect.width - (padding * 2),
+                0,  # Height is determined by the button itself.
             )
-            self.upgrade_buttons.append(
-                UpgradeButton(button_rect_a, next_upgrade_a, can_afford_a)
-            )
+            button_a = UpgradeButton(button_rect, next_upgrade_a, can_afford)
+            self.upgrade_buttons.append(button_a)
+            # Update the Y position for the next button based on the actual height of this one.
+            current_y += button_a.rect.height + button_spacing
 
         next_upgrade_b = self.upgrade_manager.get_next_upgrade(self.tower, "path_b")
         if next_upgrade_b:
-            can_afford_b = self.game_state.gold >= next_upgrade_b.cost
-            y_pos_b = stats_start_y + 120 + button_height + button_spacing
-            button_rect_b = pygame.Rect(
+            can_afford = self.game_state.gold >= next_upgrade_b.cost
+            button_rect = pygame.Rect(
                 self.rect.x + padding,
-                y_pos_b,
-                self.rect.width - padding * 2,
-                button_height,
+                current_y,  # Use the updated Y position.
+                self.rect.width - (padding * 2),
+                0,
             )
-            self.upgrade_buttons.append(
-                UpgradeButton(button_rect_b, next_upgrade_b, can_afford_b)
-            )
+            button_b = UpgradeButton(button_rect, next_upgrade_b, can_afford)
+            self.upgrade_buttons.append(button_b)
 
     def handle_event(
         self, event: pygame.event.Event, game_state: "GameState"
-    ) -> Optional[UIAction]:  # --- MODIFIED: Return type is now UIAction ---
-        """
-        Delegates event handling and returns a structured UIAction if triggered.
-        """
+    ) -> Optional[UIAction]:
+        """Delegates event handling to child buttons."""
         mouse_pos = pygame.mouse.get_pos()
-
-        # --- NEU: Hover-Zustände für alle Elemente im Panel aktualisieren ---
-        # Dies muss immer geschehen, unabhängig davon, ob die Maus im Panel ist,
-        # damit der Hover-Zustand korrekt zurückgesetzt wird, wenn die Maus das Panel verlässt.
         self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
         self.is_salvage_hovered = self.salvage_button_rect.collidepoint(mouse_pos)
-        for button in self.upgrade_buttons:
-            # `handle_event` in `UpgradeButton` aktualisiert `is_hovered` basierend auf `mouse_pos`
-            button.handle_event(
-                event, game_state
-            )  # Pass the event to update hover state
 
-        # Nur Klicks verarbeiten, wenn die Maus im Panel ist
+        for button in self.upgrade_buttons:
+            button.handle_event(event, game_state)
+
         if not self.rect.collidepoint(mouse_pos):
             return None
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_close_hovered:
-                logger.debug("Upgrade panel close button clicked.")
-                # --- MODIFIED: Return a structured UIAction object ---
                 return UIAction(type=ActionType.CLOSE_PANEL)
             if self.is_salvage_hovered:
-                logger.info(f"Player clicked salvage for tower {self.tower.entity_id}.")
-                # --- MODIFIED: Return a structured UIAction object ---
                 return UIAction(type=ActionType.SALVAGE_TOWER)
 
-        # Klicks an Upgrade-Buttons weiterleiten und deren Aktion propagieren.
         for button in self.upgrade_buttons:
-            # Die `handle_event`-Methode des Buttons gibt jetzt eine `Optional[UIAction]` zurück.
             action = button.handle_event(event, game_state)
             if action:
-                # Wenn der Button eine Aktion zurückgegeben hat, propagieren wir sie.
                 return action
         return None
 
@@ -201,12 +181,10 @@ class UpgradePanel(UIElement):
             2,
             border_radius=5,
         )
-
         refund_amount = int(
             self.tower.total_investment * self.salvage_refund_percentage
         )
         button_text = f"Salvage for {refund_amount}G"
-
         text_surf = self.font_salvage.render(
             button_text, True, self.colors["salvage_text"]
         )
