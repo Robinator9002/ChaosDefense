@@ -5,103 +5,92 @@
     "type": "stat_modifier",
     "stacking": "refresh",
     "description": "Reduces enemy movement speed.",
-    "params": {
-      "stat": "speed"
-    }
+    "params": { "stat": "speed" }
   },
   "stun": {
     "name": "Stun",
     "type": "stat_modifier",
     "stacking": "refresh",
     "description": "Stops enemy movement completely.",
-    "params": {
-      "stat": "speed",
-      "multiplier": 0
-    }
+    "params": { "stat": "speed", "multiplier": 0 }
   },
   "poison": {
     "name": "Poison",
     "type": "damage_over_time",
     "stacking": "stack_intensity",
     "description": "Deals damage over time. Multiple applications increase intensity.",
-    "params": {
-      "tick_interval": 0.5
-    }
+    "params": { "tick_interval": 0.5 }
   },
   "fire": {
     "name": "Fire",
     "type": "damage_over_time",
     "stacking": "refresh",
     "description": "Deals fire damage over time. Re-applying refreshes the duration.",
-    "params": {
-      "tick_interval": 0.5
-    }
+    "params": { "tick_interval": 0.5 }
   },
   "bleed": {
     "name": "Bleed",
     "type": "damage_over_time",
     "stacking": "stack_intensity",
     "description": "Causes the target to bleed, taking damage over time. Stacks.",
-    "params": {
-      "tick_interval": 1.0
-    }
+    "params": { "tick_interval": 1.0 }
   },
   "armor_break": {
     "name": "Armor Break",
     "type": "stat_debuff",
     "stacking": "stack_potency",
-    "description": "Reduces enemy armor, causing them to take increased damage from physical attacks.",
-    "params": {
-      "stat": "armor"
-    }
+    "description": "Reduces enemy armor.",
+    "params": { "stat": "armor" }
   },
   "vulnerability": {
     "name": "Vulnerability",
     "type": "stat_modifier",
     "stacking": "refresh",
-    "description": "Makes the enemy vulnerable, causing them to take increased damage from all sources.",
-    "params": {
-      "stat": "damage_taken_multiplier"
-    }
+    "description": "Makes the enemy take increased damage from all sources.",
+    "params": { "stat": "damage_taken_multiplier" }
   },
   "elemental_vulnerability": {
     "name": "Elemental Vulnerability",
     "type": "stat_modifier",
     "stacking": "refresh",
-    "description": "Cursed enemies take massively increased damage from all sources.",
-    "params": {
-      "stat": "damage_taken_multiplier"
-    }
+    "description": "Cursed enemies take massively increased damage.",
+    "params": { "stat": "damage_taken_multiplier" }
   },
 
-  "//": "--- NEW: TOWER BUFFS ---",
-  "//": "These are positive status effects applied by support towers to other towers.",
-
+  "//": "--- TOWER BUFFS ---",
   "damage_boost": {
     "name": "Damage Boost",
     "type": "stat_modifier",
     "stacking": "refresh",
     "description": "Increases tower damage.",
-    "params": {
-      "stat": "damage"
-    }
+    "params": { "stat": "damage" }
   },
   "range_boost": {
     "name": "Range Boost",
     "type": "stat_modifier",
     "stacking": "refresh",
     "description": "Increases tower attack range.",
-    "params": {
-      "stat": "range"
-    }
+    "params": { "stat": "range" }
   },
   "fire_rate_boost": {
     "name": "Fire Rate Boost",
     "type": "stat_modifier",
     "stacking": "refresh",
     "description": "Increases tower fire rate.",
-    "params": {
-      "stat": "fire_rate"
-    }
+    "params": { "stat": "fire_rate" }
+  },
+  "effect_potency_boost": {
+    "name": "Potency Boost",
+    "type": "stat_modifier",
+    "stacking": "refresh",
+    "description": "Increases the potency of status effects applied by the tower.",
+    "params": { "stat": "effect_potency_multiplier" }
+  },
+  "aura_size_boost": {
+    "name": "Aura Size Boost",
+    "type": "stat_modifier",
+    "stacking": "refresh",
+    "description": "Increases the radius of aura-based attacks.",
+    "params": { "stat": "aura_size_multiplier" }
   }
 }

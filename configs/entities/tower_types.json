@@ -139,5 +139,23 @@
         }
       }
     ]
+  },
+  "archmage_tower": {
+    "name": "Arch-Mage's Spire",
+    "category": "support",
+    "cost": 250,
+    "sprite_key": "towers/archmage.png",
+    "placeholder_color": [200, 180, 255],
+    "description": "Aura tower that amplifies the magical effects and area of nearby towers.",
+    "auras": [
+      {
+        "range": 100,
+        "target_type": "TOWER",
+        "effects": {
+          "effect_potency_boost": { "potency": 1.25, "duration": 0.5 },
+          "aura_size_boost": { "potency": 1.2, "duration": 0.5 }
+        }
+      }
+    ]
   }
 }
