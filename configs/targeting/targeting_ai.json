@@ -1,0 +1,44 @@
+{
+  "//": "This file defines the available AI 'personas' for towers. Each persona has a user-facing name, a description, and maps to a specific sorting function in the targeting logic.",
+
+  "SOLDIER": {
+    "name": "Soldier",
+    "description": "Targets the enemy closest to the tower.",
+    "priority_function": "sort_by_closest"
+  },
+  "EXECUTIONER": {
+    "name": "Executioner",
+    "description": "Targets the enemy that is furthest along the path (closest to the base).",
+    "priority_function": "sort_by_first"
+  },
+  "SNIPER": {
+    "name": "Sniper",
+    "description": "Targets the enemy with the highest maximum health.",
+    "priority_function": "sort_by_strongest"
+  },
+  "ASSASSIN": {
+    "name": "Assassin",
+    "description": "Targets the enemy with the lowest current health.",
+    "priority_function": "sort_by_weakest"
+  },
+  "CONTAGION": {
+    "name": "Contagion",
+    "description": "Prioritizes enemies that are not currently affected by this tower's primary debuff.",
+    "priority_function": "sort_by_unaffected"
+  },
+  "ARTILLERY": {
+    "name": "Artillery",
+    "description": "Targets the enemy with the most other enemies nearby.",
+    "priority_function": "sort_by_group_density"
+  },
+  "ARMOR_PIERCER": {
+    "name": "Armor Piercer",
+    "description": "Targets the enemy with the highest armor value.",
+    "priority_function": "sort_by_highest_armor"
+  },
+  "SHREDDER": {
+    "name": "Shredder",
+    "description": "Targets the enemy with the lowest armor value.",
+    "priority_function": "sort_by_lowest_armor"
+  }
+}
