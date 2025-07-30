@@ -130,12 +130,12 @@
       "type": "persistent_attached_aura",
       "data": {
         "range": 180,
-        "fire_rate": 0.2,
+        "fire_rate": 0.3,
         "radius": 80,
         "duration": 2.0,
         "dps": 20,
         "tick_rate": 2,
-        "bonus_damage_vs_armor_multiplier": 0.5
+        "bonus_damage_vs_armor_multiplier": 2
       }
     }
   },

@@ -96,7 +96,7 @@
                 "id": "stun",
                 "potency": 0.0,
                 "duration": 0.15,
-                "chance": 0.08
+                "chance": 0.1
               }
             }
           }

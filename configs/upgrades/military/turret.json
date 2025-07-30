@@ -7,8 +7,8 @@
         "id": "turret_a1",
         "name": "Increased Damage",
         "cost": 30,
-        "description": "Increases damage by 4.",
-        "effects": [{ "type": "add_damage", "value": 4 }]
+        "description": "Increases damage by 6.",
+        "effects": [{ "type": "add_damage", "value": 6 }]
       },
       {
         "id": "turret_a2",
@@ -24,14 +24,14 @@
         "description": "Heavier Rounds shred enemy armor on hit.",
         "effects": [
           { "type": "add_armor_shred", "value": 5 },
-          { "type": "add_damage", "value": 4 }
+          { "type": "add_damage", "value": 6 }
         ]
       },
       {
         "id": "turret_a4",
         "name": "Stun Rounds",
         "cost": 90,
-        "description": "Shots have a 25% chance to briefly stun enemies.",
+        "description": "Shots have a 30% chance to briefly stun enemies.",
         "effects": [
           {
             "type": "add_effect",
@@ -39,7 +39,7 @@
               "id": "stun",
               "potency": 0.0,
               "duration": 0.5,
-              "chance": 0.25
+              "chance": 0.3
             }
           }
         ]
@@ -69,8 +69,8 @@
         "id": "turret_b1",
         "name": "Faster Firing",
         "cost": 30,
-        "description": "Increases fire rate by 40%.",
-        "effects": [{ "type": "multiply_fire_rate", "value": 1.4 }]
+        "description": "Increases fire rate by 50%.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.5 }]
       },
       {
         "id": "turret_b2",
@@ -83,8 +83,8 @@
         "id": "turret_b3",
         "name": "Improved Autoloader",
         "cost": 115,
-        "description": "Increases fire rate by another 40%.",
-        "effects": [{ "type": "multiply_fire_rate", "value": 1.4 }]
+        "description": "Increases fire rate by another 50%.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.5 }]
       },
       {
         "id": "turret_b4",
@@ -94,7 +94,7 @@
         "effects": [
           {
             "type": "add_effect",
-            "value": { "id": "fire", "potency": 8, "duration": 3 }
+            "value": { "id": "fire", "potency": 10, "duration": 2 }
           }
         ]
       },
