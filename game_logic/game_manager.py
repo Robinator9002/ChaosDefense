@@ -13,8 +13,6 @@ from .entities.entity import Entity
 from .entities.tower import Tower
 from .entities.enemies.enemy import Enemy
 from .entities.enemies.boss_enemy import BossEnemy
-
-# --- MODIFIED: Corrected import path for Projectile ---
 from .entities.projectiles.projectile import Projectile
 from .upgrades.upgrade_manager import UpgradeManager
 from .effects.status_effect import StatusEffect
@@ -38,7 +36,6 @@ class GameManager:
         self.tile_size = self.configs["game_settings"].get("tile_size", 32)
         self.game_state: GameState = GameState()
         self.level_manager: LevelManager = LevelManager(self.configs["level_styles"])
-        # --- MODIFIED: Pass the loaded upgrade definitions to the manager ---
         self.upgrade_manager: UpgradeManager = UpgradeManager(
             self.configs.get("upgrade_definitions", {})
         )
@@ -174,8 +171,7 @@ class GameManager:
 
     def _spawn_enemy(self, spawn_job: Dict[str, Any]):
         """
-        Creates an Enemy or BossEnemy instance based on the spawn job,
-        now applying scaling to bosses.
+        Creates an Enemy or BossEnemy instance based on the spawn job.
         """
         entity_id = spawn_job["type"]
         path_index = spawn_job["path_index"]
@@ -185,10 +181,6 @@ class GameManager:
         path = self.paths[path_index]
         new_enemy = None
         difficulty_mod = self.wave_manager.difficulty_settings.get("stat_modifier", 1.0)
-
-        # NEU: Das Level für alle gespawnten Gegner wird basierend auf der aktuellen Wellennummer berechnet.
-        # Dies stellt sicher, dass die Skalierung korrekt angewendet wird.
-        # Das Level sollte immer mindestens 1 sein.
         enemy_spawn_level = max(1, self.game_state.current_wave_number)
 
         if entity_id in self.configs["boss_types"]:
@@ -197,15 +189,14 @@ class GameManager:
                 boss_type_data=boss_config,
                 path=path,
                 tile_size=self.tile_size,
-                level=enemy_spawn_level, # Verwende das berechnete Level
+                level=enemy_spawn_level,
                 difficulty_modifier=difficulty_mod,
             )
-
         elif entity_id in self.configs["enemy_types"]:
             enemy_config = self.configs["enemy_types"][entity_id]
             new_enemy = Enemy(
                 enemy_type_data=enemy_config,
-                level=enemy_spawn_level, # Verwende das berechnete Level
+                level=enemy_spawn_level,
                 path=path,
                 tile_size=self.tile_size,
                 difficulty_modifier=difficulty_mod,
@@ -245,7 +236,7 @@ class GameManager:
         self.grid.set_tile_type(tile_x, tile_y, "TOWER_OCCUPIED")
         return True
 
-    def purchase_tower_upgrade(self, tower_id: uuid.UUID, path_id: str):
+    def purchase_tower_upgrade(self, tower_id: uuid.UUID, upgrade_id: str):
         """
         Handles a request to purchase an upgrade for a specific tower.
         """
@@ -253,8 +244,12 @@ class GameManager:
         if not target_tower:
             return
 
+        # Determine path_id from upgrade_id (e.g., "turret_a1" -> "path_a")
+        path_char = upgrade_id.split("_")[-1][0]
+        path_id = f"path_{path_char}"
+
         upgrade = self.upgrade_manager.get_next_upgrade(target_tower, path_id)
-        if not upgrade:
+        if not upgrade or upgrade.id != upgrade_id:
             return
 
         if not self.game_state.spend_gold(upgrade.cost):
@@ -273,13 +268,10 @@ class GameManager:
         Handles all logic for salvaging a tower.
         """
         target_tower = next((t for t in self.towers if t.entity_id == tower_id), None)
-        if not target_tower or not self.wave_manager:
+        if not target_tower:
             return
 
-        refund_percentage = self.wave_manager.difficulty_settings.get(
-            "salvage_refund_percentage", 0.0
-        )
-        refund_amount = int(target_tower.total_investment * refund_percentage)
+        refund_amount = int(target_tower.total_investment * self.get_salvage_rate())
         self.game_state.add_gold(refund_amount)
 
         tile_x = int(target_tower.pos.x // self.tile_size)
@@ -290,3 +282,15 @@ class GameManager:
         target_tower.kill()
         self.game_state.clear_selection()
 
+    # --- BUGFIX: Add the missing helper method ---
+    def get_salvage_rate(self) -> float:
+        """
+        Safely retrieves the current salvage refund percentage from the
+        difficulty settings.
+        """
+        if self.wave_manager and self.wave_manager.difficulty_settings:
+            return self.wave_manager.difficulty_settings.get(
+                "salvage_refund_percentage", 0.0
+            )
+        # Fallback if wave manager isn't ready or settings are missing
+        return 0.0

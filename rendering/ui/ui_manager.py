@@ -8,6 +8,8 @@ from collections import OrderedDict
 from .buttons.tower_button import TowerButton
 from .buttons.tab_button import TabButton
 from .panels.upgrade_panel import UpgradePanel
+# --- NEW: Import the new TowerInfoPanel ---
+from .panels.tower_info_panel import TowerInfoPanel
 from .ui_action import UIAction, ActionType
 
 if TYPE_CHECKING:
@@ -20,8 +22,7 @@ logger = logging.getLogger(__name__)
 class UIManager:
     """
     Manages all UI elements, featuring a dynamic, tab-based interface for
-    tower selection that is automatically generated and fully navigable
-    via keyboard shortcuts.
+    tower selection and informational panels for selected towers.
     """
 
     def __init__(
@@ -34,7 +35,12 @@ class UIManager:
         self.game_manager = game_manager
         self.assets_path = assets_path
 
+        # --- UI Panel State ---
         self.upgrade_panel: Optional[UpgradePanel] = None
+        # --- NEW: Add state for the tower info panel ---
+        self.tower_info_panel: Optional[TowerInfoPanel] = None
+
+        # --- Build Bar State ---
         self.tower_categories: Dict[str, List[Dict[str, Any]]] = OrderedDict()
         self.category_tabs: List[TabButton] = []
         self.build_buttons: List[TowerButton] = []
@@ -44,12 +50,11 @@ class UIManager:
         self._discover_and_group_towers()
         self._build_dynamic_ui()
 
-    # --- NEW: Public methods for keyboard navigation ---
+    # --- Public methods for keyboard navigation ---
 
     def set_active_category_by_index(self, index: int):
         """
         Sets the active tower category tab by its numerical index.
-        Called by the Game class in response to F-key or Ctrl+Num hotkeys.
         """
         category_keys = list(self.tower_categories.keys())
         if 0 <= index < len(category_keys):
@@ -62,7 +67,6 @@ class UIManager:
     def cycle_category(self):
         """
         Cycles to the next available tower category.
-        Called by the Game class in response to Ctrl+Tab.
         """
         if not self.active_category or len(self.tower_categories) < 2:
             return
@@ -77,7 +81,6 @@ class UIManager:
     def cycle_tower_selection(self, game_state: "GameState"):
         """
         Cycles the selected tower within the currently active category.
-        Called by the Game class in response to Tab.
         """
         if not self.active_category or not self.hotkey_map:
             return
@@ -86,7 +89,7 @@ class UIManager:
         try:
             current_index = self.hotkey_map.index(current_selection)
         except ValueError:
-            current_index = -1  # Nothing is selected, so start from the beginning
+            current_index = -1
 
         next_index = (current_index + 1) % len(self.hotkey_map)
         new_tower_id = self.hotkey_map[next_index]
@@ -103,7 +106,7 @@ class UIManager:
 
     def _discover_and_group_towers(self):
         """
-        Scans tower configs, discovers unique categories in order, and groups towers.
+        Scans tower configs, discovers unique categories, and groups towers.
         """
         logger.info("Discovering tower categories from configuration...")
         tower_types = self.game_manager.configs.get("tower_types", {})
@@ -123,6 +126,7 @@ class UIManager:
             for tower_id, tower_data in tower_types.items():
                 if isinstance(tower_data, dict):
                     category = tower_data.get("category", "uncategorized")
+                    # IMPORTANT: We store the ID within the data dict for easy access later.
                     tower_data_with_id = {"id": tower_id, **tower_data}
                     if category in self.tower_categories:
                         self.tower_categories[category].append(tower_data_with_id)
@@ -183,48 +187,33 @@ class UIManager:
 
     def handle_event(self, event: pygame.event.Event, game_state: "GameState") -> bool:
         """Handles events for all UI elements."""
-        # Handle upgrade panel events first, as it's typically on top
         if self.upgrade_panel:
             action = self.upgrade_panel.handle_event(event, game_state)
             if action:
                 self._process_ui_action(action, game_state)
-                return True  # Event handled by panel, no need to process further
+                return True
 
-        # --- NEU: MOUSEMOTION für ALLE Elemente verarbeiten, um den Hover-Zustand zu aktualisieren ---
-        # Dies muss VOR jeglicher Klick-Logik geschehen, die die Verarbeitung abbrechen könnte.
         if event.type == pygame.MOUSEMOTION:
             for tab in self.category_tabs:
-                # `handle_event` in `TabButton` aktualisiert `is_hovered` basierend auf `event.pos`
                 tab.handle_event(event, game_state)
             for button in self.build_buttons:
-                # `handle_event` in `TowerButton` aktualisiert `is_hovered` basierend auf `event.pos`
                 button.handle_event(event, game_state)
-            # Hier kein `return True`, da wir wollen, dass alle Elemente ihren Hover-Zustand aktualisieren.
 
-        # --- MOUSEBUTTONDOWN-Ereignisse separat verarbeiten ---
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # Tabs auf Klicks prüfen
             for tab in self.category_tabs:
-                # `handle_event` in `TabButton` gibt True zurück, wenn geklickt
-                if tab.handle_event(
-                    event
-                ):  # Kein `collidepoint` hier, da `handle_event` das intern macht
+                if tab.handle_event(event, game_state):
                     if self.active_category != tab.category_name:
                         self.active_category = tab.category_name
                         self._update_tabs_and_buttons()
-                    return True  # Ereignis behandelt
+                    return True
 
-            # Bau-Buttons auf Klicks prüfen
             for button in self.build_buttons:
-                # `handle_event` in `TowerButton` gibt eine `UIAction` zurück, wenn geklickt
-                action = button.handle_event(
-                    event, game_state
-                )  # Kein `collidepoint` hier
+                action = button.handle_event(event, game_state)
                 if action:
                     self._process_ui_action(action, game_state)
-                    return True  # Ereignis behandelt
+                    return True
 
-        return False  # Ereignis wurde von keinem UI-Element behandelt
+        return False
 
     def _process_ui_action(self, action: UIAction, game_state: "GameState"):
         """Processes a structured UIAction from any UI element."""
@@ -238,10 +227,7 @@ class UIManager:
                 tower_id = game_state.selected_entity_id
                 upgrade_id = action.entity_id
                 if tower_id and upgrade_id:
-                    path_char = upgrade_id.split("_")[-1][0]
-                    path_id = f"path_{path_char}"
-                    self.game_manager.purchase_tower_upgrade(tower_id, path_id)
-                    self.upgrade_panel = None
+                    self.game_manager.purchase_tower_upgrade(tower_id, upgrade_id)
             case ActionType.CLOSE_PANEL:
                 game_state.clear_selection()
             case ActionType.SALVAGE_TOWER:
@@ -249,7 +235,8 @@ class UIManager:
                     self.game_manager.salvage_tower(game_state.selected_entity_id)
 
     def update(self, dt: float, game_state: "GameState"):
-        """Updates the state of the upgrade panel."""
+        """Updates the state of all UI panels based on the game state."""
+        # --- Handle Upgrade Panel for placed towers ---
         selected_id = game_state.selected_entity_id
         if selected_id:
             if (
@@ -262,13 +249,7 @@ class UIManager:
                 )
                 if selected_tower:
                     panel_rect = pygame.Rect(self.screen_rect.width - 270, 10, 260, 400)
-                    salvage_rate = (
-                        self.game_manager.wave_manager.difficulty_settings.get(
-                            "salvage_refund_percentage", 0.0
-                        )
-                        if self.game_manager.wave_manager
-                        else 0.0
-                    )
+                    salvage_rate = self.game_manager.get_salvage_rate()
                     self.upgrade_panel = UpgradePanel(
                         panel_rect,
                         selected_tower,
@@ -279,8 +260,39 @@ class UIManager:
         elif self.upgrade_panel:
             self.upgrade_panel = None
 
+        # --- NEW: Handle Info Panel for towers selected from the build bar ---
+        selected_build_id = game_state.selected_tower_to_build
+        tower_data_to_display = None
+        if selected_build_id:
+            # Find the full data dictionary for the selected tower ID
+            for category_towers in self.tower_categories.values():
+                for t_data in category_towers:
+                    if t_data['id'] == selected_build_id:
+                        tower_data_to_display = t_data
+                        break
+                if tower_data_to_display:
+                    break
+        
+        if tower_data_to_display:
+            # If a tower is selected and we have its data, show the panel
+            if not self.tower_info_panel or self.tower_info_panel.tower_data.get('id') != selected_build_id:
+                panel_width = 260
+                panel_height = 320
+                panel_rect = pygame.Rect(
+                    20,
+                    self.screen_rect.bottom - 80 - 35 - panel_height - 10,
+                    panel_width,
+                    panel_height
+                )
+                self.tower_info_panel = TowerInfoPanel(panel_rect, tower_data_to_display)
+        elif self.tower_info_panel:
+            # If nothing is selected, hide the panel
+            self.tower_info_panel = None
+
+
     def draw(self, screen: pygame.Surface, game_state: "GameState"):
         """Draws all UI components in the correct order."""
+        # Draw the main build bar background
         panel_rect = pygame.Rect(
             0, self.screen_rect.bottom - 80, self.screen_rect.width, 80
         )
@@ -288,9 +300,16 @@ class UIManager:
         panel_surf.fill((20, 25, 30, 200))
         screen.blit(panel_surf, panel_rect.topleft)
 
+        # Draw build bar elements
         for tab in self.category_tabs:
             tab.draw(screen)
         for button in self.build_buttons:
             button.draw(screen, game_state)
+
+        # --- NEW: Draw the info panel if it exists ---
+        if self.tower_info_panel:
+            self.tower_info_panel.draw(screen)
+
+        # Draw the upgrade panel last so it's on top
         if self.upgrade_panel:
             self.upgrade_panel.draw(screen)
