@@ -1,5 +1,5 @@
 {
-  "//": "ENEMY ROSTER OVERHAUL: Expanded the enemy roster to introduce more strategic variety and clear threats. Rebalanced existing units to better fit their intended roles.",
+  "//": "ENEMY SCALING OVERHAUL: Replaced the exponential 'scaling_per_level' multiplier with a linear 'scaling_per_level_add' system. This provides a much smoother, more controllable difficulty curve and prevents late-game enemies from becoming impossibly powerful.",
 
   "scout": {
     "//": "ROLE: Early-game speed check. Tests map coverage and punishes slow-firing towers.",
@@ -13,7 +13,7 @@
       "damage": 1,
       "armor": 0
     },
-    "scaling_per_level": { "hp": 1.08, "speed": 1.1, "bounty": 1.08 }
+    "scaling_per_level_add": { "hp": 1, "speed": 3, "bounty": 0.25 }
   },
 
   "grunt": {
@@ -28,7 +28,12 @@
       "damage": 1,
       "armor": 2
     },
-    "scaling_per_level": { "hp": 1.12, "speed": 1.05, "bounty": 1.1 }
+    "scaling_per_level_add": {
+      "hp": 2,
+      "speed": 1,
+      "bounty": 0.5,
+      "armor": 0.25
+    }
   },
 
   "tank": {
@@ -43,7 +48,7 @@
       "damage": 5,
       "armor": 8
     },
-    "scaling_per_level": { "hp": 1.18, "speed": 1.05, "bounty": 1.15 }
+    "scaling_per_level_add": { "hp": 10, "speed": 1, "bounty": 1, "armor": 0.5 }
   },
 
   "runner": {
@@ -58,7 +63,7 @@
       "damage": 2,
       "armor": 2
     },
-    "scaling_per_level": { "hp": 1.12, "speed": 1.12, "bounty": 1.1 }
+    "scaling_per_level_add": { "hp": 3, "speed": 4, "bounty": 0.5 }
   },
 
   "guardian": {
@@ -74,7 +79,7 @@
       "armor": 30,
       "immunities": ["slow", "stun"]
     },
-    "scaling_per_level": { "hp": 1.15, "speed": 1.05, "bounty": 1.2 }
+    "scaling_per_level_add": { "hp": 15, "speed": 1, "bounty": 1.5, "armor": 1 }
   },
 
   "bomber": {
@@ -89,6 +94,6 @@
       "damage": 8,
       "armor": 25
     },
-    "scaling_per_level": { "hp": 1.2, "speed": 1.0, "bounty": 1.25 }
+    "scaling_per_level_add": { "hp": 12, "speed": 0, "bounty": 1.5, "armor": 1 }
   }
 }
