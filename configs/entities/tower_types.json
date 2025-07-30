@@ -1,5 +1,5 @@
 {
-  "//": "TOWER SYSTEM REFACTOR: Replaced flat stat definitions with a structured 'attack' object. This allows for multiple, data-driven attack behaviors (e.g., standard projectiles, persistent auras) and is the foundation for a highly scalable tower creation system.",
+  "//": "TOWER CATEGORY REBALANCE & SUPPORT TOWER INTRODUCTION",
 
   "turret": {
     "name": "Basic Turret",
@@ -9,16 +9,12 @@
     "placeholder_color": [150, 150, 150],
     "attack": {
       "type": "standard_projectile",
-      "data": {
-        "damage": 10,
-        "range": 160,
-        "fire_rate": 1.2
-      }
+      "data": { "damage": 10, "range": 160, "fire_rate": 1.2 }
     }
   },
   "freezer": {
     "name": "Freezer",
-    "category": "support",
+    "category": "elemental",
     "cost": 50,
     "sprite_key": "towers/slower.png",
     "placeholder_color": [100, 180, 255],
@@ -28,12 +24,7 @@
         "damage": 2,
         "range": 140,
         "fire_rate": 1.0,
-        "effects": {
-          "slow": {
-            "potency": 0.2,
-            "duration": 2.0
-          }
-        }
+        "effects": { "slow": { "potency": 0.2, "duration": 2.0 } }
       }
     }
   },
@@ -53,26 +44,6 @@
       }
     }
   },
-  "mortar": {
-    "name": "Mortar",
-    "category": "artillery",
-    "cost": 120,
-    "sprite_key": "towers/mortar.png",
-    "placeholder_color": [60, 80, 60],
-    "special_properties": {
-      "minimum_range": 100
-    },
-    "attack": {
-      "type": "standard_projectile",
-      "data": {
-        "damage": 25,
-        "range": 500,
-        "fire_rate": 0.3,
-        "blast_radius": 100
-      }
-    }
-  },
-
   "energy_beacon": {
     "name": "Energy Beacon",
     "category": "elemental",
@@ -85,19 +56,10 @@
         "damage": 2,
         "range": 170,
         "fire_rate": 14.0,
-        "effects": {
-          "slow": {
-            "potency": 0.5,
-            "duration": 1.0
-          }
-        }
+        "effects": { "slow": { "potency": 0.5, "duration": 1.0 } }
       }
     }
   },
-
-  "//": "--- NEW: Magic Towers ---",
-  "//": "These towers utilize the new 'Attack Behavior' system to create unique, non-projectile effects.",
-
   "inferno_weaver": {
     "name": "Inferno Weaver",
     "category": "magic",
@@ -114,9 +76,7 @@
         "dps": 20,
         "tick_rate": 10,
         "bonus_damage_vs_armor_multiplier": -0.5,
-        "effects": {
-          "fire": { "potency": 10, "duration": 2.0 }
-        }
+        "effects": { "fire": { "potency": 10, "duration": 2.0 } }
       }
     }
   },
@@ -158,5 +118,26 @@
         "duration": 0.6
       }
     }
+  },
+
+  "//": "--- NEW: Support Towers ---",
+  "commander_tower": {
+    "name": "Commander's Beacon",
+    "category": "support",
+    "cost": 200,
+    "sprite_key": "towers/commander.png",
+    "placeholder_color": [255, 215, 0],
+    "description": "Aura tower that provides powerful combat buffs to nearby towers.",
+    "auras": [
+      {
+        "range": 120,
+        "target_type": "TOWER",
+        "effects": {
+          "damage_boost": { "potency": 1.15, "duration": 0.5 },
+          "range_boost": { "potency": 1.1, "duration": 0.5 },
+          "fire_rate_boost": { "potency": 1.1, "duration": 0.5 }
+        }
+      }
+    ]
   }
 }

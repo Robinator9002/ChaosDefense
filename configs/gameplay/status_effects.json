@@ -1,4 +1,5 @@
 {
+  "//": "DEBUFFS",
   "slow": {
     "name": "Slow",
     "type": "stat_modifier",
@@ -70,6 +71,37 @@
     "description": "Cursed enemies take massively increased damage from all sources.",
     "params": {
       "stat": "damage_taken_multiplier"
+    }
+  },
+
+  "//": "--- NEW: TOWER BUFFS ---",
+  "//": "These are positive status effects applied by support towers to other towers.",
+
+  "damage_boost": {
+    "name": "Damage Boost",
+    "type": "stat_modifier",
+    "stacking": "refresh",
+    "description": "Increases tower damage.",
+    "params": {
+      "stat": "damage"
+    }
+  },
+  "range_boost": {
+    "name": "Range Boost",
+    "type": "stat_modifier",
+    "stacking": "refresh",
+    "description": "Increases tower attack range.",
+    "params": {
+      "stat": "range"
+    }
+  },
+  "fire_rate_boost": {
+    "name": "Fire Rate Boost",
+    "type": "stat_modifier",
+    "stacking": "refresh",
+    "description": "Increases tower fire rate.",
+    "params": {
+      "stat": "fire_rate"
     }
   }
 }
