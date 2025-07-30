@@ -12,7 +12,7 @@ from ..attacks import attack_handlers
 if TYPE_CHECKING:
     from .enemies.enemy import Enemy
     from ..game_state import GameState
-    from .entity import Entity
+    from ...game_ai.targeting.targeting_manager import TargetingManager
 
 
 logger = logging.getLogger(__name__)
@@ -22,10 +22,9 @@ class Tower(Entity):
     """
     Represents a universal, data-driven defensive tower.
 
-    REFACTORED: This class is now a full citizen of the universal EffectHandler
-    system inherited from Entity. It distinguishes between permanent 'base' stats
-    (modified by upgrades) and temporary 'live' stats (modified by buffs),
-    allowing it to be affected by friendly support towers.
+    REFACTORED: Now delegates all target acquisition to the TargetingManager
+    for a massive performance increase. Its targeting behavior is now controlled
+    by a data-driven AI persona system.
     """
 
     def __init__(
@@ -48,9 +47,13 @@ class Tower(Entity):
         self.status_effects_config = status_effects_config
         self.attack_data = tower_type_data.get("attack", {})
 
+        # --- NEW: AI Persona Configuration ---
+        ai_config = tower_type_data.get("ai_config", {})
+        self.available_personas = ai_config.get("available_personas", ["SOLDIER"])
+        self.current_persona = ai_config.get("default_persona", "SOLDIER")
+
         attack_specific_data = self.attack_data.get("data", {})
 
-        # --- Base vs. Dynamic Stats for Buffs ---
         self.base_damage = attack_specific_data.get("damage", 0)
         self.base_range = attack_specific_data.get("range", 100)
         self.base_fire_rate = attack_specific_data.get("fire_rate", 1.0)
@@ -67,7 +70,6 @@ class Tower(Entity):
         self.fire_cooldown = 0.0
         self.current_targets: List["Enemy"] = []
 
-        # --- Attributes Modified by Upgrades ---
         self.projectiles_per_shot = 1
         self.pierce_count = 0
         self.armor_shred = 0
@@ -75,7 +77,6 @@ class Tower(Entity):
         self.on_apply_damage = 0
         self.on_death_explosion: Optional[Dict[str, Any]] = None
 
-        # --- NEW: Add base and live stats for Arch-Mage buffs ---
         self.base_effect_potency_multiplier = 1.0
         self.effect_potency_multiplier = self.base_effect_potency_multiplier
         self.base_aura_size_multiplier = 1.0
@@ -112,38 +113,39 @@ class Tower(Entity):
         return sprite
 
     def update(
-        self,
-        dt: float,
-        game_state: "GameState",
-        all_enemies: List["Entity"],
-        all_towers: List["Entity"],
+        self, dt: float, game_state: "GameState", targeting_manager: "TargetingManager"
     ) -> List["Entity"]:
         """
         Updates the tower's logic, finds targets, and fires.
         """
-        super().update(dt, game_state, all_enemies, all_towers)
+        # The parent update call now handles all status effect logic (buffs/debuffs).
+        super().update(dt, game_state, targeting_manager)
 
         if self.fire_cooldown > 0:
             self.fire_cooldown = max(0.0, self.fire_cooldown - dt)
 
-        self._find_new_targets(all_enemies)
+        self._find_new_targets(targeting_manager)
 
         if self.current_targets and self.fire_cooldown <= 0:
             return self._fire()
         return []
 
-    def _find_new_targets(self, enemies: List["Entity"]):
-        """Finds all valid targets within the tower's range."""
-        self.current_targets.clear()
-        potential_targets = []
-        for enemy in enemies:
-            if enemy.is_alive:
-                distance = self.get_distance_to(enemy)
-                if distance <= self.range:
-                    potential_targets.append((distance, enemy))
+    def _find_new_targets(self, targeting_manager: "TargetingManager"):
+        """
+        Delegates target acquisition to the TargetingManager for a fast,
+        filtered, and sorted list of targets based on the current AI persona.
+        """
+        # 1. Get a list of all enemies within range. This is now a very fast operation.
+        potential_targets = targeting_manager.get_nearby_enemies(self.pos, self.range)
 
-        potential_targets.sort(key=lambda t: t[0])
-        self.current_targets = [enemy for distance, enemy in potential_targets]
+        if not potential_targets:
+            self.current_targets = []
+            return
+
+        # 2. Ask the targeting manager to sort this list based on our current AI persona.
+        self.current_targets = targeting_manager.sort_targets(
+            potential_targets, self, self.current_persona
+        )
 
     def _fire(self) -> List["Entity"]:
         """Executes the tower's attack by delegating to a specialized handler."""
