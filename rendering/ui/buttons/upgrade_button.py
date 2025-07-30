@@ -3,15 +3,12 @@ import pygame
 import logging
 from typing import Optional, TYPE_CHECKING
 
-# Import the base class from the parent directory using '..'
 from ..ui_element import UIElement
-
-# --- MODIFIED: Import the new structured action classes ---
-# We now import the specific, well-defined action types and the dataclass
-# that will carry our event information.
 from ..ui_action import UIAction, ActionType
+# --- NEW: Import the text wrapping utility ---
+# We now import our reusable function to handle multi-line text.
+from ..text.text_renderer import render_text_wrapped
 
-# Use TYPE_CHECKING to avoid circular imports for type hinting.
 if TYPE_CHECKING:
     from game_logic.upgrades.upgrade import Upgrade
     from game_logic.game_state import GameState
@@ -23,31 +20,32 @@ class UpgradeButton(UIElement):
     """
     A specific UI element representing a clickable button for a tower upgrade.
 
-    This button displays the upgrade's name, cost, and description. It visually
-    changes based on whether the player can afford the upgrade and handles
-    click events to initiate a purchase by emitting a structured UIAction.
+    This button displays the upgrade's name, cost, and a potentially multi-line
+    description. It visually changes based on affordability and handles click
+    events by emitting a structured UIAction.
     """
 
     def __init__(self, rect: pygame.Rect, upgrade: "Upgrade", can_afford: bool):
         """
         Initializes a new UpgradeButton.
-
-        Args:
-            rect (pygame.Rect): The rectangle for the button's position and size.
-            upgrade (Upgrade): The Upgrade data object this button represents.
-            can_afford (bool): Whether the player currently has enough gold for
-                               this upgrade. This is passed in to determine the
-                               initial visual state.
         """
         super().__init__(rect)
         self.upgrade = upgrade
         self.can_afford = can_afford
 
-        # --- Font and Color Definitions ---
+        self._setup_fonts_and_colors()
+
+        # --- BUG FIX: Proactive Hover Check ---
+        # This ensures the button's hover state is correct upon creation,
+        # in case the mouse is already over its position.
+        if self.rect.collidepoint(pygame.mouse.get_pos()):
+            self.is_hovered = True
+
+    def _setup_fonts_and_colors(self):
+        """Initializes font and color constants for drawing."""
         self.font_name = pygame.font.SysFont("segoeui", 16, bold=True)
         self.font_cost = pygame.font.SysFont("segoeui", 14, bold=True)
         self.font_desc = pygame.font.SysFont("segoeui", 12)
-
         self.colors = {
             "bg_default": (40, 50, 60),
             "bg_hover": (60, 75, 90),
@@ -57,40 +55,29 @@ class UpgradeButton(UIElement):
             "text_desc": (180, 180, 190),
             "cost_can_afford": (255, 215, 0),
             "cost_cant_afford": (180, 40, 40),
-            "disabled_overlay": (0, 0, 0, 100),  # Semi-transparent black
+            "disabled_overlay": (0, 0, 0, 100),
         }
-
-        # --- BUG FIX: Proactive Hover Check ---
-        if self.rect.collidepoint(pygame.mouse.get_pos()):
-            self.is_hovered = True
 
     def handle_event(
         self, event: pygame.event.Event, game_state: "GameState"
-    ) -> Optional[UIAction]:  # --- MODIFIED: Return type is now UIAction ---
+    ) -> Optional[UIAction]:
         """
         Handles mouse clicks on the button.
-
-        If the button is clicked and the player can afford the upgrade, it
-        returns a structured UIAction to be processed by the UIManager.
         """
         super().handle_event(event, game_state)
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered and self.can_afford:
                 logger.info(f"Player clicked to purchase upgrade: {self.upgrade.id}")
-                # --- MODIFIED: Return a structured UIAction object ---
-                # This replaces the old string-based action, making the system
-                # more robust and easier to debug. The UIManager will now receive
-                # a clear, unambiguous command.
                 return UIAction(
                     type=ActionType.PURCHASE_UPGRADE, entity_id=self.upgrade.id
                 )
-
         return None
 
     def draw(self, screen: pygame.Surface, game_state: "GameState"):
         """
         Draws the upgrade button with its text and dynamic colors.
+        Now uses the text wrapping utility for the description.
         """
         self.can_afford = game_state.gold >= self.upgrade.cost
 
@@ -108,7 +95,7 @@ class UpgradeButton(UIElement):
         pygame.draw.rect(screen, bg_color, self.rect, border_radius=5)
         pygame.draw.rect(screen, border_color, self.rect, 2, border_radius=5)
 
-        # --- Render and Blit Text ---
+        # --- Render and Blit Static Text (Name and Cost) ---
         padding = 8
         name_surf = self.font_name.render(
             self.upgrade.name, True, self.colors["text_name"]
@@ -126,10 +113,20 @@ class UpgradeButton(UIElement):
         )
         screen.blit(cost_surf, cost_rect)
 
-        desc_surf = self.font_desc.render(
-            self.upgrade.description, True, self.colors["text_desc"]
+        # --- REFACTORED: Use the text wrapper for the description ---
+        desc_max_width = self.rect.width - (padding * 2)
+        wrapped_desc_surfaces = render_text_wrapped(
+            self.upgrade.description,
+            self.font_desc,
+            self.colors["text_desc"],
+            desc_max_width,
         )
-        screen.blit(desc_surf, (self.rect.x + padding, self.rect.y + padding + 24))
+
+        # Blit each line of the wrapped description
+        current_y = self.rect.y + padding + 24
+        for line_surf in wrapped_desc_surfaces:
+            screen.blit(line_surf, (self.rect.x + padding, current_y))
+            current_y += self.font_desc.get_height()
 
         # --- Draw Disabled Overlay ---
         if not self.can_afford:
