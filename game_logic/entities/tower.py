@@ -7,17 +7,11 @@ import math
 from typing import List, Optional, Dict, Any, TYPE_CHECKING, Callable
 
 from .entity import Entity
-
-# --- REFACTORED: Import the attack handler module ---
-# This module contains the factory functions for creating different attack types.
 from ..attacks import attack_handlers
 
-# Use TYPE_CHECKING to avoid circular imports at runtime.
 if TYPE_CHECKING:
     from .enemies.enemy import Enemy
     from ..game_state import GameState
-
-    # We need to import Entity here for the return type hint of _fire
     from .entity import Entity
 
 
@@ -28,12 +22,10 @@ class Tower(Entity):
     """
     Represents a universal, data-driven defensive tower.
 
-    This class is now a generic platform for any type of attack. Its behavior
-    is determined entirely by the 'attack' object in its configuration data.
-    It uses a handler-based system to delegate the creation of specific attack
-    entities (projectiles, auras, etc.), making it completely agnostic to the
-    mechanics of how it attacks. This allows for extreme modularity and easy
-    creation of new, unique tower types purely through JSON configuration.
+    REFACTORED: This class is now a full citizen of the universal EffectHandler
+    system inherited from Entity. It distinguishes between permanent 'base' stats
+    (modified by upgrades) and temporary 'live' stats (modified by buffs),
+    allowing it to be affected by friendly support towers.
     """
 
     def __init__(
@@ -50,38 +42,36 @@ class Tower(Entity):
         """
         super().__init__(x, y, max_hp=100)
 
-        # --- Core Tower Identification & Configuration ---
         self.tower_type_id = tower_type_id
         self.name = tower_type_data.get("name", "Unknown Tower")
         self.cost = tower_type_data.get("cost", 0)
         self.status_effects_config = status_effects_config
-
-        # --- REFACTORED: The Attack Behavior System ---
-        # The tower stores its entire attack configuration.
         self.attack_data = tower_type_data.get("attack", {})
+
+        # --- NEW: Base vs. Dynamic Stats for Buffs ---
         attack_specific_data = self.attack_data.get("data", {})
 
-        # The tower's own stats are initialized from the attack data. This is
-        # crucial because it allows the existing UpgradeManager and its
-        # effect_applicators to modify these attributes directly, which in turn
-        # are read by the attack handlers.
-        self.damage = attack_specific_data.get("damage", 0)
-        self.range = attack_specific_data.get("range", 100)
-        self.fire_rate = attack_specific_data.get("fire_rate", 1.0)
+        # 'base' stats represent the tower's permanent, upgraded state.
+        self.base_damage = attack_specific_data.get("damage", 0)
+        self.base_range = attack_specific_data.get("range", 100)
+        self.base_fire_rate = attack_specific_data.get("fire_rate", 1.0)
+
+        # 'Live' stats are reset to base stats each frame by the EffectHandler,
+        # then modified by active buffs/debuffs.
+        self.damage = self.base_damage
+        self.range = self.base_range
+        self.fire_rate = self.base_fire_rate
+
+        # This stat is not buffable and is read directly by attack handlers.
         self.blast_radius = attack_specific_data.get("blast_radius", 0)
 
-        # --- Upgrade State Tracking ---
         self.path_a_tier = 0
         self.path_b_tier = 0
         self.total_investment: int = self.cost
-
-        # --- Firing and Targeting State ---
         self.fire_cooldown = 0.0
         self.current_targets: List["Enemy"] = []
 
-        # --- Attributes Modified by Upgrades (initialized to defaults) ---
-        # These are initialized here so the upgrade system has attributes to modify.
-        # Their values are then passed to the attack handlers.
+        # Attributes Modified by Upgrades
         self.projectiles_per_shot = 1
         self.pierce_count = 0
         self.armor_shred = 0
@@ -96,9 +86,6 @@ class Tower(Entity):
         self.conditional_effects: List[Dict[str, Any]] = []
         self.on_hit_area_effects: List[Dict[str, Any]] = []
 
-        # --- NEW: Attack Handler Dispatch Table ---
-        # This dictionary maps the 'type' string from the attack config to the
-        # actual factory function that creates the attack.
         self._attack_handlers: Dict[
             str, Callable[["Tower", "Enemy"], List["Entity"]]
         ] = {
@@ -107,7 +94,6 @@ class Tower(Entity):
             "persistent_attached_aura": attack_handlers.create_persistent_attached_aura,
         }
 
-        # --- Visuals ---
         self.sprite = self._create_sprite(tile_size, tower_type_data)
         self.rect = self.sprite.get_rect(center=self.pos)
         logger.info(f"Created Level 1 {self.name} ({self.entity_id}).")
@@ -125,27 +111,29 @@ class Tower(Entity):
         return sprite
 
     def update(
-        self, dt: float, game_state: "GameState", enemies: List["Enemy"]
+        self,
+        dt: float,
+        game_state: "GameState",
+        all_enemies: List["Entity"],
+        all_towers: List["Entity"],
     ) -> List["Entity"]:
         """
-        Updates the tower's logic, finds targets, and fires by delegating
-        to the appropriate attack handler.
+        Updates the tower's logic, finds targets, and fires.
         """
-        super().update(dt, game_state)
+        # The parent update call now handles all status effect logic (buffs/debuffs).
+        super().update(dt, game_state, all_enemies, all_towers)
+
         if self.fire_cooldown > 0:
             self.fire_cooldown = max(0.0, self.fire_cooldown - dt)
 
-        self._find_new_targets(enemies)
+        self._find_new_targets(all_enemies)
 
         if self.current_targets and self.fire_cooldown <= 0:
             return self._fire()
         return []
 
-    def _find_new_targets(self, enemies: List["Enemy"]):
-        """
-        Finds all valid targets within the tower's range.
-        (This logic remains unchanged, but is now more critical than ever).
-        """
+    def _find_new_targets(self, enemies: List["Entity"]):
+        """Finds all valid targets within the tower's range."""
         self.current_targets.clear()
         potential_targets = []
         for enemy in enemies:
@@ -158,45 +146,29 @@ class Tower(Entity):
         self.current_targets = [enemy for distance, enemy in potential_targets]
 
     def _fire(self) -> List["Entity"]:
-        """
-        Executes the tower's attack by delegating to a specialized handler.
-
-        This method is the core of the Attack Behavior pattern. It reads the
-        attack type from its configuration and uses the dispatch table to call
-        the correct factory function, making the tower itself independent of
-        the attack's implementation.
-        """
+        """Executes the tower's attack by delegating to a specialized handler."""
         if not self.current_targets:
             return []
 
         if self.fire_rate > 0:
             self.fire_cooldown = 1.0 / self.fire_rate
         else:
-            # A fire rate of 0 or less means the tower does not fire automatically.
             self.fire_cooldown = float("inf")
 
-        # 1. Get the attack type string from the config (e.g., "standard_projectile").
         attack_type = self.attack_data.get("type")
         if not attack_type:
-            logger.error(
-                f"Tower '{self.name}' has no 'type' defined in its attack data."
-            )
+            logger.error(f"Tower '{self.name}' has no 'type' defined.")
             return []
 
-        # 2. Look up the corresponding handler function in our dispatch table.
         handler = self._attack_handlers.get(attack_type)
         if not handler:
             logger.error(f"No attack handler found for type: '{attack_type}'")
             return []
 
-        # 3. Delegate the creation of the attack entity to the handler.
-        # The handler is responsible for reading all necessary data from the tower.
         primary_target = self.current_targets[0]
         attack_entities = handler(self, primary_target)
 
         logger.debug(
             f"Tower '{self.name}' fired using handler '{attack_type}', creating {len(attack_entities)} entities."
         )
-
-        # 4. Return the list of entities (projectiles, auras, etc.) to be added to the game.
         return attack_entities
