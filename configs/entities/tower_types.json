@@ -173,7 +173,7 @@
 
   "//": "--- Support Towers (No Targeting AI) ---",
   "commander_tower": {
-    "name": "Commander's Beacon",
+    "name": "Commander",
     "category": "support",
     "cost": 200,
     "sprite_key": "towers/commander.png",
@@ -192,7 +192,7 @@
     ]
   },
   "archmage_tower": {
-    "name": "Arch-Mage's Spire",
+    "name": "Arch-Mage",
     "category": "support",
     "cost": 250,
     "sprite_key": "towers/archmage.png",
