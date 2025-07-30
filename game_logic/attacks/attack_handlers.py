@@ -2,10 +2,9 @@
 import logging
 import random
 import math
+import copy
 from typing import TYPE_CHECKING, List, Dict, Any
 
-# --- Import Attack Entity Classes ---
-# We import all the concrete "attack entity" classes that these handlers will create.
 from ..entities.projectiles.projectile import Projectile
 from ..entities.projectiles.projectile_data import ProjectileData
 from ..entities.projectiles.persistent_ground_aura import PersistentGroundAura
@@ -21,45 +20,39 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # --- Attack Handler Functions ---
-# Each function in this module is a "factory" for a specific attack type.
-# It takes the firing tower and a target, reads the tower's live stats and
-# attack data, and is responsible for creating and returning one or more
-# Entity objects that represent the attack.
+# Each function is a factory for a specific attack type, responsible for
+# creating and returning the attack entities.
 
 
 def create_standard_projectile(tower: "Tower", target: "Enemy") -> List[Entity]:
     """
-    Handles the creation of one or more standard, traveling projectiles.
-
-    BUGFIX: This function has been refactored to read its core stats (damage,
-    pierce, etc.) directly from the live Tower object's attributes, rather
-    than re-reading the base config data. This ensures that all upgrades
-    applied by the UpgradeManager are correctly reflected in the projectile.
+    Handles the creation of standard projectiles, now applying the tower's
+    live effect_potency_multiplier to any status effects.
     """
     attack_specific_data = tower.attack_data.get("data", {})
     projectiles_to_fire = []
     num_shots = tower.projectiles_per_shot
 
-    # Assemble the status effect instances first, using the tower's live multipliers.
     effect_instances = []
     effects_to_apply_data = attack_specific_data.get("effects", {})
     for effect_id, params in effects_to_apply_data.items():
         if random.random() <= params.get("chance", 1.0):
             if effect_id in tower.status_effects_config:
                 effect_def = tower.status_effects_config[effect_id]
+                # --- NEW: Apply the tower's live potency multiplier ---
+                final_potency = (
+                    params.get("potency", 1.0) * tower.effect_potency_multiplier
+                )
                 effect_instances.append(
                     StatusEffect(
                         effect_id=effect_id,
                         effect_data=effect_def,
-                        duration=params.get("duration", 1.0)
-                        * tower.base_effect_duration_multiplier,
-                        potency=params.get("potency", 1.0)
-                        * tower.base_effect_potency_multiplier,
+                        duration=params.get("duration", 1.0),
+                        potency=final_potency,
                         source_entity_id=tower.entity_id,
                     )
                 )
 
-    # Assemble the ProjectileData payload using the tower's current, live stats.
     projectile_payload = ProjectileData(
         damage=tower.damage,
         effects_to_apply=effect_instances,
@@ -76,11 +69,8 @@ def create_standard_projectile(tower: "Tower", target: "Enemy") -> List[Entity]:
     )
 
     for i in range(num_shots):
-        # Use modulo to cycle through targets if there are more shots than targets
         current_target = tower.current_targets[i % len(tower.current_targets)]
         origin_pos = tower.pos.copy()
-
-        # Handle spread for multi-shot attacks
         if num_shots > 1:
             spread_angle_deg = 15
             angle_offset = ((i / (num_shots - 1)) - 0.5) * spread_angle_deg * 2
@@ -103,17 +93,27 @@ def create_standard_projectile(tower: "Tower", target: "Enemy") -> List[Entity]:
 
 def create_persistent_ground_aura(tower: "Tower", target: "Enemy") -> List[Entity]:
     """
-    Handles the creation of a stationary, persistent ground effect at the
-    target's location.
-
-    BUGFIX: This function now correctly passes the 'data' sub-object from the
-    tower's attack configuration to the aura's constructor, ensuring the
-    aura is created with the correct stats (dps, radius, etc.).
+    Handles creation of a ground aura, now pre-processing its data to apply
+    the tower's live aura_size and effect_potency multipliers.
     """
+    # --- NEW: Pre-process aura data to apply live tower buffs ---
+    original_aura_data = tower.attack_data.get("data", {})
+    processed_aura_data = copy.deepcopy(original_aura_data)
+
+    # Apply aura size multiplier
+    base_radius = processed_aura_data.get("radius", 50)
+    processed_aura_data["radius"] = base_radius * tower.aura_size_multiplier
+
+    # Apply effect potency multiplier to all effects within the aura
+    if "effects" in processed_aura_data:
+        for effect_id, params in processed_aura_data["effects"].items():
+            base_potency = params.get("potency", 1.0)
+            params["potency"] = base_potency * tower.effect_potency_multiplier
+
     aura = PersistentGroundAura(
         x=target.pos.x,
         y=target.pos.y,
-        aura_data=tower.attack_data.get("data", {}),
+        aura_data=processed_aura_data,
         status_effects_config=tower.status_effects_config,
     )
     return [aura]
@@ -121,16 +121,26 @@ def create_persistent_ground_aura(tower: "Tower", target: "Enemy") -> List[Entit
 
 def create_persistent_attached_aura(tower: "Tower", target: "Enemy") -> List[Entity]:
     """
-    Handles the creation of a persistent effect that attaches to and follows
-    the primary target.
-
-    BUGFIX: This function now correctly passes the 'data' sub-object from the
-    tower's attack configuration to the aura's constructor, ensuring the
-    aura is created with the correct stats (dps, radius, etc.).
+    Handles creation of an attached aura, now pre-processing its data to apply
+    the tower's live aura_size and effect_potency multipliers.
     """
+    # --- NEW: Pre-process aura data to apply live tower buffs ---
+    original_aura_data = tower.attack_data.get("data", {})
+    processed_aura_data = copy.deepcopy(original_aura_data)
+
+    # Apply aura size multiplier
+    base_radius = processed_aura_data.get("radius", 50)
+    processed_aura_data["radius"] = base_radius * tower.aura_size_multiplier
+
+    # Apply effect potency multiplier to all effects within the aura
+    if "effects" in processed_aura_data:
+        for effect_id, params in processed_aura_data["effects"].items():
+            base_potency = params.get("potency", 1.0)
+            params["potency"] = base_potency * tower.effect_potency_multiplier
+
     aura = PersistentAttachedAura(
         target=target,
-        aura_data=tower.attack_data.get("data", {}),
+        aura_data=processed_aura_data,
         status_effects_config=tower.status_effects_config,
     )
     return [aura]
