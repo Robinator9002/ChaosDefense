@@ -6,15 +6,18 @@ from typing import Dict, List, Any, Tuple, Optional
 
 from .game_state import GameState
 from .levels.level_manager import LevelManager
+
+# --- BUGFIX: Add missing import for Grid ---
+from .level_generation.grid import Grid
 from .waves.wave_manager import WaveManager
 from .entities.tower import Tower
 from .entities.enemies.enemy import Enemy
 from .entities.enemies.boss_enemy import BossEnemy
-from .level_generation.grid import Grid
+from .entities.projectiles.projectile import Projectile
 from .upgrades.upgrade_manager import UpgradeManager
 from .effects.status_effect import StatusEffect
 
-# --- NEW: Import the TargetingManager ---
+# --- MODIFIED: Update import path for new file location ---
 from ..game_ai.targeting.targeting_manager import TargetingManager
 
 logger = logging.getLogger(__name__)
@@ -124,10 +127,14 @@ class GameManager:
         for enemy in self.enemies:
             enemy.update(dt, self.game_state, self.targeting_manager)
 
-        self.projectiles.extend(newly_created_entities)
-
+        # Note: Projectiles don't currently use the targeting manager, but we pass
+        # it for consistency and future features (e.g., projectiles that retarget).
         for projectile in self.projectiles:
             projectile.update(dt, self.game_state, self.targeting_manager)
+
+        self.projectiles.extend(
+            p for p in newly_created_entities if p not in self.projectiles
+        )
 
         self._cleanup_dead_entities()
 
