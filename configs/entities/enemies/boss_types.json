@@ -1,5 +1,5 @@
 {
-  "//": "BOSS REBALANCE PASS: Base stats (especially HP) have been significantly reduced to make their initial scripted encounter challenging but fair. A new 'scaling_per_level' object has been added to each boss, allowing them to remain a threat when they appear randomly in later waves.",
+  "//": "BOSS SCALING OVERHAUL: Replaced the exponential 'scaling_per_level' multiplier with a linear 'scaling_per_level_add' system. This ensures that bosses remain a challenge in late-game random spawns without becoming mathematically unbeatable.",
 
   "grunt_colossus": {
     "type": "soldier",
@@ -15,15 +15,11 @@
       "armor": 10,
       "immunities": ["slow", "stun"]
     },
-    "scaling_per_level": {
-      "hp": 1.2,
-      "bounty": 1.0
-    },
-    "phalanx": [
-      { "type": "grunt", "count": 8 },
-      { "type": "grunt", "count": 8 },
-      { "type": "tank", "count": 2 }
-    ]
+    "scaling_per_level_add": {
+      "hp": 50,
+      "bounty": 20,
+      "armor": 2
+    }
   },
 
   "phase_striker": {
@@ -40,15 +36,10 @@
       "armor": 5,
       "immunities": ["slow", "stun"]
     },
-    "scaling_per_level": {
-      "hp": 1.2,
-      "bounty": 1.0
-    },
-    "phalanx": [
-      { "type": "runner", "count": 12 },
-      { "type": "runner", "count": 12 },
-      { "type": "scout", "count": 20 }
-    ]
+    "scaling_per_level_add": {
+      "hp": 75,
+      "bounty": 30
+    }
   },
 
   "hyperion_vanguard": {
@@ -65,16 +56,11 @@
       "armor": 35,
       "immunities": ["slow", "stun"]
     },
-    "scaling_per_level": {
-      "hp": 1.1,
-      "bounty": 1.0,
-      "armor": 1.1
-    },
-    "phalanx": [
-      { "type": "guardian", "count": 4 },
-      { "type": "guardian", "count": 4 },
-      { "type": "tank", "count": 6 }
-    ]
+    "scaling_per_level_add": {
+      "hp": 100,
+      "bounty": 50,
+      "armor": 3
+    }
   },
 
   "demolisher": {
@@ -91,14 +77,10 @@
       "armor": 25,
       "immunities": ["slow", "stun"]
     },
-    "scaling_per_level": {
-      "hp": 1.25,
-      "bounty": 1.0
-    },
-    "phalanx": [
-      { "type": "bomber", "count": 2 },
-      { "type": "bomber", "count": 2 },
-      { "type": "guardian", "count": 3 }
-    ]
+    "scaling_per_level_add": {
+      "hp": 120,
+      "bounty": 40,
+      "armor": 2
+    }
   }
 }
