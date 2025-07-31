@@ -21,10 +21,6 @@ logger = logging.getLogger(__name__)
 class Tower(Entity):
     """
     Represents a universal, data-driven defensive tower.
-
-    REFACTORED: Now delegates all target acquisition to the TargetingManager
-    for a massive performance increase. Its targeting behavior is now controlled
-    by a data-driven AI persona system.
     """
 
     def __init__(
@@ -46,8 +42,9 @@ class Tower(Entity):
         self.cost = tower_type_data.get("cost", 0)
         self.status_effects_config = status_effects_config
         self.attack_data = tower_type_data.get("attack", {})
+        # --- BUGFIX: Ensure aura data is loaded for support towers ---
+        self.auras = tower_type_data.get("auras", [])
 
-        # --- NEW: AI Persona Configuration ---
         ai_config = tower_type_data.get("ai_config", {})
         self.available_personas = ai_config.get("available_personas", ["SOLDIER"])
         self.current_persona = ai_config.get("default_persona", "SOLDIER")
@@ -118,7 +115,6 @@ class Tower(Entity):
         """
         Updates the tower's logic, finds targets, and fires.
         """
-        # The parent update call now handles all status effect logic (buffs/debuffs).
         super().update(dt, game_state, targeting_manager)
 
         if self.fire_cooldown > 0:
@@ -130,7 +126,6 @@ class Tower(Entity):
             return self._fire()
         return []
 
-    # --- NEW: Method to change the AI persona ---
     def set_persona(self, new_persona_id: str):
         """
         Safely sets the tower's targeting persona.
@@ -150,14 +145,12 @@ class Tower(Entity):
         Delegates target acquisition to the TargetingManager for a fast,
         filtered, and sorted list of targets based on the current AI persona.
         """
-        # 1. Get a list of all enemies within range. This is now a very fast operation.
         potential_targets = targeting_manager.get_nearby_enemies(self.pos, self.range)
 
         if not potential_targets:
             self.current_targets = []
             return
 
-        # 2. Ask the targeting manager to sort this list based on our current AI persona.
         self.current_targets = targeting_manager.sort_targets(
             potential_targets, self, self.current_persona
         )
