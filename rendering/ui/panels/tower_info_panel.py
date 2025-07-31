@@ -26,11 +26,6 @@ class TowerInfoPanel(UIElement):
     ):
         """
         Initializes the TowerInfoPanel.
-
-        Args:
-            rect (pygame.Rect): The rectangle defining the panel's position and size.
-            tower_data (Dict[str, Any]): The configuration data for the tower type.
-            targeting_ai_config (Dict[str, Any]): The global targeting AI config.
         """
         super().__init__(rect)
         self.tower_data = tower_data
@@ -55,47 +50,44 @@ class TowerInfoPanel(UIElement):
             "desc": (180, 180, 190),
         }
 
-    def _calculate_and_set_dynamic_height(self):
-        """
-        Calculates the total required height for all text content plus padding
-        and resizes the panel's rect.
-        """
-        padding = 15
-        line_height_stat = 24
-        total_height = padding
+    def _get_nested_value(self, data_dict: Dict, path: str) -> Any:
+        """Safely retrieves a value from a nested dictionary using a dot-separated path."""
+        keys = path.replace("[", ".").replace("]", "").split(".")
+        current_level = data_dict
+        for key in keys:
+            if isinstance(current_level, dict):
+                current_level = current_level.get(key)
+            elif isinstance(current_level, list) and key.isdigit():
+                try:
+                    current_level = current_level[int(key)]
+                except IndexError:
+                    return None
+            else:
+                return None
+        return current_level
 
+    def _calculate_and_set_dynamic_height(self):
+        """Calculates the total required height for all content and resizes the panel."""
+        padding = 15
+        total_height = padding
         total_height += self.font_title.get_height() + 10
 
-        # --- BUGFIX: Use the same default text as the draw method ---
         description = self.tower_data.get("description", "No description available.")
         desc_max_width = self.rect.width - (padding * 2)
-        wrapped_desc_surfaces = render_text_wrapped(
+        wrapped_desc = render_text_wrapped(
             description, self.font_desc, self.colors["desc"], desc_max_width
         )
-        total_height += sum(s.get_height() for s in wrapped_desc_surfaces)
-        total_height += 15
+        total_height += sum(s.get_height() for s in wrapped_desc) + 15
 
-        attack_data = self.tower_data.get("attack", {}).get("data", {})
-        stats_to_display = {
-            "Damage": attack_data.get("damage"),
-            "Range": attack_data.get("range"),
-            "Fire Rate": f"{attack_data.get('fire_rate', 0.0):.2f}/s",
-            "DPS": attack_data.get("dps"),
-            "Blast Radius": attack_data.get("blast_radius"),
-        }
-        visible_stats = [
-            v for v in stats_to_display.values() if v and v != 0 and v != "0.00/s"
-        ]
-        if visible_stats:
+        stats_to_display = self.tower_data.get("info_panel_stats", [])
+        if stats_to_display:
             total_height += self.font_header.get_height() + 5
-            total_height += len(visible_stats) * line_height_stat
+            total_height += len(stats_to_display) * 24  # line_height_stat
             total_height += 15
 
-        ai_config = self.tower_data.get("ai_config", {})
-        personas = ai_config.get("available_personas", [])
+        personas = self.tower_data.get("ai_config", {}).get("available_personas", [])
         if personas:
             total_height += self.font_header.get_height() + 5
-            # --- NEW: Calculate height based on number of lines ---
             total_height += len(personas) * self.font_desc.get_height()
 
         total_height += padding
@@ -104,75 +96,86 @@ class TowerInfoPanel(UIElement):
     def draw(self, screen: pygame.Surface):
         """Draws the panel and all its components."""
         bg_color = self.colors["bg_hover"] if self.is_hovered else self.colors["bg"]
-
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
         panel_surf.fill(bg_color)
         screen.blit(panel_surf, self.rect.topleft)
         pygame.draw.rect(screen, self.colors["border"], self.rect, 2, border_radius=5)
-
         self._draw_text_content(screen)
 
     def _draw_text_content(self, screen: pygame.Surface):
-        """A helper method to render and position all text within the panel."""
+        """Renders and positions all text within the panel."""
         padding = 15
-        line_height_stat = 24
         current_y = self.rect.y + padding
 
+        # --- Title and Cost ---
         title_surf = self.font_title.render(
             self.tower_data.get("name", "N/A"), True, self.colors["title"]
         )
         screen.blit(title_surf, (self.rect.x + padding, current_y))
-
         cost_text = f"{self.tower_data.get('cost', 0)}G"
         cost_surf = self.font_title.render(cost_text, True, (255, 215, 0))
         cost_rect = cost_surf.get_rect(topright=(self.rect.right - padding, current_y))
         screen.blit(cost_surf, cost_rect)
         current_y += title_surf.get_height() + 10
 
+        # --- Description ---
         description = self.tower_data.get("description", "No description available.")
         desc_max_width = self.rect.width - (padding * 2)
-        wrapped_desc_surfaces = render_text_wrapped(
+        wrapped_desc = render_text_wrapped(
             description, self.font_desc, self.colors["desc"], desc_max_width
         )
-        for line_surf in wrapped_desc_surfaces:
+        for line_surf in wrapped_desc:
             screen.blit(line_surf, (self.rect.x + padding, current_y))
             current_y += line_surf.get_height()
         current_y += 15
 
-        stats_header_surf = self.font_header.render(
-            "Base Statistics", True, self.colors["header"]
-        )
-        screen.blit(stats_header_surf, (self.rect.x + padding, current_y))
-        current_y += stats_header_surf.get_height() + 5
-
-        attack_data = self.tower_data.get("attack", {}).get("data", {})
-        stats_to_display = {
-            "Damage": attack_data.get("damage"),
-            "Range": attack_data.get("range"),
-            "Fire Rate": f"{attack_data.get('fire_rate', 0.0):.2f}/s",
-            "DPS": attack_data.get("dps"),
-            "Blast Radius": attack_data.get("blast_radius"),
-        }
-
-        for label, value in stats_to_display.items():
-            if value is None or value == 0 or value == "0.00/s":
-                continue
-
-            label_surf = self.font_stat.render(
-                f"{label}:", True, self.colors["stat_label"]
+        # --- Data-Driven Statistics ---
+        stats_to_display = self.tower_data.get("info_panel_stats", [])
+        if stats_to_display:
+            header_surf = self.font_header.render(
+                "Base Statistics", True, self.colors["header"]
             )
-            value_surf = self.font_stat.render(
-                str(value), True, self.colors["stat_value"]
-            )
+            screen.blit(header_surf, (self.rect.x + padding, current_y))
+            current_y += header_surf.get_height() + 5
 
-            screen.blit(label_surf, (self.rect.x + padding, current_y))
-            screen.blit(value_surf, (self.rect.x + self.rect.width / 2, current_y))
-            current_y += line_height_stat
+            for stat_info in stats_to_display:
+                label = stat_info.get("label", "N/A")
+                value_path = stat_info.get("value_path")
+                value = (
+                    self._get_nested_value(self.tower_data, value_path)
+                    if value_path
+                    else "N/A"
+                )
 
-        current_y += 15
+                if value is None:
+                    continue
 
-        ai_config = self.tower_data.get("ai_config", {})
-        personas = ai_config.get("available_personas", [])
+                # Format the value based on the format key
+                value_format = stat_info.get("format")
+                if value_format == "per_second":
+                    value_str = f"{value:.2f}/s"
+                elif value_format == "percentage":
+                    value_str = f"{int(value * 100)}%"
+                elif value_format == "percentage_boost":
+                    value_str = f"+{int((value - 1) * 100)}%"
+                elif value_format == "multiplier":
+                    value_str = f"{value}x"
+                else:
+                    value_str = str(value)
+
+                label_surf = self.font_stat.render(
+                    f"{label}:", True, self.colors["stat_label"]
+                )
+                value_surf = self.font_stat.render(
+                    value_str, True, self.colors["stat_value"]
+                )
+                screen.blit(label_surf, (self.rect.x + padding, current_y))
+                screen.blit(value_surf, (self.rect.x + self.rect.width / 2, current_y))
+                current_y += 24  # line_height_stat
+            current_y += 15
+
+        # --- Targeting Modes ---
+        personas = self.tower_data.get("ai_config", {}).get("available_personas", [])
         if personas:
             header_surf = self.font_header.render(
                 "Targeting Modes", True, self.colors["header"]
@@ -180,7 +183,6 @@ class TowerInfoPanel(UIElement):
             screen.blit(header_surf, (self.rect.x + padding, current_y))
             current_y += header_surf.get_height() + 5
 
-            # --- NEW: Draw each persona on a new line ---
             for persona_id in personas:
                 persona_name = self.targeting_ai_config.get(persona_id, {}).get(
                     "name", persona_id

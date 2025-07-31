@@ -1,12 +1,21 @@
 {
-  "//": "TOWER AI SYSTEM INTEGRATION: Added 'ai_config' object to all attacking towers, defining their default and available targeting personas.",
-
+  "//": "TOWER DATA OVERHAUL: Added descriptions to all towers and a new 'info_panel_stats' key to make the UI data-driven.",
   "turret": {
     "name": "Basic Turret",
     "category": "military",
     "cost": 40,
+    "description": "A reliable, all-purpose single-target weapon. The backbone of any solid defense.",
     "sprite_key": "towers/turret.png",
     "placeholder_color": [150, 150, 150],
+    "info_panel_stats": [
+      { "label": "Damage", "value_path": "attack.data.damage" },
+      { "label": "Range", "value_path": "attack.data.range" },
+      {
+        "label": "Fire Rate",
+        "value_path": "attack.data.fire_rate",
+        "format": "per_second"
+      }
+    ],
     "ai_config": {
       "default_persona": "SOLDIER",
       "available_personas": ["SOLDIER", "EXECUTIONER", "SNIPER"]
@@ -20,8 +29,18 @@
     "name": "Freezer",
     "category": "elemental",
     "cost": 50,
+    "description": "Fires cryo-projectiles that slow enemies, providing valuable crowd control.",
     "sprite_key": "towers/slower.png",
     "placeholder_color": [100, 180, 255],
+    "info_panel_stats": [
+      { "label": "Damage", "value_path": "attack.data.damage" },
+      { "label": "Range", "value_path": "attack.data.range" },
+      {
+        "label": "Slow Potency",
+        "value_path": "attack.data.effects.slow.potency",
+        "format": "percentage"
+      }
+    ],
     "ai_config": {
       "default_persona": "SOLDIER",
       "available_personas": ["SOLDIER", "EXECUTIONER", "CONTAGION"]
@@ -40,8 +59,14 @@
     "name": "Cannon Tower",
     "category": "military",
     "cost": 80,
+    "description": "A heavy-hitting cannon that deals area-of-effect damage in a small radius.",
     "sprite_key": "towers/cannon.png",
     "placeholder_color": [80, 80, 100],
+    "info_panel_stats": [
+      { "label": "Damage", "value_path": "attack.data.damage" },
+      { "label": "Range", "value_path": "attack.data.range" },
+      { "label": "Blast Radius", "value_path": "attack.data.blast_radius" }
+    ],
     "ai_config": {
       "default_persona": "SOLDIER",
       "available_personas": ["SOLDIER", "EXECUTIONER", "SNIPER"]
@@ -60,8 +85,18 @@
     "name": "Energy Beacon",
     "category": "elemental",
     "cost": 100,
+    "description": "Fires a rapid stream of energy pulses that slow targets. Highly effective at locking down single enemies.",
     "sprite_key": "towers/beam.png",
     "placeholder_color": [255, 0, 255],
+    "info_panel_stats": [
+      { "label": "Damage", "value_path": "attack.data.damage" },
+      { "label": "Range", "value_path": "attack.data.range" },
+      {
+        "label": "Fire Rate",
+        "value_path": "attack.data.fire_rate",
+        "format": "per_second"
+      }
+    ],
     "ai_config": {
       "default_persona": "SOLDIER",
       "available_personas": ["SOLDIER", "EXECUTIONER", "CONTAGION"]
@@ -76,14 +111,19 @@
       }
     }
   },
-
   "mortar": {
     "name": "Mortar",
     "category": "artillery",
     "cost": 120,
+    "description": "Lob explosive shells over a very long distance, dealing massive area damage. Cannot target nearby enemies.",
     "sprite_key": "towers/mortar.png",
     "placeholder_color": [60, 80, 60],
     "special_properties": { "minimum_range": 100 },
+    "info_panel_stats": [
+      { "label": "Damage", "value_path": "attack.data.damage" },
+      { "label": "Range", "value_path": "attack.data.range" },
+      { "label": "Blast Radius", "value_path": "attack.data.blast_radius" }
+    ],
     "ai_config": {
       "default_persona": "ARTILLERY",
       "available_personas": ["ARTILLERY", "EXECUTIONER", "SNIPER"]
@@ -98,13 +138,18 @@
       }
     }
   },
-
   "inferno_weaver": {
     "name": "Inferno Weaver",
     "category": "magic",
     "cost": 150,
+    "description": "Creates persistent firewalls on the ground that burn any enemy who walks through them.",
     "sprite_key": "towers/inferno_weaver.png",
     "placeholder_color": [255, 100, 0],
+    "info_panel_stats": [
+      { "label": "DPS", "value_path": "attack.data.dps" },
+      { "label": "Range", "value_path": "attack.data.range" },
+      { "label": "Aura Radius", "value_path": "attack.data.radius" }
+    ],
     "ai_config": {
       "default_persona": "EXECUTIONER",
       "available_personas": ["EXECUTIONER", "ASSASSIN", "SNIPER"]
@@ -127,8 +172,14 @@
     "name": "Stormcaller",
     "category": "magic",
     "cost": 165,
+    "description": "Summons a storm that attaches to an enemy, dealing continuous damage to it and all others nearby.",
     "sprite_key": "towers/stormcaller.png",
     "placeholder_color": [180, 180, 255],
+    "info_panel_stats": [
+      { "label": "DPS", "value_path": "attack.data.dps" },
+      { "label": "Range", "value_path": "attack.data.range" },
+      { "label": "Aura Radius", "value_path": "attack.data.radius" }
+    ],
     "ai_config": {
       "default_persona": "EXECUTIONER",
       "available_personas": ["EXECUTIONER", "ASSASSIN", "SNIPER"]
@@ -150,28 +201,34 @@
     "name": "Curse Weaver",
     "category": "magic",
     "cost": 130,
+    "description": "Applies a powerful curse to enemies, causing them to take massively increased damage from all sources.",
     "sprite_key": "towers/curse_weaver.png",
     "placeholder_color": [140, 0, 255],
+    "info_panel_stats": [
+      { "label": "Damage", "value_path": "attack.data.damage" },
+      { "label": "Range", "value_path": "attack.data.range" },
+      {
+        "label": "Curse Amp",
+        "value_path": "attack.data.effects.elemental_vulnerability.potency",
+        "format": "multiplier"
+      }
+    ],
     "ai_config": {
       "default_persona": "EXECUTIONER",
       "available_personas": ["EXECUTIONER", "ASSASSIN", "SNIPER"]
     },
     "attack": {
-      "type": "persistent_attached_aura",
+      "type": "standard_projectile",
       "data": {
         "damage": 5,
         "range": 220,
         "fire_rate": 2,
         "effects": {
           "elemental_vulnerability": { "potency": 1.5, "duration": 5.0 }
-        },
-        "tick_rate": 10,
-        "duration": 0.6
+        }
       }
     }
   },
-
-  "//": "--- Support Towers (No Targeting AI) ---",
   "commander": {
     "name": "Commander",
     "category": "support",
@@ -179,6 +236,19 @@
     "sprite_key": "towers/commander.png",
     "placeholder_color": [255, 215, 0],
     "description": "Aura tower that provides powerful combat buffs to nearby towers.",
+    "info_panel_stats": [
+      { "label": "Aura Range", "value_path": "auras[0].range" },
+      {
+        "label": "Damage Boost",
+        "value_path": "auras[0].effects.damage_boost.potency",
+        "format": "percentage_boost"
+      },
+      {
+        "label": "Range Boost",
+        "value_path": "auras[0].effects.range_boost.potency",
+        "format": "percentage_boost"
+      }
+    ],
     "auras": [
       {
         "range": 120,
@@ -198,6 +268,19 @@
     "sprite_key": "towers/archmage.png",
     "placeholder_color": [200, 180, 255],
     "description": "Aura tower that amplifies the magical effects and area of nearby towers.",
+    "info_panel_stats": [
+      { "label": "Aura Range", "value_path": "auras[0].range" },
+      {
+        "label": "Potency Boost",
+        "value_path": "auras[0].effects.effect_potency_boost.potency",
+        "format": "percentage_boost"
+      },
+      {
+        "label": "Aura Size Boost",
+        "value_path": "auras[0].effects.aura_size_boost.potency",
+        "format": "percentage_boost"
+      }
+    ],
     "auras": [
       {
         "range": 100,
