@@ -38,7 +38,8 @@ class TowerInfoPanel(UIElement):
         self.font_title = pygame.font.SysFont("segoeui", 22, bold=True)
         self.font_header = pygame.font.SysFont("segoeui", 18, bold=True)
         self.font_stat = pygame.font.SysFont("segoeui", 16)
-        self.font_desc = pygame.font.SysFont("segoeui", 14)
+        # --- MODIFIED: Slightly larger description font ---
+        self.font_desc = pygame.font.SysFont("segoeui", 15)
         self.colors = {
             "bg": (25, 30, 40, 230),
             "bg_hover": (25, 30, 40, 60),
@@ -82,7 +83,7 @@ class TowerInfoPanel(UIElement):
         stats_to_display = self.tower_data.get("info_panel_stats", [])
         if stats_to_display:
             total_height += self.font_header.get_height() + 5
-            total_height += len(stats_to_display) * 24  # line_height_stat
+            total_height += len(stats_to_display) * 24
             total_height += 15
 
         personas = self.tower_data.get("ai_config", {}).get("available_personas", [])
@@ -107,7 +108,6 @@ class TowerInfoPanel(UIElement):
         padding = 15
         current_y = self.rect.y + padding
 
-        # --- Title and Cost ---
         title_surf = self.font_title.render(
             self.tower_data.get("name", "N/A"), True, self.colors["title"]
         )
@@ -118,7 +118,6 @@ class TowerInfoPanel(UIElement):
         screen.blit(cost_surf, cost_rect)
         current_y += title_surf.get_height() + 10
 
-        # --- Description ---
         description = self.tower_data.get("description", "No description available.")
         desc_max_width = self.rect.width - (padding * 2)
         wrapped_desc = render_text_wrapped(
@@ -129,11 +128,11 @@ class TowerInfoPanel(UIElement):
             current_y += line_surf.get_height()
         current_y += 15
 
-        # --- Data-Driven Statistics ---
         stats_to_display = self.tower_data.get("info_panel_stats", [])
         if stats_to_display:
+            # --- MODIFIED: Header text changed ---
             header_surf = self.font_header.render(
-                "Base Statistics", True, self.colors["header"]
+                "Statistics", True, self.colors["header"]
             )
             screen.blit(header_surf, (self.rect.x + padding, current_y))
             current_y += header_surf.get_height() + 5
@@ -150,7 +149,6 @@ class TowerInfoPanel(UIElement):
                 if value is None:
                     continue
 
-                # Format the value based on the format key
                 value_format = stat_info.get("format")
                 if value_format == "per_second":
                     value_str = f"{value:.2f}/s"
@@ -169,12 +167,16 @@ class TowerInfoPanel(UIElement):
                 value_surf = self.font_stat.render(
                     value_str, True, self.colors["stat_value"]
                 )
+
                 screen.blit(label_surf, (self.rect.x + padding, current_y))
-                screen.blit(value_surf, (self.rect.x + self.rect.width / 2, current_y))
-                current_y += 24  # line_height_stat
+                # --- MODIFIED: Right-align the value for a clean column ---
+                value_rect = value_surf.get_rect(
+                    topright=(self.rect.right - padding, current_y)
+                )
+                screen.blit(value_surf, value_rect)
+                current_y += 24
             current_y += 15
 
-        # --- Targeting Modes ---
         personas = self.tower_data.get("ai_config", {}).get("available_personas", [])
         if personas:
             header_surf = self.font_header.render(
