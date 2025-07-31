@@ -168,7 +168,6 @@ class GameManager:
         difficulty_mod = self.wave_manager.difficulty_settings.get("stat_modifier", 1.0)
         enemy_spawn_level = max(1, self.game_state.current_wave_number)
 
-        # --- BUGFIX: Provide the status effects config during creation ---
         status_effects_cfg = self.configs.get("status_effects", {})
 
         if entity_id in self.configs["boss_types"]:
@@ -255,6 +254,16 @@ class GameManager:
             self.grid.set_tile_type(tile_x, tile_y, "BUILDABLE")
         target_tower.kill()
         self.game_state.clear_selection()
+
+    # --- NEW: Method to handle persona change requests ---
+    def change_tower_persona(self, tower_id: uuid.UUID, new_persona_id: str):
+        """Finds a tower by its ID and requests it to change its persona."""
+        target_tower = next((t for t in self.towers if t.entity_id == tower_id), None)
+        if not target_tower:
+            logger.error(f"Could not find tower with ID {tower_id} to change persona.")
+            return
+
+        target_tower.set_persona(new_persona_id)
 
     def get_salvage_rate(self) -> float:
         """Safely retrieves the current salvage refund percentage."""
