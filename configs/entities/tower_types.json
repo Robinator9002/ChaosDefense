@@ -172,7 +172,7 @@
   },
 
   "//": "--- Support Towers (No Targeting AI) ---",
-  "commander_tower": {
+  "commander": {
     "name": "Commander",
     "category": "support",
     "cost": 200,
@@ -191,7 +191,7 @@
       }
     ]
   },
-  "archmage_tower": {
+  "archmage": {
     "name": "Arch-Mage",
     "category": "support",
     "cost": 250,
