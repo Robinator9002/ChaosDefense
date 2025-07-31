@@ -1,7 +1,7 @@
 # rendering/ui/panels/upgrade_panel.py
 import pygame
 import logging
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING, Dict, Any
 
 from ..ui_element import UIElement
 from ..buttons.upgrade_button import UpgradeButton
@@ -17,10 +17,8 @@ logger = logging.getLogger(__name__)
 
 class UpgradePanel(UIElement):
     """
-    A UI panel that displays stats and upgrade options for a selected tower.
-
-    REFACTORED: The panel now dynamically lays out its upgrade buttons and
-    can be explicitly told to rebuild its layout to reflect the latest game state.
+    A UI panel that displays stats, upgrade options, and now, targeting
+    priorities for a selected tower.
     """
 
     def __init__(
@@ -30,6 +28,7 @@ class UpgradePanel(UIElement):
         upgrade_manager: "UpgradeManager",
         game_state: "GameState",
         salvage_refund_percentage: float,
+        targeting_ai_config: Dict[str, Any],  # --- NEW: Accept AI config ---
     ):
         """
         Initializes the UpgradePanel.
@@ -39,8 +38,12 @@ class UpgradePanel(UIElement):
         self.upgrade_manager = upgrade_manager
         self.game_state = game_state
         self.salvage_refund_percentage = salvage_refund_percentage
+        self.targeting_ai_config = targeting_ai_config  # --- NEW: Store AI config ---
 
         self.upgrade_buttons: List[UpgradeButton] = []
+        self.persona_buttons: List[Dict[str, Any]] = (
+            []
+        )  # --- NEW: For targeting buttons ---
         self._setup_fonts_and_colors()
         self._create_layout()
 
@@ -54,12 +57,10 @@ class UpgradePanel(UIElement):
         )
         self.is_salvage_hovered = False
 
-    # --- NEW: Public method to trigger a UI refresh ---
     def rebuild_layout(self):
         """
         Public method to force the panel to discard its old buttons and
-        re-create them based on the current game state. This is called by
-        the UIManager immediately after an upgrade is purchased.
+        re-create them based on the current game state.
         """
         logger.debug(
             f"Rebuilding layout for tower {self.tower.entity_id}'s upgrade panel."
@@ -73,6 +74,7 @@ class UpgradePanel(UIElement):
         self.font_stat = pygame.font.SysFont("segoeui", 16)
         self.font_close = pygame.font.SysFont("segoeui", 20, bold=True)
         self.font_salvage = pygame.font.SysFont("segoeui", 16, bold=True)
+        self.font_persona = pygame.font.SysFont("segoeui", 14, bold=True)  # --- NEW ---
         self.colors = {
             "bg": (25, 30, 40, 230),
             "border": (80, 90, 100),
@@ -86,18 +88,50 @@ class UpgradePanel(UIElement):
             "salvage_bg_hover": (110, 50, 50),
             "salvage_border": (150, 80, 80),
             "salvage_text": (230, 210, 210),
+            # --- NEW: Persona Button Colors ---
+            "persona_bg_default": (40, 50, 60),
+            "persona_bg_hover": (60, 75, 90),
+            "persona_bg_active": (80, 110, 140),
+            "persona_border_default": (80, 90, 100),
+            "persona_border_active": (150, 180, 200),
+            "persona_text": (210, 210, 220),
         }
 
     def _create_layout(self):
         """
-        Creates and positions upgrade buttons dynamically, stacking them
-        vertically based on their individual calculated heights.
+        Creates and positions all UI elements dynamically.
         """
         self.upgrade_buttons.clear()
+        self.persona_buttons.clear()
         padding = 15
         button_spacing = 10
+
+        # --- Position determined by stats section ---
         current_y = self.rect.y + 210
 
+        # --- NEW: Create Targeting Priority Buttons ---
+        if self.tower.available_personas and len(self.tower.available_personas) > 1:
+            persona_button_height = 28
+            for persona_id in self.tower.available_personas:
+                persona_data = self.targeting_ai_config.get(persona_id, {})
+                button_rect = pygame.Rect(
+                    self.rect.x + padding,
+                    current_y,
+                    self.rect.width - (padding * 2),
+                    persona_button_height,
+                )
+                self.persona_buttons.append(
+                    {
+                        "id": persona_id,
+                        "name": persona_data.get("name", persona_id),
+                        "rect": button_rect,
+                        "is_hovered": False,
+                    }
+                )
+                current_y += persona_button_height + 5
+            current_y += 15  # Extra space before upgrades
+
+        # --- Create Upgrade Buttons ---
         next_upgrade_a = self.upgrade_manager.get_next_upgrade(self.tower, "path_a")
         if next_upgrade_a:
             can_afford = self.game_state.gold >= next_upgrade_a.cost
@@ -131,8 +165,15 @@ class UpgradePanel(UIElement):
         self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
         self.is_salvage_hovered = self.salvage_button_rect.collidepoint(mouse_pos)
 
-        for button in self.upgrade_buttons:
-            button.handle_event(event, game_state)
+        # --- NEW: Handle Persona Button Events ---
+        for button_data in self.persona_buttons:
+            button_data["is_hovered"] = button_data["rect"].collidepoint(mouse_pos)
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if button_data["is_hovered"]:
+                    return UIAction(
+                        type=ActionType.CHANGE_TARGETING_PERSONA,
+                        entity_id=button_data["id"],
+                    )
 
         if not self.rect.collidepoint(mouse_pos):
             return None
@@ -159,9 +200,48 @@ class UpgradePanel(UIElement):
         self._draw_text(screen)
         self._draw_close_button(screen)
         self._draw_salvage_button(screen)
+        self._draw_persona_buttons(screen)  # --- NEW ---
 
         for button in self.upgrade_buttons:
             button.draw(screen, self.game_state)
+
+    def _draw_persona_buttons(self, screen: pygame.Surface):
+        """Draws the targeting priority buttons."""
+        if not self.persona_buttons:
+            return
+
+        padding = 15
+        header_y = self.rect.y + 185
+        header_surf = self.font_header.render(
+            "Targeting Priority", True, self.colors["header"]
+        )
+        screen.blit(header_surf, (self.rect.x + padding, header_y))
+
+        for button_data in self.persona_buttons:
+            is_active = self.tower.current_persona == button_data["id"]
+
+            bg_color = self.colors["persona_bg_default"]
+            if is_active:
+                bg_color = self.colors["persona_bg_active"]
+            elif button_data["is_hovered"]:
+                bg_color = self.colors["persona_bg_hover"]
+
+            border_color = (
+                self.colors["persona_border_active"]
+                if is_active
+                else self.colors["persona_border_default"]
+            )
+
+            pygame.draw.rect(screen, bg_color, button_data["rect"], border_radius=4)
+            pygame.draw.rect(
+                screen, border_color, button_data["rect"], 1, border_radius=4
+            )
+
+            text_surf = self.font_persona.render(
+                button_data["name"], True, self.colors["persona_text"]
+            )
+            text_rect = text_surf.get_rect(center=button_data["rect"].center)
+            screen.blit(text_surf, text_rect)
 
     def _draw_close_button(self, screen: pygame.Surface):
         """Draws the 'X' button to close the panel."""
