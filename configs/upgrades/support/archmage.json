@@ -1,4 +1,5 @@
 {
+  "//": "Arch-Mage: An elite support tower that amplifies the magical effects and area of other towers.",
   "path_a": {
     "name": "Amplification",
     "description": "Focuses on raw amplification of magical effects and auras.",
@@ -6,7 +7,7 @@
       {
         "id": "archmage_a1",
         "name": "Focusing Crystals",
-        "cost": 200,
+        "cost": 250,
         "description": "Increases the potency of the Effect Potency Boost aura.",
         "effects": [
           {
@@ -23,7 +24,7 @@
       {
         "id": "archmage_a2",
         "name": "Resonant Fields",
-        "cost": 280,
+        "cost": 380,
         "description": "Increases the potency of the Aura Size Boost aura.",
         "effects": [
           {
@@ -40,7 +41,7 @@
       {
         "id": "archmage_a3",
         "name": "Leyline Attunement",
-        "cost": 350,
+        "cost": 500,
         "description": "Increases the Arch-Mage's own aura radius by 20.",
         "effects": [
           {
@@ -58,7 +59,7 @@
       {
         "id": "archmage_a4",
         "name": "Power Overwhelming",
-        "cost": 500,
+        "cost": 1000,
         "description": "Greatly increases the potency of the Effect Potency Boost aura.",
         "effects": [
           {
@@ -75,7 +76,7 @@
       {
         "id": "archmage_a5",
         "name": "Nexus of Power",
-        "cost": 1800,
+        "cost": 3000,
         "description": "Becomes a nexus of raw magic, massively amplifying the potency and size of all nearby magical effects.",
         "effects": [
           {
@@ -107,7 +108,7 @@
       {
         "id": "archmage_b1",
         "name": "Arcane Reach",
-        "cost": 180,
+        "cost": 220,
         "description": "Increases the Arch-Mage's own aura radius by 25.",
         "effects": [
           {
@@ -125,7 +126,7 @@
       {
         "id": "archmage_b2",
         "name": "Empower Projectiles",
-        "cost": 400,
+        "cost": 450,
         "description": "The Arch-Mage's aura now also grants a small Damage Boost to nearby towers.",
         "effects": [
           {
@@ -145,7 +146,7 @@
       {
         "id": "archmage_b3",
         "name": "Empower Speed",
-        "cost": 400,
+        "cost": 450,
         "description": "The Arch-Mage's aura now also grants a small Fire Rate Boost to nearby towers.",
         "effects": [
           {
@@ -165,7 +166,7 @@
       {
         "id": "archmage_b4",
         "name": "Greater Empowerment",
-        "cost": 600,
+        "cost": 750,
         "description": "Increases the potency of the granted Damage and Fire Rate boosts.",
         "effects": [
           {
@@ -191,7 +192,7 @@
       {
         "id": "archmage_b5",
         "name": "Archon's Blessing",
-        "cost": 2000,
+        "cost": 3200,
         "description": "All towers in the aura are blessed, gaining a significant boost to all stats and effect potencies.",
         "effects": [
           {
