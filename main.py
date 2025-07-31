@@ -55,6 +55,8 @@ def main():
             ),
             "boss_types": load_config(CONFIG_PATH / "entities/enemies/boss_types.json"),
             "tower_types": load_config(CONFIG_PATH / "entities/tower_types.json"),
+            # --- BUGFIX: Add the missing targeting_ai.json to the main config ---
+            "targeting_ai": load_config(CONFIG_PATH / "targeting/targeting_ai.json"),
             # Use the dynamically loaded definitions from our loader.
             "upgrade_definitions": all_upgrade_defs,
             "difficulty_scaling": load_config(
