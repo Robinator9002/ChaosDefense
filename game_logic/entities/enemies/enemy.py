@@ -30,7 +30,7 @@ class Enemy(Entity):
         path: List[Tuple[int, int]],
         tile_size: int,
         difficulty_modifier: float,
-        status_effects_config: Dict[str, Any],  # --- NEW: Accept the config ---
+        status_effects_config: Dict[str, Any],
     ):
         """
         Initializes a new Enemy.
@@ -81,8 +81,22 @@ class Enemy(Entity):
         )
 
         self.auras = enemy_type_data.get("auras", [])
-        # --- BUGFIX: Use the passed-in config ---
         self.status_effects_config = status_effects_config
+
+        # --- FIX: Add tower-specific stats to prevent crashes in EffectHandler ---
+        # This is a workaround. The EffectHandler should ideally be robust enough
+        # not to require these on every entity. However, adding them here ensures
+        # compatibility with the current handler implementation.
+        self.base_damage = 0
+        self.damage = 0
+        self.base_range = 0
+        self.range = 0
+        self.base_fire_rate = 0
+        self.fire_rate = 0
+        self.base_effect_potency_multiplier = 1.0
+        self.effect_potency_multiplier = 1.0
+        self.base_aura_size_multiplier = 1.0
+        self.aura_size_multiplier = 1.0
 
     def take_damage(
         self, amount: int, armor_shred: int = 0, ignores_armor: bool = False

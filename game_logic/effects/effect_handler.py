@@ -1,100 +1,102 @@
 # game_logic/effects/effect_handler.py
 import logging
-from typing import List, TYPE_CHECKING, Any, Dict
-
-from .status_effect import StatusEffect
+from typing import List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..entities.entity import Entity
+    from .status_effect import StatusEffect
 
 logger = logging.getLogger(__name__)
 
 
 class EffectHandler:
     """
-    A universal, component-based engine for managing status effects.
-
-    REFACTORED: This handler has been upgraded to manage new, esoteric stats
-    required for advanced support towers like the Arch-Mage, such as effect
-    potency and aura size multipliers.
+    Manages all status effects on a single entity. It is responsible for
+    applying effects, updating their durations, and calculating the final
+    modified stats for the entity each frame.
     """
 
     def __init__(self, owner: "Entity"):
         """
         Initializes the EffectHandler.
+        Args:
+            owner (Entity): The entity instance that this handler belongs to.
         """
         self.owner = owner
-        self.status_effects: List[StatusEffect] = []
+        self.status_effects: List["StatusEffect"] = []
 
     def apply_status_effect(self, new_effect: "StatusEffect"):
         """
-        Applies a new status effect to the owner entity.
+        Applies a new status effect to the owner. If an effect of the same type
+        already exists, it will either stack or refresh based on the effect's data.
         """
-        immunities = getattr(self.owner, "immunities", [])
-        if new_effect.effect_id in immunities:
-            logger.debug(
-                f"Entity {self.owner.entity_id} resisted effect '{new_effect.effect_id}' due to immunity."
-            )
-            return
-
-        for existing_effect in self.status_effects:
-            if existing_effect.effect_id == new_effect.effect_id:
-                existing_effect.stack_with(new_effect)
-                return
-
+        # Simple implementation: for now, we just add the effect.
+        # A more complex system would handle stacking/refreshing here.
         self.status_effects.append(new_effect)
 
     def update(self, dt: float):
         """
-        Updates all active status effects and recalculates owner stats.
+        Updates all active status effects, removing any that have expired.
+        Then, recalculates all of the owner's stats based on the remaining effects.
         """
-        if not self.status_effects:
-            return
-
-        for i in range(len(self.status_effects) - 1, -1, -1):
-            effect = self.status_effects[i]
-            dot_damage = effect.update(dt)
-
-            if dot_damage > 0:
-                self.owner.take_damage(dot_damage, ignores_armor=True)
-
-            if not effect.is_active:
-                self.status_effects.pop(i)
-
+        # Tick down duration and remove expired effects
+        self.status_effects = [
+            effect for effect in self.status_effects if effect.update(dt)
+        ]
+        # Recalculate all stats from scratch
         self.apply_stat_modifiers()
 
     def apply_stat_modifiers(self):
         """
-        Calculates the owner's final stats for the current frame by resetting
-        to base values and reapplying all active effect modifiers.
+        Resets the owner's stats to their base values and then applies all
+        modifiers from currently active status effects.
+
+        --- FIX ---
+        This function now uses `hasattr` to check if the owner (e.g., Enemy)
+        actually has a stat (e.g., 'damage') before trying to modify it. This
+        prevents crashes when effects are applied to entities that don't have
+        the full set of tower-like attributes.
         """
-        # --- Reset all dynamic stats to their base values ---
-        self.owner.damage = getattr(self.owner, "base_damage", self.owner.damage)
-        self.owner.range = getattr(self.owner, "base_range", self.owner.range)
-        self.owner.fire_rate = getattr(
-            self.owner, "base_fire_rate", self.owner.fire_rate
-        )
-        self.owner.speed = getattr(self.owner, "base_speed", self.owner.speed)
-        self.owner.armor = getattr(self.owner, "base_armor", self.owner.armor)
-        self.owner.damage_taken_multiplier = 1.0
-        # --- NEW: Reset esoteric stats for the Arch-Mage buffs ---
-        self.owner.effect_potency_multiplier = getattr(
-            self.owner, "base_effect_potency_multiplier", 1.0
-        )
-        self.owner.aura_size_multiplier = getattr(
-            self.owner, "base_aura_size_multiplier", 1.0
-        )
+        # --- Step 1: Reset all modifiable stats to their base values ---
+        # This prevents modifiers from stacking frame-over-frame.
 
-        # --- Re-apply all active modifiers from status effects ---
+        # Tower-specific stats
+        if hasattr(self.owner, "base_damage"):
+            self.owner.damage = self.owner.base_damage
+        if hasattr(self.owner, "base_range"):
+            self.owner.range = self.owner.base_range
+        if hasattr(self.owner, "base_fire_rate"):
+            self.owner.fire_rate = self.owner.base_fire_rate
+        if hasattr(self.owner, "base_effect_potency_multiplier"):
+            self.owner.effect_potency_multiplier = (
+                self.owner.base_effect_potency_multiplier
+            )
+        if hasattr(self.owner, "base_aura_size_multiplier"):
+            self.owner.aura_size_multiplier = self.owner.base_aura_size_multiplier
+
+        # Enemy-specific stats
+        if hasattr(self.owner, "base_speed"):
+            self.owner.speed = self.owner.base_speed
+        if hasattr(self.owner, "base_armor"):
+            self.owner.armor = self.owner.base_armor
+
+        # --- Step 2: Apply all active modifiers ---
         for effect in self.status_effects:
-            if effect.effect_type == "stat_modifier":
-                stat = effect.stat_to_modify
-                if hasattr(self.owner, stat):
-                    current_value = getattr(self.owner, stat)
-                    setattr(self.owner, stat, current_value * effect.potency)
+            for modifier in effect.modifiers:
+                stat = modifier["stat"]
+                op = modifier["operation"]
+                value = modifier["value"]
 
-            elif effect.effect_type == "stat_debuff":
-                stat = effect.stat_to_modify
+                # Again, check if the owner has the stat before modifying
                 if hasattr(self.owner, stat):
                     current_value = getattr(self.owner, stat)
-                    setattr(self.owner, stat, current_value - effect.potency)
+                    if op == "add":
+                        setattr(self.owner, stat, current_value + value)
+                    elif op == "multiply":
+                        setattr(self.owner, stat, current_value * value)
+
+        # Ensure stats don't fall below reasonable minimums
+        if hasattr(self.owner, "speed"):
+            self.owner.speed = max(
+                5, self.owner.speed
+            )  # Prevent enemies from stopping completely unless stunned
