@@ -29,7 +29,9 @@ def create_standard_projectile(tower: "Tower", target: "Enemy") -> List[Entity]:
     Handles the creation of standard projectiles, now applying the tower's
     live effect_potency_multiplier to any status effects.
     """
-    attack_specific_data = tower.attack_data.get("data", {})
+    # --- FIX: Use the renamed `tower.attack` attribute ---
+    attack_specific_data = tower.attack.get("data", {})
+    # --- END FIX ---
     projectiles_to_fire = []
     num_shots = tower.projectiles_per_shot
 
@@ -96,8 +98,9 @@ def create_persistent_ground_aura(tower: "Tower", target: "Enemy") -> List[Entit
     Handles creation of a ground aura, now pre-processing its data to apply
     the tower's live aura_size and effect_potency multipliers.
     """
-    # --- NEW: Pre-process aura data to apply live tower buffs ---
-    original_aura_data = tower.attack_data.get("data", {})
+    # --- FIX: Use the renamed `tower.attack` attribute ---
+    original_aura_data = tower.attack.get("data", {})
+    # --- END FIX ---
     processed_aura_data = copy.deepcopy(original_aura_data)
 
     # Apply aura size multiplier
@@ -124,8 +127,9 @@ def create_persistent_attached_aura(tower: "Tower", target: "Enemy") -> List[Ent
     Handles creation of an attached aura, now pre-processing its data to apply
     the tower's live aura_size and effect_potency multipliers.
     """
-    # --- NEW: Pre-process aura data to apply live tower buffs ---
-    original_aura_data = tower.attack_data.get("data", {})
+    # --- FIX: Use the renamed `tower.attack` attribute ---
+    original_aura_data = tower.attack.get("data", {})
+    # --- END FIX ---
     processed_aura_data = copy.deepcopy(original_aura_data)
 
     # Apply aura size multiplier
