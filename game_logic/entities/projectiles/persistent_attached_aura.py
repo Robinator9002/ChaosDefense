@@ -6,9 +6,12 @@ from typing import TYPE_CHECKING, List, Dict, Any
 from ..entity import Entity
 from ...effects.status_effect import StatusEffect
 
+# --- FIX: Import TargetingManager for type hinting and usage ---
 if TYPE_CHECKING:
     from ..enemies.enemy import Enemy
     from ...game_state import GameState
+    from ...game_ai.targeting.targeting_manager import TargetingManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +70,10 @@ class PersistentAttachedAura(Entity):
         )
         self.rect = self.sprite.get_rect(center=self.pos)
 
-    def update(self, dt: float, game_state: "GameState", all_enemies: List["Enemy"]):
+    # --- FIX: Corrected update signature to match the game manager's call ---
+    def update(
+        self, dt: float, game_state: "GameState", targeting_manager: "TargetingManager"
+    ):
         """
         Updates the aura's position to follow its target, ticks down duration,
         and applies pulsing effects.
@@ -90,17 +96,24 @@ class PersistentAttachedAura(Entity):
         self.tick_timer -= dt
         if self.tick_timer <= 0:
             self.tick_timer += self.tick_interval
-            self._apply_pulse_effects(all_enemies)
+            # --- FIX: Use the targeting manager to get enemies in range ---
+            enemies_in_range = targeting_manager.get_nearby_enemies(
+                self.pos, self.radius
+            )
+            self._apply_pulse_effects(enemies_in_range)
 
         # Update the rect's position after moving.
-        super().update(dt, game_state)
+        super().update(dt, game_state, targeting_manager)
 
-    def _apply_pulse_effects(self, all_enemies: List["Enemy"]):
+    # --- FIX: Parameter name updated for clarity ---
+    def _apply_pulse_effects(self, enemies_in_range: List["Enemy"]):
         """
-        Finds all enemies within the radius and applies damage and effects.
-        This version includes special damage calculation logic.
+        Applies damage and effects to all enemies within the given list.
+        The list is pre-filtered by the targeting manager.
         """
-        for enemy in all_enemies:
+        for enemy in enemies_in_range:
+            # Distance check is redundant as get_nearby_enemies already does this,
+            # but it's a safe-guard.
             if enemy.is_alive and self.pos.distance_to(enemy.pos) <= self.radius:
                 # --- Custom Damage Logic for Stormcaller ---
                 base_damage = self.damage_per_tick

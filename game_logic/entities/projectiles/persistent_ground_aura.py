@@ -6,9 +6,12 @@ from typing import TYPE_CHECKING, List, Dict, Any
 from ..entity import Entity
 from ...effects.status_effect import StatusEffect
 
+# --- FIX: Import TargetingManager for type hinting and usage ---
 if TYPE_CHECKING:
     from ..enemies.enemy import Enemy
     from ...game_state import GameState
+    from ...game_ai.targeting.targeting_manager import TargetingManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +50,6 @@ class PersistentGroundAura(Entity):
         self.tick_rate = aura_data.get("tick_rate", 4)  # Ticks per second
         self.effects_data = aura_data.get("effects", {})
         self.status_effects_config = status_effects_config
-        # NEU: Bonus Schaden gegen Rüstung Multiplikator für Auren
         self.bonus_dmg_vs_armor_mult = aura_data.get(
             "bonus_damage_vs_armor_multiplier", 0
         )
@@ -56,11 +58,10 @@ class PersistentGroundAura(Entity):
         self.tick_interval = (
             1.0 / self.tick_rate if self.tick_rate > 0 else float("inf")
         )
-        self.tick_timer = 0.0  # Start ready to tick immediately
+        self.tick_timer = 0.0
         self.damage_per_tick = self.dps / self.tick_rate if self.tick_rate > 0 else 0
 
         # --- Visuals (Placeholder) ---
-        # A semi-transparent circle serves as a placeholder for future animations.
         self.sprite = pygame.Surface(
             (self.radius * 2, self.radius * 2), pygame.SRCALPHA
         )
@@ -69,16 +70,13 @@ class PersistentGroundAura(Entity):
         )
         self.rect = self.sprite.get_rect(center=(x, y))
 
-        # Future animation state can be managed here
-        # self.animation_timer = 0.0
-        # self.current_frame = 0
-
-    def update(self, dt: float, game_state: "GameState", all_enemies: List["Enemy"]):
+    # --- FIX: Corrected update signature to match the game manager's call ---
+    def update(
+        self, dt: float, game_state: "GameState", targeting_manager: "TargetingManager"
+    ):
         """
         Ticks down duration and applies effects to enemies in the area.
         """
-        # The GameManager's main loop passes all_enemies to every entity's
-        # update method, so we accept it here even if game_state isn't used.
         if not self.is_alive:
             return
 
@@ -92,29 +90,32 @@ class PersistentGroundAura(Entity):
         self.tick_timer -= dt
         if self.tick_timer <= 0:
             self.tick_timer += self.tick_interval
-            self._apply_pulse_effects(all_enemies)
+            # --- FIX: Use the targeting manager to get enemies in range ---
+            enemies_in_range = targeting_manager.get_nearby_enemies(
+                self.pos, self.radius
+            )
+            self._apply_pulse_effects(enemies_in_range)
 
-        # Future animation logic would go here
-        # self.animation_timer += dt
-        # ...
+        # Call the base class update method
+        super().update(dt, game_state, targeting_manager)
 
-    def _apply_pulse_effects(self, all_enemies: List["Enemy"]):
+    # --- FIX: Parameter name updated for clarity ---
+    def _apply_pulse_effects(self, enemies_in_range: List["Enemy"]):
         """
-        Finds all enemies within the radius and applies damage and status effects.
+        Applies damage and status effects to the given list of enemies.
         """
-        for enemy in all_enemies:
+        for enemy in enemies_in_range:
+            # The distance check is redundant as get_nearby_enemies already does this,
+            # but it's a safe-guard.
             if enemy.is_alive and self.pos.distance_to(enemy.pos) <= self.radius:
                 # Apply damage per tick
                 if self.damage_per_tick > 0:
                     calculated_damage = self.damage_per_tick
-                    # NEUE LOGIK: Anwenden des bonus_damage_vs_armor_multiplier
                     if self.bonus_dmg_vs_armor_mult != 0:
                         calculated_damage += int(
                             enemy.armor * self.bonus_dmg_vs_armor_mult
                         )
-                        calculated_damage = max(
-                            0, calculated_damage
-                        )  # Sicherstellen, dass Schaden nicht negativ wird
+                        calculated_damage = max(0, calculated_damage)
 
                     enemy.take_damage(calculated_damage, ignores_armor=True)
 
@@ -134,5 +135,4 @@ class PersistentGroundAura(Entity):
         """
         Draws the aura's visual effect.
         """
-        # The base Entity.draw method handles camera offset and zooming perfectly.
         super().draw(screen, camera_offset, zoom)
