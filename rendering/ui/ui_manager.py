@@ -163,7 +163,6 @@ class UIManager:
                 self._process_ui_action(action, game_state)
                 return True
 
-        # --- NEW: Pass events to the info panel to update its hover state ---
         if self.tower_info_panel:
             self.tower_info_panel.handle_event(event, game_state)
 
@@ -257,14 +256,12 @@ class UIManager:
                 not self.tower_info_panel
                 or self.tower_info_panel.tower_data.get("id") != selected_build_id
             ):
-                panel_width, panel_height = 260, 400  # Increased height
+                # --- MODIFIED: Create panel with placeholder y-value ---
+                panel_width = 260
                 panel_rect = pygame.Rect(
-                    20,
-                    self.screen_rect.bottom - 80 - 35 - panel_height - 10,
-                    panel_width,
-                    panel_height,
-                )
-                # --- MODIFIED: Pass the targeting_ai config to the info panel ---
+                    20, 0, panel_width, 0
+                )  # y and height are temporary
+
                 self.tower_info_panel = TowerInfoPanel(
                     rect=panel_rect,
                     tower_data=tower_data_to_display,
@@ -272,6 +269,16 @@ class UIManager:
                         "targeting_ai", {}
                     ),
                 )
+
+                # --- MODIFIED: Reposition the panel based on its new dynamic height ---
+                self.tower_info_panel.rect.y = (
+                    self.screen_rect.bottom
+                    - 80
+                    - 35
+                    - self.tower_info_panel.rect.height
+                    - 10
+                )
+
         elif self.tower_info_panel:
             self.tower_info_panel = None
 
