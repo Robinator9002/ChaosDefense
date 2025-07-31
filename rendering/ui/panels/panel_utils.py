@@ -2,14 +2,15 @@
 from typing import Dict, Any
 
 
-def get_nested_value(data_dict: Dict, path: str) -> Any:
+def get_nested_value(data: Any, path: str) -> Any:
     """
-    Safely retrieves a value from a nested dictionary or list using a dot-separated path.
-    Example path: 'auras[0].effects.damage_boost.potency'
+    Safely retrieves a value from a nested structure (dicts, lists, or objects)
+    using a dot-separated path.
+    Example path: 'auras[0].effects.damage_boost.potency' or 'damage'
     """
     # Replace list indices like [0] with .0 for uniform splitting
     keys = path.replace("[", ".").replace("]", "").split(".")
-    current_level = data_dict
+    current_level = data
     for key in keys:
         if current_level is None:
             return None
@@ -21,7 +22,12 @@ def get_nested_value(data_dict: Dict, path: str) -> Any:
                 current_level = current_level[int(key)]
             except IndexError:
                 return None
+        # --- FIX: Handle object attributes using getattr ---
+        elif hasattr(current_level, key):
+            current_level = getattr(current_level, key)
+        # --- END FIX ---
         else:
+            # If no method works, the path is invalid for the current level
             return None
     return current_level
 

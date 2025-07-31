@@ -51,8 +51,9 @@ class UpgradePanel(UIElement):
             self.rect.right - 28, self.rect.y + 8, 20, 20
         )
         self.is_close_hovered = False
-
         self.salvage_button_rect = pygame.Rect(0, 0, 0, 0)
+        self.is_salvage_hovered = False
+
         self.rebuild_layout()
 
     def rebuild_layout(self):
@@ -60,39 +61,52 @@ class UpgradePanel(UIElement):
         Forces the panel to re-create its buttons and resize based on the
         current game state.
         """
-        self._create_layout()
+        self._create_button_objects()
         self._calculate_and_set_dynamic_height()
+        # The salvage button is always at the bottom, its position depends on the final height.
         self.salvage_button_rect = pygame.Rect(
             self.rect.x + 15, self.rect.bottom - 55, self.rect.width - 30, 40
         )
-        self.is_salvage_hovered = self.salvage_button_rect.collidepoint(
-            pygame.mouse.get_pos()
-        )
 
     def _calculate_and_set_dynamic_height(self):
-        """Calculates the total height required and resizes the panel's rect."""
+        """
+        Calculates the total height required by laying out content sections sequentially.
+        This method simulates the layout pass of the `draw` method.
+        """
         padding = 15
-        line_height = 24
+        current_y_offset = padding
 
+        # Section 1: Title and Stats
+        current_y_offset += self.font_title.get_height() + 10  # Title
+        current_y_offset += self.font_header.get_height() + 5  # Stats Header
         stats_to_display = self._get_stats_to_display()
-        stats_section_height = 40 + (len(stats_to_display) * line_height) + 5
-        current_height = padding + stats_section_height
+        current_y_offset += len(stats_to_display) * 24  # Stats list (24px per line)
+        current_y_offset += 15  # Padding after stats
 
+        # Section 2: Targeting Personas
         if self.persona_buttons:
-            current_height += 40
-            current_height += (len(self.persona_buttons) * (28 + 5)) + 15
+            current_y_offset += self.font_header.get_height() + 5  # Header
+            current_y_offset += len(self.persona_buttons) * (
+                28 + 5
+            )  # Buttons (28px high + 5px space)
+            current_y_offset += 15  # Padding after section
 
+        # Section 3: Upgrade Buttons
         if self.upgrade_buttons:
             total_upgrade_height = sum(b.rect.height for b in self.upgrade_buttons)
             total_spacing = (
-                (len(self.upgrade_buttons) - 1) * 10
-                if len(self.upgrade_buttons) > 1
-                else 0
+                (len(self.upgrade_buttons) - 1) * 10 if self.upgrade_buttons else 0
             )
-            current_height += total_upgrade_height + total_spacing
+            current_y_offset += total_upgrade_height + total_spacing
+            current_y_offset += 10  # Padding after last upgrade
 
-        current_height += 70
-        self.rect.height = current_height
+        # Section 4: Salvage Button Area
+        current_y_offset += 55  # Space for the salvage button (40px high + 15px margin)
+
+        # Final bottom padding
+        current_y_offset += padding
+
+        self.rect.height = current_y_offset
 
     def _setup_fonts_and_colors(self):
         """Initializes fonts and color constants for drawing."""
@@ -123,27 +137,19 @@ class UpgradePanel(UIElement):
             "persona_text": (210, 210, 220),
         }
 
-    def _create_layout(self):
-        """Creates and positions all UI elements dynamically."""
+    def _create_button_objects(self):
+        """Creates button instances without setting their final vertical positions."""
         self.upgrade_buttons.clear()
         self.persona_buttons.clear()
         padding = 15
+        width = self.rect.width - (padding * 2)
 
-        stats_to_display = self._get_stats_to_display()
-        stats_section_height = 40 + (len(stats_to_display) * 24) + 5
-        current_y = self.rect.y + padding + stats_section_height
-
+        # Create Persona buttons (rects will be repositioned in the draw loop)
         if self.tower.available_personas and len(self.tower.available_personas) > 1:
-            current_y += 40
-            persona_button_height = 28
             for persona_id in self.tower.available_personas:
                 persona_data = self.targeting_ai_config.get(persona_id, {})
-                button_rect = pygame.Rect(
-                    self.rect.x + padding,
-                    current_y,
-                    self.rect.width - (padding * 2),
-                    persona_button_height,
-                )
+                # Create rect with placeholder y=0, it will be set in the draw loop
+                button_rect = pygame.Rect(0, 0, width, 28)
                 self.persona_buttons.append(
                     {
                         "id": persona_id,
@@ -152,33 +158,27 @@ class UpgradePanel(UIElement):
                         "is_hovered": False,
                     }
                 )
-                current_y += persona_button_height + 5
-            current_y += 15
 
+        # Create Upgrade buttons
         next_upgrade_a = self.upgrade_manager.get_next_upgrade(self.tower, "path_a")
         if next_upgrade_a:
             can_afford = self.game_state.gold >= next_upgrade_a.cost
             button_rect = pygame.Rect(
-                self.rect.x + padding,
-                current_y,
-                self.rect.width - (padding * 2),
-                0,
+                0, 0, width, 0
+            )  # Placeholder y, height is dynamic
+            self.upgrade_buttons.append(
+                UpgradeButton(button_rect, next_upgrade_a, can_afford)
             )
-            button_a = UpgradeButton(button_rect, next_upgrade_a, can_afford)
-            self.upgrade_buttons.append(button_a)
-            current_y += button_a.rect.height + 10
 
         next_upgrade_b = self.upgrade_manager.get_next_upgrade(self.tower, "path_b")
         if next_upgrade_b:
             can_afford = self.game_state.gold >= next_upgrade_b.cost
             button_rect = pygame.Rect(
-                self.rect.x + padding,
-                current_y,
-                self.rect.width - (padding * 2),
-                0,
+                0, 0, width, 0
+            )  # Placeholder y, height is dynamic
+            self.upgrade_buttons.append(
+                UpgradeButton(button_rect, next_upgrade_b, can_afford)
             )
-            button_b = UpgradeButton(button_rect, next_upgrade_b, can_afford)
-            self.upgrade_buttons.append(button_b)
 
     def handle_event(
         self, event: pygame.event.Event, game_state: "GameState"
@@ -213,36 +213,88 @@ class UpgradePanel(UIElement):
         return None
 
     def draw(self, screen: pygame.Surface):
-        """Draws the panel and all its components."""
+        """Draws the panel and all its components sequentially."""
+        # Draw panel background
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
         panel_surf.fill(self.colors["bg"])
         screen.blit(panel_surf, self.rect.topleft)
         pygame.draw.rect(screen, self.colors["border"], self.rect, 2, border_radius=5)
 
-        self._draw_text(screen)
+        # --- Begin sequential layout and drawing ---
+        padding = 15
+        current_y = self.rect.y + padding
+
+        # Pass 1: Draw title and stats, get next Y position
+        current_y = self._draw_title_and_stats(screen, current_y)
+
+        # Pass 2: Draw personas, get next Y position
+        current_y = self._draw_persona_section(screen, current_y)
+
+        # Pass 3: Draw upgrade buttons
+        current_y = self._draw_upgrade_section(screen, current_y)
+
+        # --- Draw overlay elements ---
+        self._draw_salvage_button(screen)  # Uses its own pre-calculated rect
         self._draw_close_button(screen)
-        self._draw_salvage_button(screen)
-        self._draw_persona_buttons(screen)
 
-        for button in self.upgrade_buttons:
-            button.draw(screen, self.game_state)
+    def _draw_title_and_stats(self, screen: pygame.Surface, start_y: int) -> int:
+        """Draws title and stats, returns the Y position for the next element."""
+        padding = 15
+        line_height = 24
+        current_y = start_y
 
-    def _draw_persona_buttons(self, screen: pygame.Surface):
-        """Draws the targeting priority buttons."""
+        # Title
+        title_surf = self.font_title.render(self.tower.name, True, self.colors["title"])
+        screen.blit(title_surf, (self.rect.x + padding, current_y))
+        current_y += self.font_title.get_height() + 10
+
+        # Stats Header
+        stats_header_surf = self.font_header.render(
+            "Statistics", True, self.colors["header"]
+        )
+        screen.blit(stats_header_surf, (self.rect.x + padding, current_y))
+        current_y += stats_header_surf.get_height() + 5
+
+        # Stats List
+        stats_to_display = self._get_stats_to_display()
+        for label, value, value_format in stats_to_display:
+            value_str = format_stat_value(value, value_format)
+            label_surf = self.font_stat.render(
+                f"{label}:", True, self.colors["stat_label"]
+            )
+            value_surf = self.font_stat.render(
+                value_str, True, self.colors["stat_value"]
+            )
+            screen.blit(label_surf, (self.rect.x + padding, current_y))
+            value_rect = value_surf.get_rect(
+                topright=(self.rect.right - padding, current_y)
+            )
+            screen.blit(value_surf, value_rect)
+            current_y += line_height
+
+        current_y += 15  # Padding after stats section
+        return current_y
+
+    def _draw_persona_section(self, screen: pygame.Surface, start_y: int) -> int:
+        """Draws the targeting priority section, returns the Y for the next element."""
         if not self.persona_buttons:
-            return
+            return start_y
 
         padding = 15
-        stats_to_display = self._get_stats_to_display()
-        stats_section_height = 40 + (len(stats_to_display) * 24) + 5
-        header_y = self.rect.y + padding + stats_section_height
+        current_y = start_y
 
+        # Header
         header_surf = self.font_header.render(
             "Targeting Priority", True, self.colors["header"]
         )
-        screen.blit(header_surf, (self.rect.x + padding, header_y))
+        screen.blit(header_surf, (self.rect.x + padding, current_y))
+        current_y += header_surf.get_height() + 5
 
+        # Buttons
         for button_data in self.persona_buttons:
+            # Dynamically position the button's rect for drawing and collision
+            button_data["rect"].topleft = (self.rect.x + padding, current_y)
+
             is_active = self.tower.current_persona == button_data["id"]
             bg_color = (
                 self.colors["persona_bg_active"]
@@ -258,6 +310,7 @@ class UpgradePanel(UIElement):
                 if is_active
                 else self.colors["persona_border_default"]
             )
+
             pygame.draw.rect(screen, bg_color, button_data["rect"], border_radius=4)
             pygame.draw.rect(
                 screen, border_color, button_data["rect"], 1, border_radius=4
@@ -267,6 +320,28 @@ class UpgradePanel(UIElement):
             )
             text_rect = text_surf.get_rect(center=button_data["rect"].center)
             screen.blit(text_surf, text_rect)
+
+            current_y += button_data["rect"].height + 5
+
+        current_y += 15  # Padding after section
+        return current_y
+
+    def _draw_upgrade_section(self, screen: pygame.Surface, start_y: int) -> int:
+        """Draws the upgrade buttons, returns the Y for the next element."""
+        if not self.upgrade_buttons:
+            return start_y
+
+        padding = 15
+        current_y = start_y
+
+        for button in self.upgrade_buttons:
+            # Dynamically position the button's rect
+            button.rect.topleft = (self.rect.x + padding, current_y)
+            button.draw(screen, self.game_state)
+            current_y += button.rect.height + 10
+
+        # We return the position for the *next* element, so we subtract the final padding
+        return current_y - 10
 
     def _draw_close_button(self, screen: pygame.Surface):
         """Draws the 'X' button to close the panel."""
@@ -312,23 +387,12 @@ class UpgradePanel(UIElement):
         stats = []
         stat_definitions = self.tower_base_data.get("info_panel_stats", [])
 
-        # --- REFACTORED: Create a temporary dictionary of the tower's live data ---
-        # This allows us to use the robust get_nested_value function
-        tower_live_data = {
-            "attack": {"data": self.tower.attack_data.get("data", {})},
-            "auras": self.tower.auras,
-            "damage": self.tower.damage,
-            "range": self.tower.range,
-            "fire_rate": self.tower.fire_rate,
-        }
-
         for stat_info in stat_definitions:
             label = stat_info.get("label")
             value_path = stat_info.get("value_path")
 
-            # Use the utility to get the live value from our temporary dict
             live_value = (
-                get_nested_value(tower_live_data, value_path) if value_path else None
+                get_nested_value(self.tower, value_path) if value_path else None
             )
 
             if live_value is not None:
@@ -342,38 +406,3 @@ class UpgradePanel(UIElement):
             stats.append(("Projectiles", self.tower.projectiles_per_shot, None))
 
         return stats
-
-    def _draw_text(self, screen: pygame.Surface):
-        """Renders and blits all the text elements for the panel."""
-        padding = 15
-        line_height = 24
-        current_y = self.rect.y + padding
-
-        title_surf = self.font_title.render(self.tower.name, True, self.colors["title"])
-        screen.blit(title_surf, (self.rect.x + padding, current_y))
-        current_y += 40
-
-        stats_header_surf = self.font_header.render(
-            "Statistics", True, self.colors["header"]
-        )
-        screen.blit(stats_header_surf, (self.rect.x + padding, current_y))
-        current_y += line_height + 5
-
-        stats_to_display = self._get_stats_to_display()
-
-        for label, value, value_format in stats_to_display:
-            value_str = format_stat_value(value, value_format)
-
-            label_surf = self.font_stat.render(
-                f"{label}:", True, self.colors["stat_label"]
-            )
-            value_surf = self.font_stat.render(
-                value_str, True, self.colors["stat_value"]
-            )
-
-            screen.blit(label_surf, (self.rect.x + padding, current_y))
-            value_rect = value_surf.get_rect(
-                topright=(self.rect.right - padding, current_y)
-            )
-            screen.blit(value_surf, value_rect)
-            current_y += line_height

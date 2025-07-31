@@ -41,15 +41,20 @@ class Tower(Entity):
         self.name = tower_type_data.get("name", "Unknown Tower")
         self.cost = tower_type_data.get("cost", 0)
         self.status_effects_config = status_effects_config
-        self.attack_data = tower_type_data.get("attack", {})
-        # --- BUGFIX: Ensure aura data is loaded for support towers ---
+
+        # --- FIX: Renamed attribute to match the JSON key "attack" ---
+        self.attack = tower_type_data.get("attack", {})
+        # --- END FIX ---
+
         self.auras = tower_type_data.get("auras", [])
 
         ai_config = tower_type_data.get("ai_config", {})
         self.available_personas = ai_config.get("available_personas", ["SOLDIER"])
         self.current_persona = ai_config.get("default_persona", "SOLDIER")
 
-        attack_specific_data = self.attack_data.get("data", {})
+        # --- FIX: Use the renamed self.attack attribute ---
+        attack_specific_data = self.attack.get("data", {})
+        # --- END FIX ---
 
         self.base_damage = attack_specific_data.get("damage", 0)
         self.base_range = attack_specific_data.get("range", 100)
@@ -165,7 +170,10 @@ class Tower(Entity):
         else:
             self.fire_cooldown = float("inf")
 
-        attack_type = self.attack_data.get("type")
+        # --- FIX: Use the renamed self.attack attribute ---
+        attack_type = self.attack.get("type")
+        # --- END FIX ---
+
         if not attack_type:
             logger.error(f"Tower '{self.name}' has no 'type' defined.")
             return []
