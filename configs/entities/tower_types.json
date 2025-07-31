@@ -1,5 +1,5 @@
 {
-  "//": "TOWER DATA OVERHAUL: Added descriptions to all towers and a new 'info_panel_stats' key to make the UI data-driven.",
+  "//": "TOWER DATA OVERHAUL: Added descriptions to all towers and a new 'info_panel_stats' key to make the UI data-driven. AI personas have been reassigned for better strategic fit.",
   "turret": {
     "name": "Basic Turret",
     "category": "military",
@@ -17,8 +17,8 @@
       }
     ],
     "ai_config": {
-      "default_persona": "SOLDIER",
-      "available_personas": ["SOLDIER", "EXECUTIONER", "SNIPER"]
+      "default_persona": "EXECUTIONER",
+      "available_personas": ["EXECUTIONER", "SNIPER", "ARMOR_PIERCER"]
     },
     "attack": {
       "type": "standard_projectile",
@@ -42,8 +42,8 @@
       }
     ],
     "ai_config": {
-      "default_persona": "SOLDIER",
-      "available_personas": ["SOLDIER", "EXECUTIONER", "CONTAGION"]
+      "default_persona": "CONTAGION",
+      "available_personas": ["CONTAGION", "EXECUTIONER", "SOLDIER"]
     },
     "attack": {
       "type": "standard_projectile",
@@ -68,8 +68,8 @@
       { "label": "Blast Radius", "value_path": "attack.data.blast_radius" }
     ],
     "ai_config": {
-      "default_persona": "SOLDIER",
-      "available_personas": ["SOLDIER", "EXECUTIONER", "SNIPER"]
+      "default_persona": "ARTILLERY",
+      "available_personas": ["ARTILLERY", "EXECUTIONER", "ARMOR_PIERCER"]
     },
     "attack": {
       "type": "standard_projectile",
@@ -98,8 +98,8 @@
       }
     ],
     "ai_config": {
-      "default_persona": "SOLDIER",
-      "available_personas": ["SOLDIER", "EXECUTIONER", "CONTAGION"]
+      "default_persona": "EXECUTIONER",
+      "available_personas": ["EXECUTIONER", "ARMOR_PIERCER", "SHREDDER"]
     },
     "attack": {
       "type": "standard_projectile",
@@ -126,7 +126,7 @@
     ],
     "ai_config": {
       "default_persona": "ARTILLERY",
-      "available_personas": ["ARTILLERY", "EXECUTIONER", "SNIPER"]
+      "available_personas": ["ARTILLERY", "EXECUTIONER", "ARMOR_PIERCER"]
     },
     "attack": {
       "type": "standard_projectile",
@@ -152,7 +152,7 @@
     ],
     "ai_config": {
       "default_persona": "EXECUTIONER",
-      "available_personas": ["EXECUTIONER", "ASSASSIN", "SNIPER"]
+      "available_personas": ["EXECUTIONER", "SHREDDER", "ARTILLERY"]
     },
     "attack": {
       "type": "persistent_ground_aura",
@@ -181,8 +181,8 @@
       { "label": "Aura Radius", "value_path": "attack.data.radius" }
     ],
     "ai_config": {
-      "default_persona": "EXECUTIONER",
-      "available_personas": ["EXECUTIONER", "ASSASSIN", "SNIPER"]
+      "default_persona": "ARMOR_PIERCER",
+      "available_personas": ["ARMOR_PIERCER", "EXECUTIONER", "SNIPER"]
     },
     "attack": {
       "type": "persistent_attached_aura",
@@ -214,8 +214,13 @@
       }
     ],
     "ai_config": {
-      "default_persona": "EXECUTIONER",
-      "available_personas": ["EXECUTIONER", "ASSASSIN", "SNIPER"]
+      "default_persona": "SNIPER",
+      "available_personas": [
+        "SNIPER",
+        "EXECUTIONER",
+        "ARMOR_PIERCER",
+        "ARTILLERY"
+      ]
     },
     "attack": {
       "type": "standard_projectile",
