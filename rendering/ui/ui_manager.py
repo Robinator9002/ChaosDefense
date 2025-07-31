@@ -226,11 +226,18 @@ class UIManager:
                     None,
                 )
                 if selected_tower:
-                    panel_rect = pygame.Rect(self.screen_rect.width - 270, 10, 260, 550)
+                    panel_rect = pygame.Rect(
+                        self.screen_rect.width - 270, 10, 260, 0
+                    )  # Temp height
                     salvage_rate = self.game_manager.get_salvage_rate()
+                    # --- MODIFIED: Pass the tower's base data from the main config ---
+                    tower_base_data = self.game_manager.configs.get(
+                        "tower_types", {}
+                    ).get(selected_tower.tower_type_id, {})
                     self.upgrade_panel = UpgradePanel(
                         rect=panel_rect,
                         tower=selected_tower,
+                        tower_base_data=tower_base_data,
                         upgrade_manager=self.game_manager.upgrade_manager,
                         game_state=game_state,
                         salvage_refund_percentage=salvage_rate,
@@ -256,11 +263,8 @@ class UIManager:
                 not self.tower_info_panel
                 or self.tower_info_panel.tower_data.get("id") != selected_build_id
             ):
-                # --- MODIFIED: Create panel with placeholder y-value ---
                 panel_width = 260
-                panel_rect = pygame.Rect(
-                    20, 0, panel_width, 0
-                )  # y and height are temporary
+                panel_rect = pygame.Rect(20, 0, panel_width, 0)
 
                 self.tower_info_panel = TowerInfoPanel(
                     rect=panel_rect,
@@ -270,7 +274,6 @@ class UIManager:
                     ),
                 )
 
-                # --- MODIFIED: Reposition the panel based on its new dynamic height ---
                 self.tower_info_panel.rect.y = (
                     self.screen_rect.bottom
                     - 80
