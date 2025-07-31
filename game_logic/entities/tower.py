@@ -48,17 +48,25 @@ class Tower(Entity):
         self.available_personas = ai_config.get("available_personas", [])
         self.current_persona = ai_config.get("default_persona", None)
 
+        # --- FIX: Unify State ---
+        # The attack dictionary is now the single source of truth for stats.
+        # Base stats are stored for the effect handler to reset to each frame.
+        # Live stats are accessed via properties that read/write to the dictionary.
         attack_specific_data = self.attack.get("data", {})
+        if not attack_specific_data:  # Ensure 'data' dict exists for support towers
+            self.attack["data"] = {}
+            attack_specific_data = self.attack["data"]
 
         self.base_damage = attack_specific_data.get("damage", 0)
         self.base_range = attack_specific_data.get("range", 100)
         self.base_fire_rate = attack_specific_data.get("fire_rate", 1.0)
+        self.base_blast_radius = attack_specific_data.get("blast_radius", 0)
 
-        self.damage = self.base_damage
-        self.range = self.base_range
-        self.fire_rate = self.base_fire_rate
-
-        self.blast_radius = attack_specific_data.get("blast_radius", 0)
+        # Initialize the values in the dictionary if they don't exist
+        attack_specific_data.setdefault("damage", self.base_damage)
+        attack_specific_data.setdefault("range", self.base_range)
+        attack_specific_data.setdefault("fire_rate", self.base_fire_rate)
+        attack_specific_data.setdefault("blast_radius", self.base_blast_radius)
 
         self.path_a_tier = 0
         self.path_b_tier = 0
@@ -96,6 +104,48 @@ class Tower(Entity):
         self.rect = self.sprite.get_rect(center=self.pos)
         logger.info(f"Created Level 1 {self.name} ({self.entity_id}).")
 
+    # --- START: Property-based stat access ---
+    # This ensures that game logic (using self.damage) and UI (reading from
+    # self.attack['data']['damage']) are always in sync.
+
+    @property
+    def damage(self) -> float:
+        return self.attack.get("data", {}).get("damage", 0)
+
+    @damage.setter
+    def damage(self, value: float):
+        if "data" in self.attack:
+            self.attack["data"]["damage"] = value
+
+    @property
+    def range(self) -> float:
+        return self.attack.get("data", {}).get("range", 0)
+
+    @range.setter
+    def range(self, value: float):
+        if "data" in self.attack:
+            self.attack["data"]["range"] = value
+
+    @property
+    def fire_rate(self) -> float:
+        return self.attack.get("data", {}).get("fire_rate", 0)
+
+    @fire_rate.setter
+    def fire_rate(self, value: float):
+        if "data" in self.attack:
+            self.attack["data"]["fire_rate"] = value
+
+    @property
+    def blast_radius(self) -> float:
+        return self.attack.get("data", {}).get("blast_radius", 0)
+
+    @blast_radius.setter
+    def blast_radius(self, value: float):
+        if "data" in self.attack:
+            self.attack["data"]["blast_radius"] = value
+
+    # --- END: Property-based stat access ---
+
     def _create_sprite(
         self, tile_size: int, tower_data: Dict[str, Any]
     ) -> pygame.Surface:
@@ -116,8 +166,8 @@ class Tower(Entity):
         """
         super().update(dt, game_state, targeting_manager)
 
-        # --- FIX: If a tower has no attack (i.e., it's a support tower), skip all attack logic ---
-        if not self.attack:
+        # --- FIX: If a tower has no attack type (i.e., it's a support tower), skip all attack logic ---
+        if not self.attack.get("type"):
             return []
 
         if self.fire_cooldown > 0:
