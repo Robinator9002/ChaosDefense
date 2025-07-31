@@ -41,20 +41,14 @@ class Tower(Entity):
         self.name = tower_type_data.get("name", "Unknown Tower")
         self.cost = tower_type_data.get("cost", 0)
         self.status_effects_config = status_effects_config
-
-        # --- FIX: Renamed attribute to match the JSON key "attack" ---
         self.attack = tower_type_data.get("attack", {})
-        # --- END FIX ---
-
         self.auras = tower_type_data.get("auras", [])
 
         ai_config = tower_type_data.get("ai_config", {})
-        self.available_personas = ai_config.get("available_personas", ["SOLDIER"])
-        self.current_persona = ai_config.get("default_persona", "SOLDIER")
+        self.available_personas = ai_config.get("available_personas", [])
+        self.current_persona = ai_config.get("default_persona", None)
 
-        # --- FIX: Use the renamed self.attack attribute ---
         attack_specific_data = self.attack.get("data", {})
-        # --- END FIX ---
 
         self.base_damage = attack_specific_data.get("damage", 0)
         self.base_range = attack_specific_data.get("range", 100)
@@ -122,6 +116,10 @@ class Tower(Entity):
         """
         super().update(dt, game_state, targeting_manager)
 
+        # --- FIX: If a tower has no attack (i.e., it's a support tower), skip all attack logic ---
+        if not self.attack:
+            return []
+
         if self.fire_cooldown > 0:
             self.fire_cooldown = max(0.0, self.fire_cooldown - dt)
 
@@ -147,8 +145,7 @@ class Tower(Entity):
 
     def _find_new_targets(self, targeting_manager: "TargetingManager"):
         """
-        Delegates target acquisition to the TargetingManager for a fast,
-        filtered, and sorted list of targets based on the current AI persona.
+        Delegates target acquisition to the TargetingManager.
         """
         potential_targets = targeting_manager.get_nearby_enemies(self.pos, self.range)
 
@@ -170,10 +167,7 @@ class Tower(Entity):
         else:
             self.fire_cooldown = float("inf")
 
-        # --- FIX: Use the renamed self.attack attribute ---
         attack_type = self.attack.get("type")
-        # --- END FIX ---
-
         if not attack_type:
             logger.error(f"Tower '{self.name}' has no 'type' defined.")
             return []

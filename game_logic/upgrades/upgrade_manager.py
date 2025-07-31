@@ -3,14 +3,8 @@ import logging
 from typing import Dict, Any, Optional, TYPE_CHECKING, Callable
 
 from .upgrade import Upgrade
-
-# --- MODIFIED: Import the new, separated effect applicator functions ---
-# We now import the module containing our library of handler functions.
-# The relative path '..' correctly navigates from 'upgrades' up to 'game_logic'
-# and then down into the 'effects' directory, as per your structural change.
 from ..effects import effect_applicators
 
-# Use TYPE_CHECKING to avoid a circular import dependency at runtime.
 if TYPE_CHECKING:
     from ..entities.tower import Tower
 
@@ -26,21 +20,12 @@ class UpgradeManager:
     def __init__(self, upgrade_definitions: Dict[str, Any]):
         """
         Initializes the UpgradeManager.
-
-        It parses the raw upgrade definitions and, most importantly, creates a
-        dispatch table (_effect_handlers) that maps effect type strings from
-        the JSON config to the actual Python functions that apply those effects.
         """
         self.definitions: Dict[str, Dict[str, list[Upgrade]]] = {}
-        # --- NEW: The dispatch table for all upgrade effects ---
-        # This dictionary is the core of the new system. It maps the 'type'
-        # string from the JSON to the corresponding function in the
-        # effect_applicators module. To add a new effect to the game, you
-        # only need to add an entry here and in the applicators file.
         self._effect_handlers: Dict[str, Callable[["Tower", Any], None]] = {
-            # --- NEW: Handler for modifying nested attack data ---
             "modify_attack_data": effect_applicators.modify_attack_data,
-            # --- Existing Handlers ---
+            # --- FIX: Register the new handler for aura upgrades ---
+            "modify_nested": effect_applicators.modify_nested_aura_property,
             "add_damage": effect_applicators.add_damage,
             "add_range": effect_applicators.add_range,
             "multiply_fire_rate": effect_applicators.multiply_fire_rate,
@@ -51,7 +36,6 @@ class UpgradeManager:
             "add_execute_threshold": effect_applicators.add_execute_threshold,
             "multiply_blast_radius": effect_applicators.multiply_blast_radius,
             "add_blast_effect": effect_applicators.add_blast_effect,
-            "multiply_effect_duration": effect_applicators.multiply_effect_duration,
             "multiply_effect_potency": effect_applicators.multiply_effect_potency,
             "add_on_apply_damage": effect_applicators.add_on_apply_damage,
             "add_on_death_explosion": effect_applicators.add_on_death_explosion,
@@ -66,8 +50,6 @@ class UpgradeManager:
     def _parse_definitions(self, raw_definitions: Dict[str, Any]):
         """
         Parses the raw upgrade definition dictionary into Upgrade objects.
-        This method is now compatible with the new JSON structure where 'effects'
-        is a list of objects.
         """
         for tower_type_id, paths_data in raw_definitions.items():
             if not isinstance(paths_data, dict):
