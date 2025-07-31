@@ -130,6 +130,21 @@ class Tower(Entity):
             return self._fire()
         return []
 
+    # --- NEW: Method to change the AI persona ---
+    def set_persona(self, new_persona_id: str):
+        """
+        Safely sets the tower's targeting persona.
+        """
+        if new_persona_id in self.available_personas:
+            self.current_persona = new_persona_id
+            logger.info(
+                f"Tower {self.entity_id} changed persona to '{new_persona_id}'."
+            )
+        else:
+            logger.warning(
+                f"Attempted to set invalid persona '{new_persona_id}' for tower {self.entity_id}."
+            )
+
     def _find_new_targets(self, targeting_manager: "TargetingManager"):
         """
         Delegates target acquisition to the TargetingManager for a fast,
