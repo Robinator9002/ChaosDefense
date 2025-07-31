@@ -1,0 +1,228 @@
+{
+  "path_a": {
+    "name": "Amplification",
+    "description": "Focuses on raw amplification of magical effects and auras.",
+    "upgrades": [
+      {
+        "id": "archmage_a1",
+        "name": "Focusing Crystals",
+        "cost": 200,
+        "description": "Increases the potency of the Effect Potency Boost aura.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.effect_potency_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_a2",
+        "name": "Resonant Fields",
+        "cost": 280,
+        "description": "Increases the potency of the Aura Size Boost aura.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.aura_size_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_a3",
+        "name": "Leyline Attunement",
+        "cost": 350,
+        "description": "Increases the Arch-Mage's own aura radius by 20.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "auras[0]",
+              "operation": "modify_nested",
+              "nested_key": "range",
+              "nested_op": "add",
+              "amount": 20
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_a4",
+        "name": "Power Overwhelming",
+        "cost": 500,
+        "description": "Greatly increases the potency of the Effect Potency Boost aura.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.effect_potency_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.25
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_a5",
+        "name": "Nexus of Power",
+        "cost": 1800,
+        "description": "Becomes a nexus of raw magic, massively amplifying the potency and size of all nearby magical effects.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.effect_potency_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.5
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.aura_size_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.2
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "path_b": {
+    "name": "Metamagic",
+    "description": "Focuses on granting new, unique magical properties to nearby towers.",
+    "upgrades": [
+      {
+        "id": "archmage_b1",
+        "name": "Arcane Reach",
+        "cost": 180,
+        "description": "Increases the Arch-Mage's own aura radius by 25.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "auras[0]",
+              "operation": "modify_nested",
+              "nested_key": "range",
+              "nested_op": "add",
+              "amount": 25
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_b2",
+        "name": "Empower Projectiles",
+        "cost": 400,
+        "description": "The Arch-Mage's aura now also grants a small Damage Boost to nearby towers.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "auras[0].effects",
+              "operation": "add_effect",
+              "effect": {
+                "id": "damage_boost",
+                "potency": 1.1,
+                "duration": 0.5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_b3",
+        "name": "Empower Speed",
+        "cost": 400,
+        "description": "The Arch-Mage's aura now also grants a small Fire Rate Boost to nearby towers.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "auras[0].effects",
+              "operation": "add_effect",
+              "effect": {
+                "id": "fire_rate_boost",
+                "potency": 1.1,
+                "duration": 0.5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_b4",
+        "name": "Greater Empowerment",
+        "cost": 600,
+        "description": "Increases the potency of the granted Damage and Fire Rate boosts.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.damage_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.05
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.fire_rate_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.05
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_b5",
+        "name": "Archon's Blessing",
+        "cost": 2000,
+        "description": "All towers in the aura are blessed, gaining a significant boost to all stats and effect potencies.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.effect_potency_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.2
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.damage_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.1
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.fire_rate_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.1
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

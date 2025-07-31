@@ -1,0 +1,224 @@
+{
+  "path_a": {
+    "name": "Offensive Leadership",
+    "description": "Focuses on dramatically increasing the damage output of nearby towers.",
+    "upgrades": [
+      {
+        "id": "commander_a1",
+        "name": "Inspirational Tactics",
+        "cost": 150,
+        "description": "Increases the potency of the Damage Boost aura.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.damage_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.05
+            }
+          }
+        ]
+      },
+      {
+        "id": "commander_a2",
+        "name": "Rallying Cry",
+        "cost": 220,
+        "description": "Increases the potency of the Fire Rate Boost aura.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.fire_rate_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.05
+            }
+          }
+        ]
+      },
+      {
+        "id": "commander_a3",
+        "name": "Expanded Command",
+        "cost": 300,
+        "description": "Increases the aura's radius by 25.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "auras[0]",
+              "operation": "modify_nested",
+              "nested_key": "range",
+              "nested_op": "add",
+              "amount": 25
+            }
+          }
+        ]
+      },
+      {
+        "id": "commander_a4",
+        "name": "Decisive Strategy",
+        "cost": 450,
+        "description": "Greatly increases the potency of the Damage Boost aura.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.damage_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "commander_a5",
+        "name": "Supreme Commander",
+        "cost": 1200,
+        "description": "Massively increases the potency of all offensive buffs and further extends the aura's range.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.damage_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.15
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.fire_rate_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.1
+            }
+          },
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "auras[0]",
+              "operation": "modify_nested",
+              "nested_key": "range",
+              "nested_op": "add",
+              "amount": 35
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "path_b": {
+    "name": "Defensive Fortification",
+    "description": "Focuses on increasing the range and tactical advantage of nearby towers.",
+    "upgrades": [
+      {
+        "id": "commander_b1",
+        "name": "Advanced Optics",
+        "cost": 120,
+        "description": "Increases the potency of the Range Boost aura.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.range_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.05
+            }
+          }
+        ]
+      },
+      {
+        "id": "commander_b2",
+        "name": "Signal Flares",
+        "cost": 200,
+        "description": "Increases the aura's radius by 30.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "auras[0]",
+              "operation": "modify_nested",
+              "nested_key": "range",
+              "nested_op": "add",
+              "amount": 30
+            }
+          }
+        ]
+      },
+      {
+        "id": "commander_b3",
+        "name": "Reinforced Positions",
+        "cost": 350,
+        "description": "Greatly increases the potency of the Range Boost aura.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.range_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "commander_b4",
+        "name": "Battlefield Control",
+        "cost": 500,
+        "description": "Dramatically increases the aura's radius.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "auras[0]",
+              "operation": "modify_nested",
+              "nested_key": "range",
+              "nested_op": "add",
+              "amount": 50
+            }
+          }
+        ]
+      },
+      {
+        "id": "commander_b5",
+        "name": "Total War",
+        "cost": 1500,
+        "description": "The Commander's presence is felt across the battlefield, providing a significant boost to all stats for all towers in its massive radius.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.damage_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.1
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.range_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.1
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "key": "auras[0].effects.fire_rate_boost",
+              "nested_key": "potency",
+              "nested_op": "add",
+              "amount": 0.1
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
