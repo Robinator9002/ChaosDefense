@@ -4,8 +4,6 @@ import logging
 from typing import Dict, Any, TYPE_CHECKING
 
 from ..ui_element import UIElement
-
-# --- MODIFIED: Use the new, corrected path for the text renderer ---
 from ..text.text_renderer import render_text_wrapped
 
 if TYPE_CHECKING:
@@ -20,16 +18,23 @@ class TowerInfoPanel(UIElement):
     selected from the build menu, before it is placed.
     """
 
-    def __init__(self, rect: pygame.Rect, tower_data: Dict[str, Any]):
+    def __init__(
+        self,
+        rect: pygame.Rect,
+        tower_data: Dict[str, Any],
+        targeting_ai_config: Dict[str, Any],
+    ):
         """
         Initializes the TowerInfoPanel.
 
         Args:
             rect (pygame.Rect): The rectangle defining the panel's position and size.
             tower_data (Dict[str, Any]): The configuration data for the tower type.
+            targeting_ai_config (Dict[str, Any]): The global targeting AI config.
         """
         super().__init__(rect)
         self.tower_data = tower_data
+        self.targeting_ai_config = targeting_ai_config  # --- NEW ---
         self._setup_fonts_and_colors()
 
     def _setup_fonts_and_colors(self):
@@ -40,6 +45,7 @@ class TowerInfoPanel(UIElement):
         self.font_desc = pygame.font.SysFont("segoeui", 14)
         self.colors = {
             "bg": (25, 30, 40, 230),
+            "bg_hover": (25, 30, 40, 60),  # --- NEW: Transparent background color ---
             "border": (80, 90, 100),
             "title": (240, 240, 240),
             "header": (200, 200, 210),
@@ -50,13 +56,16 @@ class TowerInfoPanel(UIElement):
 
     def draw(self, screen: pygame.Surface):
         """Draws the panel and all its components."""
+        # --- NEW: Change background transparency on hover ---
+        bg_color = self.colors["bg_hover"] if self.is_hovered else self.colors["bg"]
+
         # Draw panel background and border
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        panel_surf.fill(self.colors["bg"])
+        panel_surf.fill(bg_color)
         screen.blit(panel_surf, self.rect.topleft)
         pygame.draw.rect(screen, self.colors["border"], self.rect, 2, border_radius=5)
 
-        # --- Render and Blit all text content ---
+        # Render and Blit all text content
         self._draw_text_content(screen)
 
     def _draw_text_content(self, screen: pygame.Surface):
@@ -101,12 +110,11 @@ class TowerInfoPanel(UIElement):
             "Damage": attack_data.get("damage"),
             "Range": attack_data.get("range"),
             "Fire Rate": f"{attack_data.get('fire_rate', 0.0):.2f}/s",
-            "DPS": attack_data.get("dps"),  # For aura towers
+            "DPS": attack_data.get("dps"),
             "Blast Radius": attack_data.get("blast_radius"),
         }
 
         for label, value in stats_to_display.items():
-            # Only display stats that are present and non-zero
             if value is None or value == 0 or value == "0.00/s":
                 continue
 
@@ -120,3 +128,27 @@ class TowerInfoPanel(UIElement):
             screen.blit(label_surf, (self.rect.x + padding, current_y))
             screen.blit(value_surf, (self.rect.x + self.rect.width / 2, current_y))
             current_y += line_height_stat
+
+        current_y += 15
+
+        # --- NEW: Targeting Modes Section ---
+        ai_config = self.tower_data.get("ai_config", {})
+        personas = ai_config.get("available_personas", [])
+        if personas:
+            header_surf = self.font_header.render(
+                "Targeting Modes", True, self.colors["header"]
+            )
+            screen.blit(header_surf, (self.rect.x + padding, current_y))
+            current_y += header_surf.get_height() + 5
+
+            persona_names = [
+                self.targeting_ai_config.get(p, {}).get("name", p) for p in personas
+            ]
+
+            persona_text = ", ".join(persona_names)
+            wrapped_personas = render_text_wrapped(
+                persona_text, self.font_desc, self.colors["desc"], desc_max_width
+            )
+            for line_surf in wrapped_personas:
+                screen.blit(line_surf, (self.rect.x + padding, current_y))
+                current_y += self.font_desc.get_height()

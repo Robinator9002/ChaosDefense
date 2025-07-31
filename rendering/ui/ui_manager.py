@@ -162,6 +162,11 @@ class UIManager:
             if action:
                 self._process_ui_action(action, game_state)
                 return True
+
+        # --- NEW: Pass events to the info panel to update its hover state ---
+        if self.tower_info_panel:
+            self.tower_info_panel.handle_event(event, game_state)
+
         if event.type == pygame.MOUSEMOTION:
             for tab in self.category_tabs:
                 tab.handle_event(event, game_state)
@@ -201,13 +206,11 @@ class UIManager:
             case ActionType.SALVAGE_TOWER:
                 if game_state.selected_entity_id:
                     self.game_manager.salvage_tower(game_state.selected_entity_id)
-            # --- NEW: Handle the persona change action ---
             case ActionType.CHANGE_TARGETING_PERSONA:
                 tower_id = game_state.selected_entity_id
                 persona_id = action.entity_id
                 if tower_id and persona_id:
                     self.game_manager.change_tower_persona(tower_id, persona_id)
-                    # Rebuild the panel to visually update the active button
                     if self.upgrade_panel:
                         self.upgrade_panel.rebuild_layout()
 
@@ -224,11 +227,8 @@ class UIManager:
                     None,
                 )
                 if selected_tower:
-                    panel_rect = pygame.Rect(
-                        self.screen_rect.width - 270, 10, 260, 550
-                    )  # Increased height
+                    panel_rect = pygame.Rect(self.screen_rect.width - 270, 10, 260, 550)
                     salvage_rate = self.game_manager.get_salvage_rate()
-                    # --- MODIFIED: Pass the targeting_ai config to the panel ---
                     self.upgrade_panel = UpgradePanel(
                         rect=panel_rect,
                         tower=selected_tower,
@@ -241,6 +241,7 @@ class UIManager:
                     )
         elif self.upgrade_panel:
             self.upgrade_panel = None
+
         selected_build_id = game_state.selected_tower_to_build
         tower_data_to_display = None
         if selected_build_id:
@@ -256,15 +257,20 @@ class UIManager:
                 not self.tower_info_panel
                 or self.tower_info_panel.tower_data.get("id") != selected_build_id
             ):
-                panel_width, panel_height = 260, 320
+                panel_width, panel_height = 260, 400  # Increased height
                 panel_rect = pygame.Rect(
                     20,
                     self.screen_rect.bottom - 80 - 35 - panel_height - 10,
                     panel_width,
                     panel_height,
                 )
+                # --- MODIFIED: Pass the targeting_ai config to the info panel ---
                 self.tower_info_panel = TowerInfoPanel(
-                    panel_rect, tower_data_to_display
+                    rect=panel_rect,
+                    tower_data=tower_data_to_display,
+                    targeting_ai_config=self.game_manager.configs.get(
+                        "targeting_ai", {}
+                    ),
                 )
         elif self.tower_info_panel:
             self.tower_info_panel = None
