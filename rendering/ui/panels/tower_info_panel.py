@@ -6,6 +6,9 @@ from typing import Dict, Any, TYPE_CHECKING
 from ..ui_element import UIElement
 from ..text.text_renderer import render_text_wrapped
 
+# --- NEW: Import shared utility functions ---
+from .panel_utils import get_nested_value, format_stat_value
+
 if TYPE_CHECKING:
     from game_logic.game_state import GameState
 
@@ -38,7 +41,6 @@ class TowerInfoPanel(UIElement):
         self.font_title = pygame.font.SysFont("segoeui", 22, bold=True)
         self.font_header = pygame.font.SysFont("segoeui", 18, bold=True)
         self.font_stat = pygame.font.SysFont("segoeui", 16)
-        # --- MODIFIED: Slightly larger description font ---
         self.font_desc = pygame.font.SysFont("segoeui", 15)
         self.colors = {
             "bg": (25, 30, 40, 230),
@@ -50,22 +52,6 @@ class TowerInfoPanel(UIElement):
             "stat_value": (220, 220, 230),
             "desc": (180, 180, 190),
         }
-
-    def _get_nested_value(self, data_dict: Dict, path: str) -> Any:
-        """Safely retrieves a value from a nested dictionary using a dot-separated path."""
-        keys = path.replace("[", ".").replace("]", "").split(".")
-        current_level = data_dict
-        for key in keys:
-            if isinstance(current_level, dict):
-                current_level = current_level.get(key)
-            elif isinstance(current_level, list) and key.isdigit():
-                try:
-                    current_level = current_level[int(key)]
-                except IndexError:
-                    return None
-            else:
-                return None
-        return current_level
 
     def _calculate_and_set_dynamic_height(self):
         """Calculates the total required height for all content and resizes the panel."""
@@ -130,7 +116,6 @@ class TowerInfoPanel(UIElement):
 
         stats_to_display = self.tower_data.get("info_panel_stats", [])
         if stats_to_display:
-            # --- MODIFIED: Header text changed ---
             header_surf = self.font_header.render(
                 "Statistics", True, self.colors["header"]
             )
@@ -140,8 +125,9 @@ class TowerInfoPanel(UIElement):
             for stat_info in stats_to_display:
                 label = stat_info.get("label", "N/A")
                 value_path = stat_info.get("value_path")
+                # --- REFACTORED: Use shared utility function ---
                 value = (
-                    self._get_nested_value(self.tower_data, value_path)
+                    get_nested_value(self.tower_data, value_path)
                     if value_path
                     else "N/A"
                 )
@@ -149,17 +135,8 @@ class TowerInfoPanel(UIElement):
                 if value is None:
                     continue
 
-                value_format = stat_info.get("format")
-                if value_format == "per_second":
-                    value_str = f"{value:.2f}/s"
-                elif value_format == "percentage":
-                    value_str = f"{int(value * 100)}%"
-                elif value_format == "percentage_boost":
-                    value_str = f"+{int((value - 1) * 100)}%"
-                elif value_format == "multiplier":
-                    value_str = f"{value}x"
-                else:
-                    value_str = str(value)
+                # --- REFACTORED: Use shared utility function ---
+                value_str = format_stat_value(value, stat_info.get("format"))
 
                 label_surf = self.font_stat.render(
                     f"{label}:", True, self.colors["stat_label"]
@@ -169,7 +146,6 @@ class TowerInfoPanel(UIElement):
                 )
 
                 screen.blit(label_surf, (self.rect.x + padding, current_y))
-                # --- MODIFIED: Right-align the value for a clean column ---
                 value_rect = value_surf.get_rect(
                     topright=(self.rect.right - padding, current_y)
                 )
