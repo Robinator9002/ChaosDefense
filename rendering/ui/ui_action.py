@@ -25,6 +25,8 @@ class ActionType(Enum):
     SALVAGE_TOWER = auto()
     # Action to close the currently open panel (e.g., the upgrade panel).
     CLOSE_PANEL = auto()
+    # --- NEW: Action to change a tower's targeting AI persona ---
+    CHANGE_TARGETING_PERSONA = auto()
 
 
 @dataclass(frozen=True)
@@ -48,7 +50,11 @@ class UIAction:
         Validates the dataclass instance after it's been created.
         This ensures that actions that require an ID actually have one.
         """
-        if self.type in (ActionType.SELECT_TOWER, ActionType.PURCHASE_UPGRADE):
+        if self.type in (
+            ActionType.SELECT_TOWER,
+            ActionType.PURCHASE_UPGRADE,
+            ActionType.CHANGE_TARGETING_PERSONA,  # Also requires an ID
+        ):
             if self.entity_id is None:
                 logger.error(
                     f"UIAction of type '{self.type.name}' requires an 'entity_id'."
