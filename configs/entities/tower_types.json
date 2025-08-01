@@ -1,5 +1,5 @@
 {
-  "//": "TOWER DATA OVERHAUL: Added descriptions to all towers and a new 'info_panel_stats' key to make the UI data-driven. AI personas have been reassigned for better strategic fit.",
+  "//": "TOWER DATA OVERHAUL: Removed the hard-coded 'ai_config' block from all towers. Persona eligibility will now be determined dynamically by the game logic based on a tower's current abilities.",
   "turret": {
     "name": "Basic Turret",
     "category": "military",
@@ -16,10 +16,6 @@
         "format": "per_second"
       }
     ],
-    "ai_config": {
-      "default_persona": "EXECUTIONER",
-      "available_personas": ["EXECUTIONER", "SNIPER", "ARMOR_PIERCER"]
-    },
     "attack": {
       "type": "standard_projectile",
       "data": { "damage": 10, "range": 160, "fire_rate": 1.2 }
@@ -41,10 +37,6 @@
         "format": "percentage"
       }
     ],
-    "ai_config": {
-      "default_persona": "CONTAGION",
-      "available_personas": ["CONTAGION", "EXECUTIONER", "SOLDIER"]
-    },
     "attack": {
       "type": "standard_projectile",
       "data": {
@@ -67,10 +59,6 @@
       { "label": "Range", "value_path": "attack.data.range" },
       { "label": "Blast Radius", "value_path": "attack.data.blast_radius" }
     ],
-    "ai_config": {
-      "default_persona": "ARTILLERY",
-      "available_personas": ["ARTILLERY", "EXECUTIONER", "ARMOR_PIERCER"]
-    },
     "attack": {
       "type": "standard_projectile",
       "data": {
@@ -97,10 +85,6 @@
         "format": "per_second"
       }
     ],
-    "ai_config": {
-      "default_persona": "EXECUTIONER",
-      "available_personas": ["EXECUTIONER", "ARMOR_PIERCER", "SHREDDER"]
-    },
     "attack": {
       "type": "standard_projectile",
       "data": {
@@ -124,10 +108,6 @@
       { "label": "Range", "value_path": "attack.data.range" },
       { "label": "Blast Radius", "value_path": "attack.data.blast_radius" }
     ],
-    "ai_config": {
-      "default_persona": "ARTILLERY",
-      "available_personas": ["ARTILLERY", "EXECUTIONER", "ARMOR_PIERCER"]
-    },
     "attack": {
       "type": "standard_projectile",
       "data": {
@@ -140,7 +120,6 @@
     }
   },
   "inferno_weaver": {
-    "//": "BALANCE PASS 2: Base stats nerfed to make upgrades more meaningful.",
     "name": "Inferno Weaver",
     "category": "magic",
     "cost": 150,
@@ -152,10 +131,6 @@
       { "label": "Range", "value_path": "attack.data.range" },
       { "label": "Aura Radius", "value_path": "attack.data.radius" }
     ],
-    "ai_config": {
-      "default_persona": "EXECUTIONER",
-      "available_personas": ["EXECUTIONER", "SHREDDER", "ARTILLERY"]
-    },
     "attack": {
       "type": "persistent_ground_aura",
       "data": {
@@ -171,7 +146,6 @@
     }
   },
   "stormcaller": {
-    "//": "BALANCE PASS 2: Base version heavily nerfed to require upgrades. Role is now a utility anti-armor specialist.",
     "name": "Stormcaller",
     "category": "magic",
     "cost": 165,
@@ -183,10 +157,6 @@
       { "label": "Range", "value_path": "attack.data.range" },
       { "label": "Aura Radius", "value_path": "attack.data.radius" }
     ],
-    "ai_config": {
-      "default_persona": "ARMOR_PIERCER",
-      "available_personas": ["ARMOR_PIERCER", "EXECUTIONER", "SNIPER"]
-    },
     "attack": {
       "type": "persistent_attached_aura",
       "data": {
@@ -217,15 +187,6 @@
         "format": "multiplier"
       }
     ],
-    "ai_config": {
-      "default_persona": "SNIPER",
-      "available_personas": [
-        "SNIPER",
-        "EXECUTIONER",
-        "ARMOR_PIERCER",
-        "ARTILLERY"
-      ]
-    },
     "attack": {
       "type": "standard_projectile",
       "data": {
@@ -239,7 +200,6 @@
     }
   },
   "commander": {
-    "//": "BALANCE PASS 2: Base version nerfed to only provide a small damage buff, making its upgrades essential.",
     "name": "Commander",
     "category": "support",
     "cost": 160,
@@ -265,7 +225,6 @@
     ]
   },
   "archmage": {
-    "//": "BALANCE PASS 2: Base stats unchanged as requested. Its power will come from its strong upgrades.",
     "name": "Arch-Mage",
     "category": "support",
     "cost": 190,
