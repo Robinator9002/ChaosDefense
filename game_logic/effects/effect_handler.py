@@ -16,6 +16,21 @@ class EffectHandler:
     and calculating the final modified stats for the entity each frame.
     """
 
+    # --- REFACTOR: Centralized list of modifiable stats ---
+    # This list is the single source of truth for all stats that can be
+    # temporarily modified by status effects. This decouples the handler from
+    # specific entity implementations (Tower, Enemy). To add a new modifiable
+    # stat to the game, a developer only needs to add it here.
+    MODIFIABLE_STATS = [
+        "damage",
+        "range",
+        "fire_rate",
+        "effect_potency_multiplier",
+        "aura_size_multiplier",
+        "speed",
+        "armor",
+    ]
+
     def __init__(self, owner: "Entity"):
         """
         Initializes the EffectHandler.
@@ -30,15 +45,11 @@ class EffectHandler:
         Applies a new status effect to the owner. If an effect of the same type
         already exists, it will either stack or refresh based on the effect's data.
         """
-        # --- Stacking Logic ---
-        # Check if an effect of the same type from the same source already exists.
         for existing_effect in self.status_effects:
             if existing_effect.effect_id == new_effect.effect_id:
-                # Let the existing effect handle the stacking logic.
                 existing_effect.stack_with(new_effect)
-                return  # Stop after stacking.
+                return
 
-        # If no existing effect was found, simply add the new one.
         self.status_effects.append(new_effect)
 
     def update(self, dt: float):
@@ -48,74 +59,44 @@ class EffectHandler:
         """
         total_dot_damage = 0
 
-        # --- 1. Update durations and gather DoT damage ---
         for effect in self.status_effects:
-            # The update method ticks down the duration and internal DoT timers.
             effect.update(dt)
-            # The get_dot_damage method checks if a DoT tick occurred this frame.
             total_dot_damage += effect.get_dot_damage()
 
-        # --- 2. Apply any accumulated DoT damage ---
         if total_dot_damage > 0:
-            # We pass ignores_armor=True because DoT effects typically bypass armor.
             self.owner.take_damage(total_dot_damage, ignores_armor=True)
 
-        # --- 3. Remove any effects that have expired during the update ---
         self.status_effects = [
             effect for effect in self.status_effects if effect.is_active
         ]
 
-        # --- 4. Recalculate all stats from scratch based on remaining effects ---
         self.apply_stat_modifiers()
 
     def apply_stat_modifiers(self):
         """
         Resets the owner's stats to their base values and then applies all
         modifiers from currently active status effects.
-
-        --- FIX ---
-        This function now uses `hasattr` to check if the owner (e.g., Enemy)
-        actually has a stat (e.g., 'damage') before trying to modify it. This
-        prevents crashes when effects are applied to entities that don't have
-        the full set of tower-like attributes.
         """
         # --- Step 1: Reset all modifiable stats to their base values ---
-        # This prevents modifiers from stacking frame-over-frame.
+        # This generic loop iterates through our centralized list.
+        for stat_name in self.MODIFIABLE_STATS:
+            base_stat_name = f"base_{stat_name}"
+            # Check if the owner has both the stat and its 'base_' counterpart.
+            if hasattr(self.owner, stat_name) and hasattr(self.owner, base_stat_name):
+                base_value = getattr(self.owner, base_stat_name)
+                setattr(self.owner, stat_name, base_value)
 
-        # Tower-specific stats
-        if hasattr(self.owner, "base_damage"):
-            self.owner.damage = self.owner.base_damage
-        if hasattr(self.owner, "base_range"):
-            self.owner.range = self.owner.base_range
-        if hasattr(self.owner, "base_fire_rate"):
-            self.owner.fire_rate = self.owner.base_fire_rate
-        if hasattr(self.owner, "base_effect_potency_multiplier"):
-            self.owner.effect_potency_multiplier = (
-                self.owner.base_effect_potency_multiplier
-            )
-        if hasattr(self.owner, "base_aura_size_multiplier"):
-            self.owner.aura_size_multiplier = self.owner.base_aura_size_multiplier
-
-        # Enemy-specific stats
-        if hasattr(self.owner, "base_speed"):
-            self.owner.speed = self.owner.base_speed
-        if hasattr(self.owner, "base_armor"):
-            self.owner.armor = self.owner.base_armor
-
-        # Universal stats
+        # Handle special cases that don't follow the base_stat pattern.
         if hasattr(self.owner, "damage_taken_multiplier"):
             self.owner.damage_taken_multiplier = 1.0
 
         # --- Step 2: Apply all active modifiers ---
-        # This loop now correctly reads from the `modifiers` property we added
-        # to the StatusEffect class, fixing the original bug.
         for effect in self.status_effects:
             for modifier in effect.modifiers:
                 stat = modifier["stat"]
                 op = modifier["operation"]
                 value = modifier["value"]
 
-                # Again, check if the owner has the stat before modifying
                 if hasattr(self.owner, stat):
                     current_value = getattr(self.owner, stat)
                     if op == "add":
@@ -125,7 +106,5 @@ class EffectHandler:
 
         # Ensure stats don't fall below reasonable minimums
         if hasattr(self.owner, "speed"):
-            # A speed of 0 should only be possible via a stun, not a slow.
-            # Stun effects will set the multiplier to 0 directly.
             if not any(e.effect_id == "stun" for e in self.status_effects):
                 self.owner.speed = max(5, self.owner.speed)
