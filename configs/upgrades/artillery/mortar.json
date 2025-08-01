@@ -1,85 +1,72 @@
 {
+  "//": "BALANCE PASS 2: Upgrades have been refactored to align with the Mortar's new role as a long-range, high-damage wave softener, rather than a crowd-control specialist.",
   "path_a": {
     "name": "Heavy Ordinance",
-    "description": "Focuses on making each explosion as devastating as possible.",
+    "description": "Focuses on making each shell as devastating as possible in a concentrated area.",
     "upgrades": [
       {
         "id": "mortar_a1",
-        "name": "Bigger Booms",
-        "cost": 90,
-        "description": "Increases the blast radius of each shell.",
-        "effects": [{ "type": "multiply_blast_radius", "value": 1.25 }]
-      },
-      {
-        "id": "mortar_a2",
         "name": "High-Explosive Payload",
-        "cost": 130,
+        "cost": 110,
         "description": "Increases shell damage by 15.",
         "effects": [{ "type": "add_damage", "value": 15 }]
       },
       {
+        "id": "mortar_a2",
+        "name": "Improved Propellant",
+        "cost": 150,
+        "description": "Increases attack range by 50.",
+        "effects": [{ "type": "add_range", "value": 50 }]
+      },
+      {
         "id": "mortar_a3",
-        "name": "Cluster Bombs",
-        "cost": 200,
-        "description": "Shells release smaller bombs on impact, increasing the effective blast radius.",
-        "effects": [{ "type": "multiply_blast_radius", "value": 1.25 }]
+        "name": "Shrapnel Shells",
+        "cost": 220,
+        "description": "Explosions cause enemies to bleed, taking significant damage over time.",
+        "effects": [
+          {
+            "type": "add_blast_effect",
+            "value": { "id": "bleed", "potency": 25, "duration": 5 }
+          }
+        ]
       },
       {
         "id": "mortar_a4",
         "name": "The Big One",
-        "cost": 280,
-        "description": "Massively increases shell damage by 40.",
-        "effects": [{ "type": "add_damage", "value": 40 }]
+        "cost": 300,
+        "description": "Massively increases shell damage by 50.",
+        "effects": [{ "type": "add_damage", "value": 50 }]
       },
       {
         "id": "mortar_a5",
-        "name": "Napalm",
-        "cost": 350,
-        "description": "Explosions leave a patch of fire on the ground, burning enemies who walk through it.",
+        "name": "Napalm Coating",
+        "cost": 450,
+        "description": "Explosions now also ignite enemies, dealing further damage over time.",
         "effects": [
           {
             "type": "add_blast_effect",
-            "value": { "id": "fire", "potency": 5, "duration": 4 }
+            "value": { "id": "fire", "potency": 20, "duration": 4 }
           }
         ]
       }
     ]
   },
   "path_b": {
-    "name": "Rapid Deployment",
-    "description": "Turns the mortar into a suppression tool with faster firing and utility shells.",
+    "name": "Suppression Barrage",
+    "description": "Turns the mortar into a rapid-fire debuff tool that weakens enemies for other towers.",
     "upgrades": [
       {
         "id": "mortar_b1",
         "name": "Improved Loading",
-        "cost": 100,
-        "description": "Increases fire rate by 10%.",
-        "effects": [{ "type": "multiply_fire_rate", "value": 1.1 }]
-      },
-      {
-        "id": "mortar_b2",
-        "name": "Concussion Shells",
-        "cost": 150,
-        "description": "Explosions now briefly stun enemies.",
-        "effects": [
-          {
-            "type": "add_blast_effect",
-            "value": { "id": "stun", "potency": 0, "duration": 0.75 }
-          }
-        ]
-      },
-      {
-        "id": "mortar_b3",
-        "name": "Autoloader",
-        "cost": 210,
-        "description": "Increases fire rate by another 20%.",
+        "cost": 120,
+        "description": "Increases fire rate by 20%.",
         "effects": [{ "type": "multiply_fire_rate", "value": 1.2 }]
       },
       {
-        "id": "mortar_b4",
+        "id": "mortar_b2",
         "name": "Corrosion Agent",
-        "cost": 280,
-        "description": "Shells release a gas that corrodes armor.",
+        "cost": 180,
+        "description": "Shells release a gas that corrodes armor, reducing it by 10.",
         "effects": [
           {
             "type": "add_blast_effect",
@@ -92,11 +79,34 @@
         ]
       },
       {
+        "id": "mortar_b3",
+        "name": "Autoloader",
+        "cost": 240,
+        "description": "Increases fire rate by another 30%.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.3 }]
+      },
+      {
+        "id": "mortar_b4",
+        "name": "Vulnerability Payload",
+        "cost": 320,
+        "description": "Shells now make enemies vulnerable, causing them to take 20% increased damage from all sources.",
+        "effects": [
+          {
+            "type": "add_blast_effect",
+            "value": {
+              "id": "vulnerability",
+              "potency": 1.2,
+              "duration": 4
+            }
+          }
+        ]
+      },
+      {
         "id": "mortar_b5",
-        "cost": 380,
+        "cost": 480,
         "name": "Orbital Targeting",
-        "description": "Final upgrade. Grants a massive boost to fire rate.",
-        "effects": [{ "type": "multiply_fire_rate", "value": 1.25 }]
+        "description": "Final upgrade. Grants a massive boost to fire rate, blanketing the area in debuffs.",
+        "effects": [{ "type": "multiply_fire_rate", "value": 1.5 }]
       }
     ]
   }
