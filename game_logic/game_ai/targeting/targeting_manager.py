@@ -34,14 +34,9 @@ class TargetingManager:
         self.targeting_ai_config = targeting_ai_config
 
         # --- The spatial hash grids ---
-        # These dictionaries map a cell coordinate (tuple) to a list of entities in that cell.
         self.enemy_grid: Dict[Tuple[int, int], List["Enemy"]] = defaultdict(list)
         self.tower_grid: Dict[Tuple[int, int], List["Tower"]] = defaultdict(list)
 
-        # --- PERFORMANCE FIX: Entity State Tracking ---
-        # This dictionary tracks the last known cell for each entity. This allows us
-        # to know if an entity has moved to a new cell, requiring an update.
-        # Key: entity.entity_id (uuid), Value: (cell_x, cell_y) (Tuple[int, int])
         self._entity_cell_map: Dict[uuid.UUID, Tuple[int, int]] = {}
 
         self.sorters: Dict[str, Callable] = {
@@ -66,7 +61,6 @@ class TargetingManager:
     def add_entity(self, entity: "Entity"):
         """
         Adds a new entity to the appropriate spatial grid and tracks its cell.
-        This is called once when an entity is created.
         """
         cell_coords = self._get_cell_coords(entity.pos)
 
@@ -80,7 +74,6 @@ class TargetingManager:
     def remove_entity(self, entity: "Entity"):
         """
         Removes an entity from the spatial grid and stops tracking it.
-        This is called once when an entity is destroyed.
         """
         if entity.entity_id not in self._entity_cell_map:
             return
@@ -104,23 +97,20 @@ class TargetingManager:
     def update_entity_position(self, entity: "Entity"):
         """
         Checks if a moving entity has crossed into a new cell and updates the
-        grid accordingly. This is called every frame for moving entities.
+        grid accordingly.
         """
         if entity.entity_id not in self._entity_cell_map:
-            return  # Should not happen for moving entities, but as a safeguard.
+            return
 
         last_known_cell = self._entity_cell_map[entity.entity_id]
         current_cell = self._get_cell_coords(entity.pos)
 
         if last_known_cell != current_cell:
-            # The entity has moved to a new cell.
-            # We must remove it from the old cell's list and add it to the new one.
             try:
                 if "Enemy" in [cls.__name__ for cls in entity.__class__.__mro__]:
                     if entity in self.enemy_grid[last_known_cell]:
                         self.enemy_grid[last_known_cell].remove(entity)
                     self.enemy_grid[current_cell].append(entity)
-                # Add logic for moving towers here if they ever exist
             except ValueError:
                 logger.warning(
                     f"Attempted to update entity {entity.entity_id} which was not in its tracked cell."
@@ -154,7 +144,6 @@ class TargetingManager:
 
         for x in range(min_x, max_x + 1):
             for y in range(min_y, max_y + 1):
-                # Using .get() is safe for cells that might be empty
                 for entity in grid.get((x, y), []):
                     if (
                         entity.is_alive
@@ -173,7 +162,8 @@ class TargetingManager:
         persona_data = self.targeting_ai_config.get(persona_id)
         if not persona_data:
             logger.warning(f"Unknown AI persona '{persona_id}'. Defaulting to closest.")
-            return targeting_priorities.sort_by_closest(targets, tower, [])
+            # --- REFACTORED: Pass self instead of empty list ---
+            return targeting_priorities.sort_by_closest(targets, tower, self)
 
         function_name = persona_data.get("priority_function")
         sorter = self.sorters.get(function_name)
@@ -182,9 +172,8 @@ class TargetingManager:
             logger.error(f"No sorter function found for '{function_name}'.")
             return targets
 
-        # For sorters that need global context, provide all enemies.
-        # This is less efficient than getting from the grid, but only runs when a
-        # tower is actually sorting, not every frame.
-        all_enemies = [enemy for cell in self.enemy_grid.values() for enemy in cell]
-
-        return sorter(targets, tower, all_enemies)
+        # --- REFACTORED: Pass the TargetingManager instance itself ---
+        # Instead of passing a slow, pre-compiled list of all enemies, we now
+        # pass the manager itself. This gives sorter functions access to its
+        # highly efficient query methods, like get_nearby_enemies.
+        return sorter(targets, tower, self)
