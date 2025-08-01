@@ -39,11 +39,6 @@ def main():
     """Main function to set up and run the game."""
     logger.info("--- Loading All Game Configurations ---")
     try:
-        # --- MODIFIED: Automated Upgrade Discovery ---
-        # We now point our loader to the root 'upgrades' directory.
-        # The loader's recursive search will automatically find all upgrade
-        # files in any subdirectories (e.g., 'military', 'support'), making
-        # the system plug-and-play for new tower categories.
         upgrade_root_dir = CONFIG_PATH / "upgrades"
         all_upgrade_defs = load_all_upgrades([upgrade_root_dir])
 
@@ -54,14 +49,13 @@ def main():
                 CONFIG_PATH / "entities/enemies/enemy_types.json"
             ),
             "boss_types": load_config(CONFIG_PATH / "entities/enemies/boss_types.json"),
-            # --- NEW: Load the buffer enemy configurations ---
             "buffer_types": load_config(
                 CONFIG_PATH / "entities/enemies/buffer_types.json"
             ),
             "tower_types": load_config(CONFIG_PATH / "entities/tower_types.json"),
-            # --- BUGFIX: Add the missing targeting_ai.json to the main config ---
             "targeting_ai": load_config(CONFIG_PATH / "targeting/targeting_ai.json"),
-            # Use the dynamically loaded definitions from our loader.
+            # --- NEW: Load the AI formations playbook ---
+            "formations": load_config(CONFIG_PATH / "ai/formations.json"),
             "upgrade_definitions": all_upgrade_defs,
             "difficulty_scaling": load_config(
                 CONFIG_PATH / "scaling/difficulty_scaling.json"
