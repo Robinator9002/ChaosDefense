@@ -54,6 +54,10 @@ def main():
                 CONFIG_PATH / "entities/enemies/enemy_types.json"
             ),
             "boss_types": load_config(CONFIG_PATH / "entities/enemies/boss_types.json"),
+            # --- NEW: Load the buffer enemy configurations ---
+            "buffer_types": load_config(
+                CONFIG_PATH / "entities/enemies/buffer_types.json"
+            ),
             "tower_types": load_config(CONFIG_PATH / "entities/tower_types.json"),
             # --- BUGFIX: Add the missing targeting_ai.json to the main config ---
             "targeting_ai": load_config(CONFIG_PATH / "targeting/targeting_ai.json"),
