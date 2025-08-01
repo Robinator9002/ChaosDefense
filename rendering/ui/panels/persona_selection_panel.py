@@ -49,7 +49,8 @@ class _PersonaButton(UIElement):
     def handle_event(
         self, event: pygame.event.Event, game_state=None
     ) -> Optional[UIAction]:
-        super().handle_event(event, game_state)
+        # The base class handle_event is not called here, as the parent panel
+        # now calculates the hover state based on the scroll position.
         if self.is_eligible and not self.is_active:
             if (
                 event.type == pygame.MOUSEBUTTONDOWN
@@ -100,7 +101,7 @@ class _PersonaButton(UIElement):
 class PersonaSelectionPanel(UIElement):
     """
     A modal panel that displays all available AI personas, allowing the player
-    to select a new one for a tower.
+    to select a new one for a tower. Features a scrollbar if content overflows.
     """
 
     def __init__(
@@ -111,15 +112,22 @@ class PersonaSelectionPanel(UIElement):
         active_persona: str,
     ):
         panel_width = 400
-        panel_height = 500  # Will be adjusted dynamically
-        rect = pygame.Rect(0, 0, panel_width, panel_height)
-        rect.center = screen_rect.center
-        super().__init__(rect)
+        max_panel_height = screen_rect.height * 0.8
+
+        super().__init__(pygame.Rect(0, 0, panel_width, 0))
 
         self.buttons: List[_PersonaButton] = []
         self._setup_fonts_and_colors()
         self._create_buttons(all_personas, eligible_personas, active_persona)
-        self._perform_layout()
+
+        self.scroll_y = 0
+        self.content_height = 0
+        self.visible_height = 0
+        self.max_scroll = 0
+        self.is_scrollable = False
+
+        self._perform_layout(max_panel_height)
+        self.rect.center = screen_rect.center
 
         self.close_button_rect = pygame.Rect(
             self.rect.right - 32, self.rect.y + 8, 24, 24
@@ -135,6 +143,8 @@ class PersonaSelectionPanel(UIElement):
             "title": (220, 220, 230),
             "close_default": (150, 150, 160),
             "close_hover": (255, 80, 80),
+            "scrollbar_track": (30, 35, 45),
+            "scrollbar_handle": (80, 90, 100),
         }
 
     def _create_buttons(
@@ -144,15 +154,11 @@ class PersonaSelectionPanel(UIElement):
         active_persona: str,
     ):
         for persona_id, persona_data in all_personas.items():
-            # --- CRASH FIX: Ensure we only process valid persona data ---
-            # This check gracefully ignores comments (like "//") or any other
-            # non-dictionary entries in the JSON file.
             if not isinstance(persona_data, dict):
                 continue
 
             is_active = persona_id == active_persona
             is_eligible = persona_id in eligible_personas
-            # Rect position will be set in _perform_layout
             button = _PersonaButton(
                 pygame.Rect(0, 0, 0, 0),
                 persona_id,
@@ -162,70 +168,121 @@ class PersonaSelectionPanel(UIElement):
             )
             self.buttons.append(button)
 
-    def _perform_layout(self):
+    def _perform_layout(self, max_height: float):
         padding = 20
+        header_height = 60
+        footer_padding = 10
         button_width = self.rect.width - (padding * 2)
         button_height = 65
         button_spacing = 10
 
-        current_y = self.rect.y + 60  # Space for title
+        self.content_height = (
+            len(self.buttons) * (button_height + button_spacing) - button_spacing
+        )
 
+        total_required_height = self.content_height + header_height + footer_padding
+        if total_required_height > max_height:
+            self.rect.height = max_height
+            self.is_scrollable = True
+            button_width -= 15  # Make space for scrollbar
+        else:
+            self.rect.height = total_required_height
+            self.is_scrollable = False
+
+        self.visible_height = self.rect.height - header_height - footer_padding
+        self.max_scroll = max(0, self.content_height - self.visible_height)
+
+        current_y = 0
         for button in self.buttons:
-            button.rect.topleft = (self.rect.x + padding, current_y)
+            button.rect.topleft = (padding, current_y)
             button.rect.size = (button_width, button_height)
             current_y += button_height + button_spacing
-
-        # Adjust panel height to fit all buttons
-        self.rect.height = (current_y - self.rect.y) + padding - button_spacing
 
     def handle_event(
         self, event: pygame.event.Event, game_state=None
     ) -> Optional[UIAction]:
+        # --- CRASH FIX: Separated event handling by type ---
+        # MOUSEMOTION events are now handled in their own block to safely update
+        # hover states without crashing on other event types.
         if event.type == pygame.MOUSEMOTION:
             self.is_close_hovered = self.close_button_rect.collidepoint(event.pos)
+            for button in self.buttons:
+                # The panel is responsible for setting hover state because it knows the scroll offset
+                on_screen_rect = button.rect.move(
+                    self.rect.x, self.rect.y + 60 - self.scroll_y
+                )
+                button.is_hovered = on_screen_rect.collidepoint(event.pos)
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.is_close_hovered:
-                # Use a more specific action to avoid closing the main upgrade panel
-                return UIAction(type=ActionType.CLOSE_PERSONA_PANEL)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            # Handle mouse wheel scrolling
+            if self.is_scrollable and self.rect.collidepoint(event.pos):
+                if event.button == 4:  # Scroll up
+                    self.scroll_y = max(0, self.scroll_y - 35)
+                elif event.button == 5:  # Scroll down
+                    self.scroll_y = min(self.max_scroll, self.scroll_y + 35)
 
-        for button in self.buttons:
-            action = button.handle_event(event, game_state)
-            if action:
-                return action
+            # Handle left clicks
+            if event.button == 1:
+                if self.is_close_hovered:
+                    return UIAction(type=ActionType.CLOSE_PERSONA_PANEL)
 
-        # Absorb clicks on the panel background so they don't go through to the map
-        if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos):
-            return UIAction(
-                type=ActionType.UI_CLICK
-            )  # Generic action to signify UI was clicked
+                for button in self.buttons:
+                    # Use the hover state calculated during MOUSEMOTION
+                    if button.is_hovered:
+                        action = button.handle_event(event, game_state)
+                        if action:
+                            return action
+
+                # Absorb clicks on the panel background
+                if self.rect.collidepoint(event.pos):
+                    return UIAction(type=ActionType.UI_CLICK)
 
         return None
 
     def draw(self, screen: pygame.Surface):
-        # Draw a semi-transparent overlay on the whole screen
         overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 150))
         screen.blit(overlay, (0, 0))
 
-        # Draw panel background
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
         panel_surf.fill(self.colors["bg"])
         screen.blit(panel_surf, self.rect.topleft)
         pygame.draw.rect(screen, self.colors["border"], self.rect, 2, border_radius=8)
 
-        # Draw title
         title_surf = self.font_title.render(
             "Change Targeting Persona", True, self.colors["title"]
         )
         title_rect = title_surf.get_rect(centerx=self.rect.centerx, y=self.rect.y + 20)
         screen.blit(title_surf, title_rect)
 
-        # Draw buttons
-        for button in self.buttons:
-            button.draw(screen)
+        content_area = self.rect.inflate(-2, -68)
+        content_area.top += 60
 
-        # Draw close button
+        screen.set_clip(content_area)
+
+        for button in self.buttons:
+            on_screen_pos = (
+                self.rect.x + button.rect.x,
+                self.rect.y + 60 + button.rect.y - self.scroll_y,
+            )
+
+            if (
+                on_screen_pos[1] < self.rect.bottom
+                and on_screen_pos[1] + button.rect.height > self.rect.top + 60
+            ):
+                temp_rect = button.rect.copy()
+                temp_rect.topleft = on_screen_pos
+
+                original_rect = button.rect
+                button.rect = temp_rect
+                button.draw(screen)
+                button.rect = original_rect
+
+        screen.set_clip(None)
+
+        if self.is_scrollable:
+            self._draw_scrollbar(screen)
+
         close_color = (
             self.colors["close_hover"]
             if self.is_close_hovered
@@ -234,3 +291,32 @@ class PersonaSelectionPanel(UIElement):
         close_surf = self.font_close.render("X", True, close_color)
         close_rect = close_surf.get_rect(center=self.close_button_rect.center)
         screen.blit(close_surf, close_rect)
+
+    def _draw_scrollbar(self, screen: pygame.Surface):
+        track_width = 10
+        track_rect = pygame.Rect(
+            self.rect.right - track_width - 5,
+            self.rect.top + 60,
+            track_width,
+            self.visible_height,
+        )
+        pygame.draw.rect(
+            screen, self.colors["scrollbar_track"], track_rect, border_radius=5
+        )
+
+        if self.content_height > self.visible_height:
+            handle_height = self.visible_height * (
+                self.visible_height / self.content_height
+            )
+            handle_height = max(20, handle_height)
+
+            # Prevent division by zero if max_scroll is 0
+            scroll_ratio = self.scroll_y / self.max_scroll if self.max_scroll > 0 else 0
+            handle_y = track_rect.y + (track_rect.height - handle_height) * scroll_ratio
+
+            handle_rect = pygame.Rect(
+                track_rect.x, handle_y, track_rect.width, handle_height
+            )
+            pygame.draw.rect(
+                screen, self.colors["scrollbar_handle"], handle_rect, border_radius=5
+            )

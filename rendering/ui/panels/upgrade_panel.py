@@ -43,7 +43,6 @@ class UpgradePanel(UIElement):
         self.targeting_ai_config = targeting_ai_config
 
         self.upgrade_buttons: List[UpgradeButton] = []
-        # --- UI IMPROVEMENT: Separate rect for the button ---
         self.persona_change_button_rect = pygame.Rect(0, 0, 0, 0)
         self.is_persona_button_hovered = False
 
@@ -95,8 +94,8 @@ class UpgradePanel(UIElement):
         current_y += 15
 
         # --- UI IMPROVEMENT: Layout for persona info and change button ---
-        current_y += self.font_header.get_height() + 5  # Header
-        current_y += 24  # Space for the "Current: ..." text
+        current_y += self.font_header.get_height() + 8  # Header (was 5)
+        current_y += 28  # Space for the "Current: ..." text (was 24)
         button_width = self.rect.width - (padding * 2)
         self.persona_change_button_rect = pygame.Rect(
             self.rect.x + padding, current_y, button_width, 30
@@ -105,6 +104,7 @@ class UpgradePanel(UIElement):
 
         # Section 3: Upgrade Buttons
         if self.upgrade_buttons:
+            current_y += 10  # Extra padding before upgrade buttons
             for button in self.upgrade_buttons:
                 button.rect.topleft = (self.rect.x + padding, current_y)
                 current_y += button.rect.height + 10
@@ -207,8 +207,17 @@ class UpgradePanel(UIElement):
         # --- UI IMPROVEMENT: Draw separated info and button ---
 
         # 1. Draw Header
+        # Calculate Y position based on the layout of the stats section
+        stats_to_display = self._get_stats_to_display()
         header_y = (
-            self.persona_change_button_rect.y - 24 - self.font_header.get_height() - 5
+            self.rect.y
+            + padding
+            + self.font_title.get_height()
+            + 10
+            + self.font_header.get_height()
+            + 5
+            + (len(stats_to_display) * 24)
+            + 15
         )
         header_surf = self.font_header.render(
             "Targeting Priority", True, self.colors["header"]
@@ -216,7 +225,7 @@ class UpgradePanel(UIElement):
         screen.blit(header_surf, (self.rect.x + padding, header_y))
 
         # 2. Draw Current Persona Info Text
-        info_y = self.persona_change_button_rect.y - 26
+        info_y = header_y + self.font_header.get_height() + 8
         active_persona_name = self.targeting_ai_config.get(
             self.tower.current_persona, {}
         ).get("name", "N/A")
@@ -230,7 +239,7 @@ class UpgradePanel(UIElement):
         value_rect = value_surf.get_rect(topright=(self.rect.right - padding, info_y))
         screen.blit(value_surf, value_rect)
 
-        # 3. Draw the "Change..." Button
+        # 3. Draw the "Change..." Button (its rect is already correctly positioned by _perform_layout)
         bg_color = (
             self.colors["persona_bg_hover"]
             if self.is_persona_button_hovered
