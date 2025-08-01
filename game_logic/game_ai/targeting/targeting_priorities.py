@@ -108,7 +108,10 @@ def sort_by_unaffected(
     primary status effect (e.g., 'slow' for a Freezer).
     """
     primary_effect_id = None
-    effects_data = tower.attack_data.get("data", {}).get("effects", {})
+    # --- BUG FIX: Changed tower.attack_data to tower.attack ---
+    # The Tower class was refactored to use 'attack' as its main attribute
+    # for attack-related data. This line was missed during the refactor.
+    effects_data = tower.attack.get("data", {}).get("effects", {})
     if effects_data:
         primary_effect_id = next(iter(effects_data))
 
