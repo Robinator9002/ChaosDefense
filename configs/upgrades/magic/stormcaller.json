@@ -1,13 +1,14 @@
 {
+  "//": "BALANCE PASS 2: Upgrades have been massively buffed to compensate for the nerfed base tower, creating a more meaningful sense of progression and specialization.",
   "path_a": {
     "name": "Eye of the Storm",
-    "description": "Focuses on increasing the direct power and area of the storm.",
+    "description": "Focuses on dramatically increasing the direct anti-armor power and area of the storm.",
     "upgrades": [
       {
         "id": "stormcaller_a1",
         "name": "Charged Particles",
         "cost": 140,
-        "description": "Increases the storm's damage per second.",
+        "description": "Increases the storm's damage per second by 3.",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -17,21 +18,25 @@
       },
       {
         "id": "stormcaller_a2",
-        "name": "Wide Front",
-        "cost": 190,
-        "description": "Increases the radius of the storm by 20%.",
+        "name": "Increased Frequency",
+        "cost": 210,
+        "description": "Greatly increases the tower's fire rate.",
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "radius", "operation": "multiply", "amount": 1.2 }
+            "value": {
+              "key": "fire_rate",
+              "operation": "multiply",
+              "amount": 2.0
+            }
           }
         ]
       },
       {
         "id": "stormcaller_a3",
         "name": "Overcharge",
-        "cost": 280,
-        "description": "The storm's bonus damage against armored targets is now much more effective.",
+        "cost": 320,
+        "description": "The storm's bonus damage against armored targets is much more effective.",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -46,32 +51,32 @@
       {
         "id": "stormcaller_a4",
         "name": "Lingering Charge",
-        "cost": 350,
-        "description": "Increases the duration of the storm by 1.5 seconds.",
+        "cost": 400,
+        "description": "Increases the duration of the storm by 2 seconds.",
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "duration", "operation": "add", "amount": 1.5 }
+            "value": { "key": "duration", "operation": "add", "amount": 2.0 }
           }
         ]
       },
       {
         "id": "stormcaller_a5",
         "name": "Maelstrom",
-        "cost": 600,
-        "description": "The storm becomes a massive Maelstrom, dealing immense damage and covering a vast area.",
+        "cost": 750,
+        "description": "The storm becomes a massive Maelstrom, massively increasing its effectiveness against armor and its damage per second.",
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "dps", "operation": "add", "amount": 8 }
+            "value": {
+              "key": "bonus_damage_vs_armor_multiplier",
+              "operation": "add",
+              "amount": 1.0
+            }
           },
           {
             "type": "modify_attack_data",
-            "value": {
-              "key": "radius",
-              "operation": "multiply",
-              "amount": 1.25
-            }
+            "value": { "key": "dps", "operation": "add", "amount": 10 }
           }
         ]
       }
@@ -79,25 +84,20 @@
   },
   "path_b": {
     "name": "Conduit",
-    "description": "Focuses on utility and applying debilitating secondary effects.",
+    "description": "Focuses on utility and applying debilitating secondary effects to armored targets.",
     "upgrades": [
       {
         "id": "stormcaller_b1",
         "name": "Static Discharge",
-        "cost": 130,
-        "description": "The storm now has a chance to briefly stun enemies caught within it.",
+        "cost": 150,
+        "description": "The storm now applies a stacking armor break, shredding armor over time.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "effects",
+              "path": "attack.data.effects",
               "operation": "add_effect",
-              "effect": {
-                "id": "stun",
-                "potency": 0.0,
-                "duration": 0.15,
-                "chance": 0.1
-              }
+              "amount": { "armor_break": { "potency": 4, "duration": 2.0 } }
             }
           }
         ]
@@ -105,48 +105,43 @@
       {
         "id": "stormcaller_b2",
         "name": "Ionized Air",
-        "cost": 180,
+        "cost": 200,
         "description": "Increases the tick rate of the storm, applying effects more often.",
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "tick_rate", "operation": "add", "amount": 1 }
+            "value": { "key": "tick_rate", "operation": "add", "amount": 2 }
           }
         ]
       },
       {
         "id": "stormcaller_b3",
         "name": "Magnetic Field",
-        "cost": 240,
-        "description": "The storm now also slows enemies, making them easier targets.",
+        "cost": 280,
+        "description": "The storm's slow effect becomes significantly more potent.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "effects",
-              "operation": "add_effect",
-              "effect": { "id": "slow", "potency": 0.3, "duration": 1.0 }
+              "path": "attack.data.effects.slow.potency",
+              "operation": "add",
+              "amount": 0.25
             }
           }
         ]
       },
       {
         "id": "stormcaller_b4",
-        "name": "Chain Lightning",
-        "cost": 320,
-        "description": "The storm now has a chance to arc to a nearby enemy, dealing damage.",
+        "name": "Rapid Casting",
+        "cost": 350,
+        "description": "Significantly increases the tower's fire rate.",
         "effects": [
           {
             "type": "modify_attack_data",
             "value": {
-              "key": "on_tick_chain",
-              "operation": "set",
-              "params": {
-                "chance": 0.25,
-                "damage": 15,
-                "range": 100,
-                "bounces": 1
-              }
+              "key": "fire_rate",
+              "operation": "multiply",
+              "amount": 1.5
             }
           }
         ]
@@ -154,18 +149,16 @@
       {
         "id": "stormcaller_b5",
         "name": "System Shock",
-        "cost": 600,
+        "cost": 700,
         "description": "Enemies affected by the storm become vulnerable, taking increased damage from all sources.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "effects",
+              "path": "attack.data.effects",
               "operation": "add_effect",
-              "effect": {
-                "id": "vulnerability",
-                "potency": 1.2,
-                "duration": 2.0
+              "amount": {
+                "vulnerability": { "potency": 1.25, "duration": 2.0 }
               }
             }
           }
@@ -174,4 +167,3 @@
     ]
   }
 }
-
