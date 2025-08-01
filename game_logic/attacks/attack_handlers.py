@@ -26,22 +26,23 @@ logger = logging.getLogger(__name__)
 
 def create_standard_projectile(tower: "Tower", target: "Enemy") -> List[Entity]:
     """
-    Handles the creation of standard projectiles, now applying the tower's
-    live effect_potency_multiplier to any status effects.
+    Handles the creation of standard projectiles, applying the tower's live
+    effect_potency_multiplier and including effects from upgrades.
     """
-    # --- FIX: Use the renamed `tower.attack` attribute ---
     attack_specific_data = tower.attack.get("data", {})
-    # --- END FIX ---
     projectiles_to_fire = []
     num_shots = tower.projectiles_per_shot
 
     effect_instances = []
-    effects_to_apply_data = attack_specific_data.get("effects", {})
-    for effect_id, params in effects_to_apply_data.items():
+
+    # --- BUG FIX: Process both base effects and upgrade-added effects ---
+
+    # 1. Process base effects from the tower's definition (e.g., a Freezer's slow)
+    base_effects_data = attack_specific_data.get("effects", {})
+    for effect_id, params in base_effects_data.items():
         if random.random() <= params.get("chance", 1.0):
             if effect_id in tower.status_effects_config:
                 effect_def = tower.status_effects_config[effect_id]
-                # --- NEW: Apply the tower's live potency multiplier ---
                 final_potency = (
                     params.get("potency", 1.0) * tower.effect_potency_multiplier
                 )
@@ -50,6 +51,25 @@ def create_standard_projectile(tower: "Tower", target: "Enemy") -> List[Entity]:
                         effect_id=effect_id,
                         effect_data=effect_def,
                         duration=params.get("duration", 1.0),
+                        potency=final_potency,
+                        source_entity_id=tower.entity_id,
+                    )
+                )
+
+    # 2. Process dynamic effects added by upgrades (e.g., a Turret's stun rounds)
+    for effect_data in tower.on_hit_effects:
+        effect_id = effect_data.get("id")
+        if random.random() <= effect_data.get("chance", 1.0):
+            if effect_id and effect_id in tower.status_effects_config:
+                effect_def = tower.status_effects_config[effect_id]
+                final_potency = (
+                    effect_data.get("potency", 1.0) * tower.effect_potency_multiplier
+                )
+                effect_instances.append(
+                    StatusEffect(
+                        effect_id=effect_id,
+                        effect_data=effect_def,
+                        duration=effect_data.get("duration", 1.0),
                         potency=final_potency,
                         source_entity_id=tower.entity_id,
                     )
@@ -94,20 +114,12 @@ def create_standard_projectile(tower: "Tower", target: "Enemy") -> List[Entity]:
 
 
 def create_persistent_ground_aura(tower: "Tower", target: "Enemy") -> List[Entity]:
-    """
-    Handles creation of a ground aura, now pre-processing its data to apply
-    the tower's live aura_size and effect_potency multipliers.
-    """
-    # --- FIX: Use the renamed `tower.attack` attribute ---
     original_aura_data = tower.attack.get("data", {})
-    # --- END FIX ---
     processed_aura_data = copy.deepcopy(original_aura_data)
 
-    # Apply aura size multiplier
     base_radius = processed_aura_data.get("radius", 50)
     processed_aura_data["radius"] = base_radius * tower.aura_size_multiplier
 
-    # Apply effect potency multiplier to all effects within the aura
     if "effects" in processed_aura_data:
         for effect_id, params in processed_aura_data["effects"].items():
             base_potency = params.get("potency", 1.0)
@@ -123,20 +135,12 @@ def create_persistent_ground_aura(tower: "Tower", target: "Enemy") -> List[Entit
 
 
 def create_persistent_attached_aura(tower: "Tower", target: "Enemy") -> List[Entity]:
-    """
-    Handles creation of an attached aura, now pre-processing its data to apply
-    the tower's live aura_size and effect_potency multipliers.
-    """
-    # --- FIX: Use the renamed `tower.attack` attribute ---
     original_aura_data = tower.attack.get("data", {})
-    # --- END FIX ---
     processed_aura_data = copy.deepcopy(original_aura_data)
 
-    # Apply aura size multiplier
     base_radius = processed_aura_data.get("radius", 50)
     processed_aura_data["radius"] = base_radius * tower.aura_size_multiplier
 
-    # Apply effect potency multiplier to all effects within the aura
     if "effects" in processed_aura_data:
         for effect_id, params in processed_aura_data["effects"].items():
             base_potency = params.get("potency", 1.0)

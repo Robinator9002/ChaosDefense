@@ -44,10 +44,8 @@ class Tower(Entity):
         self.cost = tower_type_data.get("cost", 0)
         self.status_effects_config = status_effects_config
 
-        # The `attack` dictionary is the single source of truth for all combat stats.
-        # Properties below provide a safe and consistent way to access this data.
         self.attack = tower_type_data.get("attack", {})
-        self.attack.setdefault("data", {})  # Ensure data dict exists for support towers
+        self.attack.setdefault("data", {})
 
         self.auras = tower_type_data.get("auras", [])
 
@@ -66,10 +64,6 @@ class Tower(Entity):
         self.path_b_tier = 0
 
         # --- Base Stats Initialization ---
-        # These `base_` attributes store the tower's unmodified stats. The
-        # EffectHandler uses them to reset stats each frame before reapplying buffs.
-        # We initialize them by reading the live properties, which pull from the
-        # config data. This ensures consistency.
         self.base_damage = self.damage
         self.base_range = self.range
         self.base_fire_rate = self.fire_rate
@@ -78,7 +72,6 @@ class Tower(Entity):
         self.base_aura_size_multiplier = 1.0
 
         # --- Live Stats (Managed by EffectHandler) ---
-        # These are initialized here but will be modified by status effects.
         self.effect_potency_multiplier = self.base_effect_potency_multiplier
         self.aura_size_multiplier = self.base_aura_size_multiplier
 
@@ -92,8 +85,11 @@ class Tower(Entity):
         self.bonus_damage_per_debuff = 0
         self.conditional_effects: List[Dict[str, Any]] = []
         self.on_hit_area_effects: List[Dict[str, Any]] = []
+        self.on_hit_effects: List[Dict[str, Any]] = []
 
-        # This is a dispatch table mapping attack types from JSON to actual functions.
+        # --- BUG FIX: Restore the on_blast_effects list for the 'add_blast_effect' applicator ---
+        self.on_blast_effects: List[Dict[str, Any]] = []
+
         self._attack_handlers: Dict[
             str, Callable[["Tower", "Enemy"], List["Entity"]]
         ] = {
@@ -106,12 +102,6 @@ class Tower(Entity):
         self.sprite = self._create_sprite(tile_size, tower_type_data)
         self.rect = self.sprite.get_rect(center=self.pos)
         logger.info(f"Created Level 1 {self.name} ({self.entity_id}).")
-
-    # --- START: Property-based Stat Access ---
-    # This is the core of the "single source of truth" design. All game logic
-    # should use these properties (e.g., `tower.damage`). They read directly
-    # from the `attack` dictionary, ensuring data is always consistent. The
-    # setters allow the EffectHandler to modify these live stats.
 
     @property
     def damage(self) -> float:
@@ -150,12 +140,9 @@ class Tower(Entity):
         """Provides clean access to the on-hit effects dictionary."""
         return self.attack["data"].get("effects", {})
 
-    # --- END: Property-based Stat Access ---
-
     def _create_sprite(
         self, tile_size: int, tower_data: Dict[str, Any]
     ) -> pygame.Surface:
-        """Creates the visual representation for the placed tower."""
         sprite = pygame.Surface((tile_size, tile_size), pygame.SRCALPHA)
         color = tower_data.get("placeholder_color", (128, 128, 128))
         pygame.draw.rect(
@@ -167,12 +154,8 @@ class Tower(Entity):
     def update(
         self, dt: float, game_state: "GameState", targeting_manager: "TargetingManager"
     ) -> List["Entity"]:
-        """
-        Updates the tower's logic, finds targets, and fires.
-        """
         super().update(dt, game_state, targeting_manager)
 
-        # If a tower has no attack type (i.e., it's a pure support tower), skip all attack logic.
         if not self.attack.get("type"):
             return []
 
@@ -186,9 +169,6 @@ class Tower(Entity):
         return []
 
     def set_persona(self, new_persona_id: str):
-        """
-        Safely sets the tower's targeting persona.
-        """
         if new_persona_id in self.available_personas:
             self.current_persona = new_persona_id
             logger.info(
@@ -200,10 +180,6 @@ class Tower(Entity):
             )
 
     def _find_new_targets(self, targeting_manager: "TargetingManager"):
-        """
-        Delegates target acquisition to the TargetingManager.
-        """
-        # Uses the `self.range` property to get the live range, including buffs.
         potential_targets = targeting_manager.get_nearby_enemies(self.pos, self.range)
 
         if not potential_targets:
@@ -215,11 +191,9 @@ class Tower(Entity):
         )
 
     def _fire(self) -> List["Entity"]:
-        """Executes the tower's attack by delegating to a specialized handler."""
         if not self.current_targets:
             return []
 
-        # Uses the `self.fire_rate` property to get the live fire rate, including buffs.
         if self.fire_rate > 0:
             self.fire_cooldown = 1.0 / self.fire_rate
         else:
