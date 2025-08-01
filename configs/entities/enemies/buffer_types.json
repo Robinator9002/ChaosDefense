@@ -13,7 +13,7 @@
       "damage": 1,
       "armor": 5
     },
-    "scaling_per_level_add": { "hp": 25, "speed": 1, "bounty": 2, "armor": 1 },
+    "scaling_per_level_add": { "hp": 15, "speed": 1, "bounty": 2, "armor": 1 },
     "auras": [
       {
         "range": 110,
@@ -38,7 +38,7 @@
       "armor": 15
     },
     "scaling_per_level_add": {
-      "hp": 40,
+      "hp": 20,
       "speed": 0,
       "bounty": 3,
       "armor": 1.5
