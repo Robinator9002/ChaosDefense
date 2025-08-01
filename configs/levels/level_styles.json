@@ -10,7 +10,7 @@
       "paths_config": {
         "elbow": 2
       },
-      "level_difficulty": 4,
+      "level_difficulty": 1,
       "starting_gold": 200,
       "base_hp": 25,
       "allowed_boss_types": ["soldier"],

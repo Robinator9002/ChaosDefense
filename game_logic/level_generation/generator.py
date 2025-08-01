@@ -2,7 +2,7 @@
 import random
 import logging
 import math
-from typing import Tuple, List, Callable, Set
+from typing import Tuple, List, Callable, Set, Dict
 
 # The generator now only needs to know about the Pathfinder, not its inner workings.
 from ..pathfinding.pathfinder import Pathfinder
@@ -16,8 +16,10 @@ class LevelGenerator:
     """
     A static class responsible for procedural level generation.
 
-    This class orchestrates the creation of playable maps by requesting a
-    configurable number of paths (1-3) from the Pathfinder.
+    REFACTORED: This class now features a fully data-driven path generation
+    system. It reads a 'paths_config' dictionary from the level parameters,
+    allowing designers to specify any number and combination of path types
+    (e.g., "elbow", "wandering") for a level.
     """
 
     @staticmethod
@@ -25,21 +27,29 @@ class LevelGenerator:
         """
         Orchestrates the entire level generation process.
         """
-        logger.info("Starting procedural level generation with configurable paths.")
+        logger.info("Starting procedural level generation with dynamic paths.")
 
         # --- Generation Sequence ---
         LevelGenerator._create_border(grid)
         target_points = LevelGenerator._place_base_zone(grid, size=4)
 
-        # Read num_paths from config, clamp it to a valid range (1-3).
-        num_paths = params.get("num_paths", 3)
-        num_paths = max(1, min(num_paths, 3))
-        logger.info(f"Configuration requests {num_paths} path(s).")
+        # --- REFACTORED: Read the new paths_config dictionary ---
+        paths_config = params.get("paths_config")
+        if not paths_config or not isinstance(paths_config, dict):
+            logger.error(
+                "Level generation failed: 'paths_config' is missing or invalid."
+            )
+            return grid, []
 
-        start_points = LevelGenerator._define_start_points(grid, num_paths)
+        total_paths_requested = sum(paths_config.values())
+        logger.info(
+            f"Configuration requests {total_paths_requested} paths: {paths_config}"
+        )
+
+        start_points = LevelGenerator._define_start_points(grid, total_paths_requested)
 
         paths = LevelGenerator._request_paths(
-            grid, start_points, target_points, num_paths
+            grid, start_points, target_points, paths_config
         )
         if not paths:
             logger.error("Pathfinder failed to generate the required paths. Aborting.")
@@ -77,111 +87,78 @@ class LevelGenerator:
         grid: Grid,
         start_points: List[Tuple[int, int]],
         all_targets: List[Tuple[int, int]],
-        num_paths: int,
+        paths_config: Dict[str, int],
     ) -> List[List[Tuple[int, int]]]:
         """
-        Requests a configurable number of paths from the Pathfinder sequentially,
-        ensuring that each path generation step is aware of all previous paths to prevent overlaps.
+        Generates a set of paths based on a configuration dictionary. This
+        method is now fully dynamic and data-driven.
         """
-        if not all_targets or len(all_targets) < num_paths:
+        total_paths_requested = sum(paths_config.values())
+        if not all_targets or len(all_targets) < total_paths_requested:
             logger.error(
-                "Not enough valid target points on base provided for the requested number of paths."
+                f"Not enough target points ({len(all_targets)}) for the requested number of paths ({total_paths_requested})."
             )
             return []
 
         all_paths: List[List[Tuple[int, int]]] = []
         occupied_coords: Set[Tuple[int, int]] = set()
 
+        # Create mutable pools of start and target points to draw from
+        available_starts = list(start_points)
+        available_targets = list(all_targets)
+        random.shuffle(available_targets)  # Randomize target assignment
+
+        # Define path generation parameters
         turn_x_range_short = (int(grid.width * 0.3), int(grid.width * 0.45))
         turn_x_range_long = (int(grid.width * 0.55), int(grid.width * 0.7))
 
-        target_top, target_left, target_bottom = (
-            all_targets[0],
-            all_targets[1],
-            all_targets[2],
-        )
+        # --- REFACTORED: Dynamic Path Generation Loop ---
+        # This loop iterates through the requested path types and counts,
+        # replacing the old, rigid if/elif structure.
+        path_num = 1
+        for path_type, count in paths_config.items():
+            for _ in range(count):
+                if not available_starts or not available_targets:
+                    logger.error(
+                        "Ran out of available start or target points during path generation."
+                    )
+                    return []
 
-        # --- Define the sequence of path requests as a list of "jobs" ---
-        requests = []
-        if num_paths == 1:
-            # For 1 path, it's a wandering path to the left entrance.
-            requests.append(
-                {
-                    "start": start_points[0],
-                    "target": target_left,
-                    "type": "wandering",
-                    "args": None,
-                }
-            )
-        elif num_paths == 2:
-            # For 2 paths, they are both elbows to the top and bottom.
-            requests.append(
-                {
-                    "start": start_points[0],
-                    "target": target_top,
-                    "type": "elbow",
-                    "args": turn_x_range_short,
-                }
-            )
-            requests.append(
-                {
-                    "start": start_points[1],
-                    "target": target_bottom,
-                    "type": "elbow",
-                    "args": turn_x_range_long,
-                }
-            )
-        elif num_paths == 3:
-            # For 3 paths, generate the middle one first as it's the most constrained.
-            requests.append(
-                {
-                    "start": start_points[1],
-                    "target": target_left,
-                    "type": "wandering",
-                    "args": None,
-                }
-            )
-            requests.append(
-                {
-                    "start": start_points[0],
-                    "target": target_top,
-                    "type": "elbow",
-                    "args": turn_x_range_short,
-                }
-            )
-            requests.append(
-                {
-                    "start": start_points[2],
-                    "target": target_bottom,
-                    "type": "elbow",
-                    "args": turn_x_range_long,
-                }
-            )
+                start = available_starts.pop(0)
+                target = available_targets.pop(0)
 
-        # --- Execute the requests sequentially ---
-        for i, job in enumerate(requests):
-            path = None
-            logger.info(
-                f"Requesting path #{i+1} (type: {job['type']}) from {job['start']} to {job['target']}"
-            )
-
-            if job["type"] == "wandering":
-                path = Pathfinder.create_wandering_path(
-                    grid, job["start"], job["target"], occupied_coords
-                )
-            elif job["type"] == "elbow":
-                path = Pathfinder.create_elbow_path(
-                    grid, job["start"], job["target"], job["args"], occupied_coords
+                logger.info(
+                    f"Requesting path #{path_num} (type: {path_type}) from {start} to {target}"
                 )
 
-            if path:
-                all_paths.append(path)
-                occupied_coords.update(path)  # CRITICAL: Update state for the next job.
-            else:
-                logger.error(
-                    f"FATAL: Pathfinder failed to create path #{i+1}. Aborting generation."
-                )
-                return []  # Fail fast to avoid a broken map.
+                path = None
+                if path_type == "wandering":
+                    path = Pathfinder.create_wandering_path(
+                        grid, start, target, occupied_coords
+                    )
+                elif path_type == "elbow":
+                    # Simple logic to vary the turn range for visual interest
+                    turn_range = (
+                        turn_x_range_short if path_num % 2 != 0 else turn_x_range_long
+                    )
+                    path = Pathfinder.create_elbow_path(
+                        grid, start, target, turn_range, occupied_coords
+                    )
+                else:
+                    logger.warning(
+                        f"Unknown path type in paths_config: '{path_type}'. Skipping."
+                    )
+                    continue
+
+                if path:
+                    all_paths.append(path)
+                    occupied_coords.update(path)
+                    path_num += 1
+                else:
+                    logger.error(
+                        f"FATAL: Pathfinder failed to create path #{path_num} ('{path_type}'). Aborting generation."
+                    )
+                    return []
 
         return all_paths
 
@@ -223,23 +200,21 @@ class LevelGenerator:
 
     @staticmethod
     def _define_start_points(grid: Grid, num_paths: int) -> List[Tuple[int, int]]:
-        """Defines evenly distributed starting points on the left edge of the map."""
+        """
+        REFACTORED: Dynamically defines evenly distributed starting points on
+        the left edge of the map for any number of paths.
+        """
         if num_paths <= 0:
             return []
 
         points = []
-        # For 1 path, start in the middle.
-        if num_paths == 1:
-            points.append((1, grid.height // 2))
-        # For 2 paths, use top and bottom quarters.
-        elif num_paths == 2:
-            points.append((1, grid.height // 4))
-            points.append((1, grid.height * 3 // 4))
-        # For 3 paths, use top, middle, bottom.
-        elif num_paths == 3:
-            points.append((1, grid.height // 4))
-            points.append((1, grid.height // 2))
-            points.append((1, grid.height * 3 // 4))
+        # Calculate vertical spacing to distribute points evenly.
+        # The +1 in the denominator ensures padding from the top and bottom edges.
+        spacing = grid.height / (num_paths + 1)
+
+        for i in range(num_paths):
+            y_coord = int(spacing * (i + 1))
+            points.append((1, y_coord))
 
         return sorted(points, key=lambda p: p[1])
 
