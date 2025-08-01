@@ -11,17 +11,16 @@ from .waves.wave_manager import WaveManager
 from .entities.tower import Tower
 from .entities.enemies.enemy import Enemy
 from .entities.enemies.boss_enemy import BossEnemy
-
-# --- NEW: Import the BufferEnemy class ---
 from .entities.enemies.buffer_enemy import BufferEnemy
 from .entities.projectiles.projectile import Projectile
-
-# --- BUG FIX: Import aura entities so the GameManager can recognize them ---
 from .entities.projectiles.persistent_ground_aura import PersistentGroundAura
 from .entities.projectiles.persistent_attached_aura import PersistentAttachedAura
 from .upgrades.upgrade_manager import UpgradeManager
 from .effects.status_effect import StatusEffect
 from .game_ai.targeting.targeting_manager import TargetingManager
+
+# --- NEW: Import the DirectorAI class ---
+from .game_ai.director_ai import DirectorAI
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +46,20 @@ class GameManager:
         self.targeting_manager: TargetingManager = TargetingManager(
             cell_size=120, targeting_ai_config=targeting_ai_config
         )
+        # --- NEW: Instantiate the Director AI ---
+        player_difficulty = self.configs["game_settings"].get("difficulty", 1)
+        self.director_ai: DirectorAI = DirectorAI(
+            difficulty_settings=self.configs["difficulty_scaling"].get(
+                str(player_difficulty)
+            ),
+            wave_scaling_config=self.configs["wave_scaling"],
+        )
         self.wave_manager: Optional[WaveManager] = None
         self.grid: Optional[Grid] = None
         self.paths: List[List[Tuple[int, int]]] = []
 
         self.enemies: Dict[uuid.UUID, Enemy] = {}
         self.towers: Dict[uuid.UUID, Tower] = {}
-        # This dictionary will now hold projectiles AND temporary aura effects.
         self.projectiles: Dict[uuid.UUID, Any] = {}
 
         self._setup_new_game()
@@ -84,7 +90,6 @@ class GameManager:
             wave_scaling_config=self.configs["wave_scaling"],
             enemy_types=self.configs["enemy_types"],
             boss_types=self.configs["boss_types"],
-            # --- NEW: Pass buffer types to the WaveManager ---
             buffer_types=self.configs["buffer_types"],
             allowed_boss_types=gen_params.get("allowed_boss_types", []),
             player_difficulty=player_difficulty,
@@ -112,25 +117,25 @@ class GameManager:
             if new_entities:
                 newly_created_entities.extend(new_entities)
 
-        for enemy in self.enemies.values():
-            enemy.update(dt, self.game_state, self.targeting_manager)
-            self.targeting_manager.update_entity_position(enemy)
+        for enemy in list(self.enemies.values()):
+            # --- MODIFIED: Check for leaked enemies ---
+            # We will modify the enemy update method to return the enemy instance if it leaks.
+            leaked_enemy = enemy.update(dt, self.game_state, self.targeting_manager)
+            if leaked_enemy:
+                self.director_ai.record_enemy_leak(leaked_enemy)
+
+            # Update the enemy's position in the targeting grid if it's still alive
+            if enemy.is_alive:
+                self.targeting_manager.update_entity_position(enemy)
 
         for projectile in self.projectiles.values():
             projectile.update(dt, self.game_state, self.targeting_manager)
 
-        # --- BUG FIX: Correctly handle all types of created entities ---
-        # The logic now checks if a new entity is a Projectile OR any of the
-        # aura types, ensuring they are all correctly added to the game world.
         for entity in newly_created_entities:
             if isinstance(
                 entity, (Projectile, PersistentGroundAura, PersistentAttachedAura)
             ):
                 self.projectiles[entity.entity_id] = entity
-                # Auras that affect enemies need to be in the targeting grid
-                # so that enemies can find them (if needed in the future).
-                # For now, only auras affect enemies, not the other way around.
-                # Projectiles are not added as nothing targets them.
                 if not isinstance(entity, Projectile):
                     self.targeting_manager.add_entity(entity)
             else:
@@ -145,6 +150,10 @@ class GameManager:
             dead_enemy = self.enemies[enemy_id]
             self.game_state.add_gold(dead_enemy.bounty)
             self._handle_on_death_effects(dead_enemy)
+
+            # --- NEW: Report enemy death to the Director AI ---
+            self.director_ai.record_enemy_death(dead_enemy)
+
             self.targeting_manager.remove_entity(dead_enemy)
             del self.enemies[enemy_id]
 
@@ -152,7 +161,6 @@ class GameManager:
             pid for pid, p in self.projectiles.items() if not p.is_alive
         ]
         for proj_id in dead_projectile_ids:
-            # --- BUG FIX: Ensure auras are also removed from the targeting grid ---
             entity_to_remove = self.projectiles[proj_id]
             if not isinstance(entity_to_remove, Projectile):
                 self.targeting_manager.remove_entity(entity_to_remove)
@@ -221,7 +229,6 @@ class GameManager:
                 difficulty_modifier=difficulty_mod,
                 status_effects_config=status_effects_cfg,
             )
-        # --- NEW: Check for buffer enemy types ---
         elif entity_id in self.configs["buffer_types"]:
             config = self.configs["buffer_types"][entity_id]
             new_enemy = BufferEnemy(
