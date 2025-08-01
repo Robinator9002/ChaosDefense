@@ -17,10 +17,8 @@ class Enemy(Entity):
     """
     Represents an enemy unit that moves along a path.
 
-    REFACTORED: This class has been dramatically simplified. It no longer
-    manages its own status effects. Instead, it inherits the universal
-    EffectHandler component from the base Entity class, which handles all
-    buff/debuff logic automatically.
+    REFACTORED: With the new intelligent EffectHandler, this class no longer
+    requires dummy tower-specific stats (like base_damage) to function correctly.
     """
 
     def __init__(
@@ -40,7 +38,6 @@ class Enemy(Entity):
         render_props = enemy_type_data.get("render_props", {})
 
         self.name = enemy_type_data.get("name", "Unknown Enemy")
-        # --- NEW: Store the enemy type ID for the AI ---
         self.enemy_type_id = enemy_type_data.get("id", "unknown")
         self.level = level
 
@@ -49,19 +46,18 @@ class Enemy(Entity):
         calculated_hp = int(level_scaled_hp * difficulty_modifier)
 
         speed_increase = scaling.get("speed", 0)
-        self.base_speed = base_stats.get("speed", 50) + (speed_increase * (level - 1))
+        # These are the entity's core stats. The EffectHandler will snapshot them.
+        self.speed = base_stats.get("speed", 50) + (speed_increase * (level - 1))
 
         armor_increase = scaling.get("armor", 0)
         level_scaled_armor = base_stats.get("armor", 0) + (armor_increase * (level - 1))
-        self.base_armor = int(level_scaled_armor)
+        self.armor = int(level_scaled_armor)
 
         bounty_increase = scaling.get("bounty", 0)
         self.bounty = int(base_stats.get("bounty", 0) + (bounty_increase * (level - 1)))
         self.damage_to_base = int(base_stats.get("damage", 1) * difficulty_modifier)
         self.immunities: List[str] = base_stats.get("immunities", [])
 
-        self.speed = self.base_speed
-        self.armor = self.base_armor
         self.damage_taken_multiplier = 1.0
 
         self.path = path
@@ -78,6 +74,8 @@ class Enemy(Entity):
         placeholder_sprite = pygame.Surface((size, size))
         placeholder_sprite.fill(color)
 
+        # The super().__init__ call must come after the core stats are set,
+        # so the EffectHandler can take an accurate initial snapshot.
         super().__init__(
             initial_pos.x, initial_pos.y, calculated_hp, placeholder_sprite
         )
@@ -85,16 +83,9 @@ class Enemy(Entity):
         self.auras = enemy_type_data.get("auras", [])
         self.status_effects_config = status_effects_config
 
-        self.base_damage = 0
-        self.damage = 0
-        self.base_range = 0
-        self.range = 0
-        self.base_fire_rate = 0
-        self.fire_rate = 0
-        self.base_effect_potency_multiplier = 1.0
-        self.effect_potency_multiplier = 1.0
-        self.base_aura_size_multiplier = 1.0
-        self.aura_size_multiplier = 1.0
+        # --- REMOVED: The dummy tower-specific stats are no longer needed ---
+        # The new EffectHandler is smart enough to handle entities that
+        # do not have stats like 'damage', 'range', or 'fire_rate'.
 
     def take_damage(
         self, amount: int, armor_shred: int = 0, ignores_armor: bool = False
@@ -118,11 +109,6 @@ class Enemy(Entity):
     ) -> Optional["Enemy"]:
         """
         The main update loop for the enemy entity.
-
-        Returns:
-            Optional[Enemy]: Returns `self` if the enemy has reached the end of
-                             the path (leaked), otherwise returns `None`. This
-                             provides a signal to the GameManager.
         """
         if not self.is_alive:
             return None
@@ -150,9 +136,6 @@ class Enemy(Entity):
     def _on_reach_end(self, game_state: "GameState") -> "Enemy":
         """
         Handles logic for when the enemy reaches the end of its path.
-
-        Returns:
-            Enemy: Returns `self` to signal to the caller that this enemy leaked.
         """
         logger.warning(
             f"Enemy {self.name} ({self.entity_id}) reached the end. Dealing {self.damage_to_base} damage."

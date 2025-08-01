@@ -1,6 +1,6 @@
 # game_logic/effects/effect_handler.py
 import logging
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Dict, Any
 
 if TYPE_CHECKING:
     from ..entities.entity import Entity
@@ -14,13 +14,14 @@ class EffectHandler:
     Manages all status effects on a single entity. It is responsible for
     applying effects, updating their durations, applying damage-over-time,
     and calculating the final modified stats for the entity each frame.
+
+    REFACTORED: Now uses a hybrid stat reset system. It prefers to use 'base_'
+    attributes for resetting stats (ideal for towers with permanent upgrades),
+    but will fall back to a snapshot of the entity's initial stats if a 'base_'
+    attribute is not found. This makes the handler universally compatible
+    without requiring dummy attributes on entities like enemies.
     """
 
-    # --- REFACTOR: Centralized list of modifiable stats ---
-    # This list is the single source of truth for all stats that can be
-    # temporarily modified by status effects. This decouples the handler from
-    # specific entity implementations (Tower, Enemy). To add a new modifiable
-    # stat to the game, a developer only needs to add it here.
     MODIFIABLE_STATS = [
         "damage",
         "range",
@@ -29,6 +30,7 @@ class EffectHandler:
         "aura_size_multiplier",
         "speed",
         "armor",
+        "damage_taken_multiplier",
     ]
 
     def __init__(self, owner: "Entity"):
@@ -39,6 +41,14 @@ class EffectHandler:
         """
         self.owner = owner
         self.status_effects: List["StatusEffect"] = []
+
+        # --- NEW: Take a snapshot of the owner's initial stats ---
+        # This serves as a fallback for entities that don't have 'base_' attributes.
+        self._initial_stats: Dict[str, Any] = {
+            stat: getattr(owner, stat)
+            for stat in self.MODIFIABLE_STATS
+            if hasattr(owner, stat)
+        }
 
     def apply_status_effect(self, new_effect: "StatusEffect"):
         """
@@ -54,8 +64,8 @@ class EffectHandler:
 
     def update(self, dt: float):
         """
-        Updates all active status effects, applying DoT damage, removing any
-        that have expired, and then recalculating all of the owner's stats.
+        Updates all active status effects, applying DoT, removing expired ones,
+        and then recalculating all of the owner's stats.
         """
         total_dot_damage = 0
 
@@ -74,23 +84,24 @@ class EffectHandler:
 
     def apply_stat_modifiers(self):
         """
-        Resets the owner's stats to their base values and then applies all
-        modifiers from currently active status effects.
+        Resets the owner's stats and then applies all active modifiers.
         """
-        # --- Step 1: Reset all modifiable stats to their base values ---
-        # This generic loop iterates through our centralized list.
+        # --- REFACTORED: Hybrid Stat Reset Logic ---
         for stat_name in self.MODIFIABLE_STATS:
+            if not hasattr(self.owner, stat_name):
+                continue
+
             base_stat_name = f"base_{stat_name}"
-            # Check if the owner has both the stat and its 'base_' counterpart.
-            if hasattr(self.owner, stat_name) and hasattr(self.owner, base_stat_name):
+            # Prefer the 'base_' attribute if it exists (for towers)
+            if hasattr(self.owner, base_stat_name):
                 base_value = getattr(self.owner, base_stat_name)
                 setattr(self.owner, stat_name, base_value)
+            # Fall back to the initial snapshot (for enemies)
+            elif stat_name in self._initial_stats:
+                initial_value = self._initial_stats[stat_name]
+                setattr(self.owner, stat_name, initial_value)
 
-        # Handle special cases that don't follow the base_stat pattern.
-        if hasattr(self.owner, "damage_taken_multiplier"):
-            self.owner.damage_taken_multiplier = 1.0
-
-        # --- Step 2: Apply all active modifiers ---
+        # --- Apply all active modifiers ---
         for effect in self.status_effects:
             for modifier in effect.modifiers:
                 stat = modifier["stat"]
