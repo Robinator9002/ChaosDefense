@@ -95,6 +95,8 @@ class GameManager:
             player_difficulty=player_difficulty,
             initial_level_difficulty=level_difficulty,
             num_paths=len(self.paths),
+            # --- FIX: Pass the DirectorAI instance to the WaveManager ---
+            director_ai=self.director_ai,
         )
         logger.info("--- Game Manager setup complete ---")
 
@@ -118,13 +120,11 @@ class GameManager:
                 newly_created_entities.extend(new_entities)
 
         for enemy in list(self.enemies.values()):
-            # --- MODIFIED: Check for leaked enemies ---
-            # We will modify the enemy update method to return the enemy instance if it leaks.
             leaked_enemy = enemy.update(dt, self.game_state, self.targeting_manager)
             if leaked_enemy:
+                # The GameManager is now responsible for reporting the leak
                 self.director_ai.record_enemy_leak(leaked_enemy)
 
-            # Update the enemy's position in the targeting grid if it's still alive
             if enemy.is_alive:
                 self.targeting_manager.update_entity_position(enemy)
 
@@ -151,7 +151,6 @@ class GameManager:
             self.game_state.add_gold(dead_enemy.bounty)
             self._handle_on_death_effects(dead_enemy)
 
-            # --- NEW: Report enemy death to the Director AI ---
             self.director_ai.record_enemy_death(dead_enemy)
 
             self.targeting_manager.remove_entity(dead_enemy)
@@ -219,8 +218,11 @@ class GameManager:
         status_effects_cfg = self.configs.get("status_effects", {})
         new_enemy = None
 
+        # --- NEW: Add the enemy type ID to the data for the AI ---
+        config = {}
         if entity_id in self.configs["boss_types"]:
             config = self.configs["boss_types"][entity_id]
+            config["id"] = entity_id
             new_enemy = BossEnemy(
                 boss_type_data=config,
                 path=path,
@@ -231,6 +233,7 @@ class GameManager:
             )
         elif entity_id in self.configs["buffer_types"]:
             config = self.configs["buffer_types"][entity_id]
+            config["id"] = entity_id
             new_enemy = BufferEnemy(
                 enemy_type_data=config,
                 level=enemy_spawn_level,
@@ -241,6 +244,7 @@ class GameManager:
             )
         elif entity_id in self.configs["enemy_types"]:
             config = self.configs["enemy_types"][entity_id]
+            config["id"] = entity_id
             new_enemy = Enemy(
                 enemy_type_data=config,
                 level=enemy_spawn_level,
