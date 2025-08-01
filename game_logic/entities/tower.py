@@ -4,6 +4,7 @@ import logging
 import uuid
 import random
 import math
+import copy  # <-- IMPORT THE COPY MODULE
 from typing import List, Optional, Dict, Any, TYPE_CHECKING, Callable
 
 from .entity import Entity
@@ -44,10 +45,14 @@ class Tower(Entity):
         self.cost = tower_type_data.get("cost", 0)
         self.status_effects_config = status_effects_config
 
-        self.attack = tower_type_data.get("attack", {})
-        self.attack.setdefault("data", {})
+        # --- CRITICAL FIX: DEEP COPY ---
+        # We must create a deep copy of the mutable data from the config file.
+        # If we don't, every tower of the same type will share the exact same
+        # dictionary in memory, causing upgrades on one tower to affect all of them.
+        self.attack = copy.deepcopy(tower_type_data.get("attack", {}))
+        self.auras = copy.deepcopy(tower_type_data.get("auras", []))
 
-        self.auras = tower_type_data.get("auras", [])
+        self.attack.setdefault("data", {})
 
         # --- Targeting & AI ---
         ai_config = tower_type_data.get("ai_config", {})
@@ -86,8 +91,6 @@ class Tower(Entity):
         self.conditional_effects: List[Dict[str, Any]] = []
         self.on_hit_area_effects: List[Dict[str, Any]] = []
         self.on_hit_effects: List[Dict[str, Any]] = []
-
-        # --- BUG FIX: Restore the on_blast_effects list for the 'add_blast_effect' applicator ---
         self.on_blast_effects: List[Dict[str, Any]] = []
 
         self._attack_handlers: Dict[
