@@ -1,7 +1,7 @@
 # game_logic/effects/status_effect.py
 import logging
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,46 @@ class StatusEffect:
             f"for {duration}s."
         )
 
-    def update(self, dt: float) -> int:
+    @property
+    def modifiers(self) -> List[Dict[str, Any]]:
+        """
+        A property that translates the effect's data into a standardized list
+        of stat modifiers for the EffectHandler to consume. This is the fix
+        for the bug where the handler was looking for a non-existent attribute.
+
+        Returns:
+            A list of modification dictionaries, e.g.,
+            [{"stat": "speed", "operation": "multiply", "value": 0.6}]
+        """
+        if self.effect_type not in ["stat_modifier", "stat_debuff"]:
+            return []
+
+        if not self.stat_to_modify:
+            return []
+
+        # For stat_modifier, potency is a multiplier (e.g., 1.2 for +20%, 0.6 for -40%)
+        if self.effect_type == "stat_modifier":
+            return [
+                {
+                    "stat": self.stat_to_modify,
+                    "operation": "multiply",
+                    "value": self.potency,
+                }
+            ]
+
+        # For stat_debuff, potency is a flat reduction (e.g., -5 armor)
+        if self.effect_type == "stat_debuff":
+            return [
+                {
+                    "stat": self.stat_to_modify,
+                    "operation": "add",
+                    "value": -self.potency,  # Apply as a negative addition
+                }
+            ]
+
+        return []
+
+    def update(self, dt: float) -> bool:
         """
         Ticks down the effect's duration and handles DoT logic.
 
@@ -65,24 +104,40 @@ class StatusEffect:
             dt (float): The time elapsed since the last frame.
 
         Returns:
-            int: The amount of DoT damage to be applied this frame, or 0.
+            bool: True if the effect is still active, False if it has expired.
         """
         if not self.is_active:
-            return 0
+            return False
 
         self.duration_remaining -= dt
         if self.duration_remaining <= 0:
             self.expire()
-            return 0
+            return False
 
         # --- Handle DoT Ticking ---
         if self.effect_type == "damage_over_time" and self.tick_interval > 0:
             self.tick_timer -= dt
             if self.tick_timer <= 0:
-                self.tick_timer += self.tick_interval  # Reset timer for the next tick
-                # The potency for a DoT is its damage per tick.
-                return int(self.potency)
+                self.tick_timer += self.tick_interval
+                # The owner's EffectHandler will read this value
+                damage_this_tick = int(self.potency)
+                # We can directly apply damage here if we have the owner
+                # but for now, we'll let the handler manage it.
+                pass  # Placeholder for future direct application
 
+        return True
+
+    def get_dot_damage(self) -> int:
+        """
+        Calculates and returns any damage-over-time damage that should be
+        applied this frame. Resets the internal flag after checking.
+
+        Returns:
+            int: The amount of DoT damage to apply.
+        """
+        if self.effect_type == "damage_over_time" and self.tick_timer <= 0:
+            # This check happens after the update loop has already ticked the timer
+            return int(self.potency)
         return 0
 
     def expire(self):

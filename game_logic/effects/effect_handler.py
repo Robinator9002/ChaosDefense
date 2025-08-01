@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class EffectHandler:
     """
     Manages all status effects on a single entity. It is responsible for
-    applying effects, updating their durations, and calculating the final
-    modified stats for the entity each frame.
+    applying effects, updating their durations, applying damage-over-time,
+    and calculating the final modified stats for the entity each frame.
     """
 
     def __init__(self, owner: "Entity"):
@@ -30,20 +30,42 @@ class EffectHandler:
         Applies a new status effect to the owner. If an effect of the same type
         already exists, it will either stack or refresh based on the effect's data.
         """
-        # Simple implementation: for now, we just add the effect.
-        # A more complex system would handle stacking/refreshing here.
+        # --- Stacking Logic ---
+        # Check if an effect of the same type from the same source already exists.
+        for existing_effect in self.status_effects:
+            if existing_effect.effect_id == new_effect.effect_id:
+                # Let the existing effect handle the stacking logic.
+                existing_effect.stack_with(new_effect)
+                return  # Stop after stacking.
+
+        # If no existing effect was found, simply add the new one.
         self.status_effects.append(new_effect)
 
     def update(self, dt: float):
         """
-        Updates all active status effects, removing any that have expired.
-        Then, recalculates all of the owner's stats based on the remaining effects.
+        Updates all active status effects, applying DoT damage, removing any
+        that have expired, and then recalculating all of the owner's stats.
         """
-        # Tick down duration and remove expired effects
+        total_dot_damage = 0
+
+        # --- 1. Update durations and gather DoT damage ---
+        for effect in self.status_effects:
+            # The update method ticks down the duration and internal DoT timers.
+            effect.update(dt)
+            # The get_dot_damage method checks if a DoT tick occurred this frame.
+            total_dot_damage += effect.get_dot_damage()
+
+        # --- 2. Apply any accumulated DoT damage ---
+        if total_dot_damage > 0:
+            # We pass ignores_armor=True because DoT effects typically bypass armor.
+            self.owner.take_damage(total_dot_damage, ignores_armor=True)
+
+        # --- 3. Remove any effects that have expired during the update ---
         self.status_effects = [
-            effect for effect in self.status_effects if effect.update(dt)
+            effect for effect in self.status_effects if effect.is_active
         ]
-        # Recalculate all stats from scratch
+
+        # --- 4. Recalculate all stats from scratch based on remaining effects ---
         self.apply_stat_modifiers()
 
     def apply_stat_modifiers(self):
@@ -80,7 +102,13 @@ class EffectHandler:
         if hasattr(self.owner, "base_armor"):
             self.owner.armor = self.owner.base_armor
 
+        # Universal stats
+        if hasattr(self.owner, "damage_taken_multiplier"):
+            self.owner.damage_taken_multiplier = 1.0
+
         # --- Step 2: Apply all active modifiers ---
+        # This loop now correctly reads from the `modifiers` property we added
+        # to the StatusEffect class, fixing the original bug.
         for effect in self.status_effects:
             for modifier in effect.modifiers:
                 stat = modifier["stat"]
@@ -97,6 +125,7 @@ class EffectHandler:
 
         # Ensure stats don't fall below reasonable minimums
         if hasattr(self.owner, "speed"):
-            self.owner.speed = max(
-                5, self.owner.speed
-            )  # Prevent enemies from stopping completely unless stunned
+            # A speed of 0 should only be possible via a stun, not a slow.
+            # Stun effects will set the multiplier to 0 directly.
+            if not any(e.effect_id == "stun" for e in self.status_effects):
+                self.owner.speed = max(5, self.owner.speed)
