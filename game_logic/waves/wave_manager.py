@@ -27,6 +27,7 @@ class WaveManager:
         wave_scaling_config: Dict[str, Any],
         enemy_types: Dict[str, Any],
         boss_types: Dict[str, Any],
+        buffer_types: Dict[str, Any],  # --- NEW: Accept buffer types ---
         allowed_boss_types: List[str],
         player_difficulty: int,
         initial_level_difficulty: int,
@@ -39,7 +40,11 @@ class WaveManager:
             str(player_difficulty), difficulty_config["1"]
         )
         self.num_paths = num_paths
-        self.base_enemy_types = enemy_types
+
+        # --- NEW: Combine standard and buffer enemies into one pool ---
+        # This creates a single dictionary of all non-boss enemies that can
+        # be used by the wave generation system.
+        self.base_standard_enemies = {**enemy_types, **buffer_types}
 
         self.wave_state = WaveState(effective_level_difficulty=initial_level_difficulty)
         self.wave_state.initialize_lane_cooldowns(num_paths)
@@ -112,8 +117,11 @@ class WaveManager:
                 self.wave_state, self.num_paths
             )
         else:
+            # --- MODIFIED: Use the combined enemy pool ---
+            # This pool now includes standard enemies, buffer enemies, and any
+            # bosses that have met their spawn difficulty threshold.
             available_enemies = self.boss_handler.update_available_enemies(
-                self.wave_state, self.base_enemy_types
+                self.wave_state, self.base_standard_enemies
             )
             spawn_jobs = self.wave_generator.generate_standard_wave(
                 self.wave_state, self.num_paths, available_enemies
