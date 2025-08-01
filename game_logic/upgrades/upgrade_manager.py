@@ -24,8 +24,9 @@ class UpgradeManager:
         self.definitions: Dict[str, Dict[str, list[Upgrade]]] = {}
         self._effect_handlers: Dict[str, Callable[["Tower", Any], None]] = {
             "modify_attack_data": effect_applicators.modify_attack_data,
-            # --- FIX: Register the new handler for aura upgrades ---
-            "modify_nested": effect_applicators.modify_nested_aura_property,
+            # --- FIX: Register the new, powerful generic handler for all nested property modifications. ---
+            # This replaces the old, specific handler and is the key to fixing support tower upgrades.
+            "modify_nested": effect_applicators.modify_nested_property,
             "add_damage": effect_applicators.add_damage,
             "add_range": effect_applicators.add_range,
             "multiply_fire_rate": effect_applicators.multiply_fire_rate,

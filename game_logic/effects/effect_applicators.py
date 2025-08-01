@@ -123,44 +123,75 @@ def modify_attack_data(tower: "Tower", value: Dict[str, Any]):
             attack_specifics[key] = amount
 
 
-def modify_nested_aura_property(tower: "Tower", value: Dict[str, Any]):
+def modify_nested_property(tower: "Tower", value: Dict[str, Any]):
     """
-    Modifies a nested property within a tower's aura definition.
-    Example: change the potency of the 'damage_boost' effect in the first aura.
-    """
-    if not hasattr(tower, "auras") or not tower.auras:
-        logger.warning(
-            f"Attempted to modify aura on tower {tower.name} which has no auras."
-        )
-        return
+    Modifies a nested property within a tower's data structure using a
+    dot- and bracket-separated path string. This is the key handler for
+    support tower upgrades that modify complex, nested data like auras.
 
-    aura_index = value.get("aura_index", 0)
-    path = value.get("path", "").split(".")
+    Args:
+        tower (Tower): The tower entity to be modified.
+        value (Dict[str, Any]): A dictionary defining the modification.
+            Expected format:
+            {
+                "path": "auras[0].effects.damage_boost.potency",
+                "operation": "add" | "multiply",
+                "amount": <float_or_int>
+            }
+    """
+    path_str = value.get("path")
     operation = value.get("operation")
     amount = value.get("amount")
 
-    if not all([path, operation, amount is not None]):
-        logger.error(f"Invalid value for modify_nested_aura_property: {value}")
+    # --- 1. Validate the input data from the JSON config ---
+    if not all([path_str, operation, amount is not None]):
+        logger.error(f"Invalid value for modify_nested_property: {value}")
         return
 
-    try:
-        current_level = tower.auras[aura_index]
-        for key in path[:-1]:
-            current_level = current_level[key]
+    # --- 2. Parse the path string into a list of keys ---
+    # This standardizes access for attributes, dict keys, and list indices.
+    # e.g., "auras[0].effects" becomes ["auras", "0", "effects"]
+    keys = path_str.replace("[", ".").replace("]", "").split(".")
 
-        final_key = path[-1]
-        original_value = current_level[final_key]
+    try:
+        # --- 3. Traverse the structure to find the parent of the target property ---
+        current_level = tower
+        for key in keys[:-1]:  # Go up to the second-to-last key
+            if key.isdigit() and isinstance(current_level, list):
+                current_level = current_level[int(key)]
+            elif isinstance(current_level, dict):
+                current_level = current_level[key]
+            else:
+                current_level = getattr(current_level, key)
+
+        final_key = keys[-1]
+
+        # --- 4. Get the original value and apply the operation ---
+        if final_key.isdigit() and isinstance(current_level, list):
+            original_value = current_level[int(final_key)]
+            final_key = int(final_key)  # Cast to int for list indexing
+        elif isinstance(current_level, dict):
+            original_value = current_level[final_key]
+        else:
+            original_value = getattr(current_level, final_key)
 
         if operation == "add":
-            current_level[final_key] += amount
+            new_value = original_value + amount
         elif operation == "multiply":
-            current_level[final_key] *= amount
+            new_value = original_value * amount
         else:
             logger.warning(
-                f"Unknown operation '{operation}' for modify_nested_aura_property"
+                f"Unknown operation '{operation}' for modify_nested_property"
             )
+            return
 
-    except (KeyError, IndexError, TypeError) as e:
-        logger.error(
-            f"Could not modify nested aura property with path '{'.'.join(path)}': {e}"
-        )
+        # --- 5. Set the new value back on the parent object/dict/list ---
+        if isinstance(current_level, dict) or isinstance(current_level, list):
+            current_level[final_key] = new_value
+        else:
+            setattr(current_level, final_key, new_value)
+
+        logger.debug(f"Modified '{path_str}': {original_value} -> {new_value}")
+
+    except (KeyError, IndexError, TypeError, AttributeError) as e:
+        logger.error(f"Could not modify nested property with path '{path_str}': {e}")
