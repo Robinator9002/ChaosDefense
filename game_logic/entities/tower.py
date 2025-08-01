@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 class Tower(Entity):
     """
-    Represents a universal, data-driven defensive tower.
+    Represents a universal, data-driven defensive tower. Its stats and behaviors
+    are defined by configuration data, and this class brings them to life.
     """
 
     def __init__(
@@ -37,61 +38,62 @@ class Tower(Entity):
         """
         super().__init__(x, y, max_hp=100)
 
+        # --- Core Identifiers & Data ---
         self.tower_type_id = tower_type_id
         self.name = tower_type_data.get("name", "Unknown Tower")
         self.cost = tower_type_data.get("cost", 0)
         self.status_effects_config = status_effects_config
+
+        # The `attack` dictionary is the single source of truth for all combat stats.
+        # Properties below provide a safe and consistent way to access this data.
         self.attack = tower_type_data.get("attack", {})
+        self.attack.setdefault("data", {})  # Ensure data dict exists for support towers
+
         self.auras = tower_type_data.get("auras", [])
 
+        # --- Targeting & AI ---
         ai_config = tower_type_data.get("ai_config", {})
         self.available_personas = ai_config.get("available_personas", [])
-        self.current_persona = ai_config.get("default_persona", None)
-
-        # --- FIX: Unify State ---
-        # The attack dictionary is now the single source of truth for stats.
-        # Base stats are stored for the effect handler to reset to each frame.
-        # Live stats are accessed via properties that read/write to the dictionary.
-        attack_specific_data = self.attack.get("data", {})
-        if not attack_specific_data:  # Ensure 'data' dict exists for support towers
-            self.attack["data"] = {}
-            attack_specific_data = self.attack["data"]
-
-        self.base_damage = attack_specific_data.get("damage", 0)
-        self.base_range = attack_specific_data.get("range", 100)
-        self.base_fire_rate = attack_specific_data.get("fire_rate", 1.0)
-        self.base_blast_radius = attack_specific_data.get("blast_radius", 0)
-
-        # Initialize the values in the dictionary if they don't exist
-        attack_specific_data.setdefault("damage", self.base_damage)
-        attack_specific_data.setdefault("range", self.base_range)
-        attack_specific_data.setdefault("fire_rate", self.base_fire_rate)
-        attack_specific_data.setdefault("blast_radius", self.base_blast_radius)
-
-        self.path_a_tier = 0
-        self.path_b_tier = 0
-        self.total_investment: int = self.cost
-        self.fire_cooldown = 0.0
+        self.current_persona = ai_config.get("default_persona", "EXECUTIONER")
         self.current_targets: List["Enemy"] = []
 
+        # --- State & Cooldowns ---
+        self.fire_cooldown = 0.0
+        self.total_investment: int = self.cost
+
+        # --- Upgrade Progression ---
+        self.path_a_tier = 0
+        self.path_b_tier = 0
+
+        # --- Base Stats Initialization ---
+        # These `base_` attributes store the tower's unmodified stats. The
+        # EffectHandler uses them to reset stats each frame before reapplying buffs.
+        # We initialize them by reading the live properties, which pull from the
+        # config data. This ensures consistency.
+        self.base_damage = self.damage
+        self.base_range = self.range
+        self.base_fire_rate = self.fire_rate
+        self.base_blast_radius = self.blast_radius
+        self.base_effect_potency_multiplier = 1.0
+        self.base_aura_size_multiplier = 1.0
+
+        # --- Live Stats (Managed by EffectHandler) ---
+        # These are initialized here but will be modified by status effects.
+        self.effect_potency_multiplier = self.base_effect_potency_multiplier
+        self.aura_size_multiplier = self.base_aura_size_multiplier
+
+        # --- Special Properties (Modified by Upgrades) ---
         self.projectiles_per_shot = 1
         self.pierce_count = 0
         self.armor_shred = 0
         self.execute_threshold: Optional[Dict[str, float]] = None
         self.on_apply_damage = 0
         self.on_death_explosion: Optional[Dict[str, Any]] = None
-
-        self.base_effect_potency_multiplier = 1.0
-        self.effect_potency_multiplier = self.base_effect_potency_multiplier
-        self.base_aura_size_multiplier = 1.0
-        self.aura_size_multiplier = self.base_aura_size_multiplier
-
-        self.on_hit_effects: List[Dict[str, Any]] = []
-        self.on_blast_effects: List[Dict[str, Any]] = []
         self.bonus_damage_per_debuff = 0
         self.conditional_effects: List[Dict[str, Any]] = []
         self.on_hit_area_effects: List[Dict[str, Any]] = []
 
+        # This is a dispatch table mapping attack types from JSON to actual functions.
         self._attack_handlers: Dict[
             str, Callable[["Tower", "Enemy"], List["Entity"]]
         ] = {
@@ -100,51 +102,55 @@ class Tower(Entity):
             "persistent_attached_aura": attack_handlers.create_persistent_attached_aura,
         }
 
+        # --- Visuals ---
         self.sprite = self._create_sprite(tile_size, tower_type_data)
         self.rect = self.sprite.get_rect(center=self.pos)
         logger.info(f"Created Level 1 {self.name} ({self.entity_id}).")
 
-    # --- START: Property-based stat access ---
-    # This ensures that game logic (using self.damage) and UI (reading from
-    # self.attack['data']['damage']) are always in sync.
+    # --- START: Property-based Stat Access ---
+    # This is the core of the "single source of truth" design. All game logic
+    # should use these properties (e.g., `tower.damage`). They read directly
+    # from the `attack` dictionary, ensuring data is always consistent. The
+    # setters allow the EffectHandler to modify these live stats.
 
     @property
     def damage(self) -> float:
-        return self.attack.get("data", {}).get("damage", 0)
+        return self.attack["data"].get("damage", 0)
 
     @damage.setter
     def damage(self, value: float):
-        if "data" in self.attack:
-            self.attack["data"]["damage"] = value
+        self.attack["data"]["damage"] = value
 
     @property
     def range(self) -> float:
-        return self.attack.get("data", {}).get("range", 0)
+        return self.attack["data"].get("range", 0)
 
     @range.setter
     def range(self, value: float):
-        if "data" in self.attack:
-            self.attack["data"]["range"] = value
+        self.attack["data"]["range"] = value
 
     @property
     def fire_rate(self) -> float:
-        return self.attack.get("data", {}).get("fire_rate", 0)
+        return self.attack["data"].get("fire_rate", 0)
 
     @fire_rate.setter
     def fire_rate(self, value: float):
-        if "data" in self.attack:
-            self.attack["data"]["fire_rate"] = value
+        self.attack["data"]["fire_rate"] = value
 
     @property
     def blast_radius(self) -> float:
-        return self.attack.get("data", {}).get("blast_radius", 0)
+        return self.attack["data"].get("blast_radius", 0)
 
     @blast_radius.setter
     def blast_radius(self, value: float):
-        if "data" in self.attack:
-            self.attack["data"]["blast_radius"] = value
+        self.attack["data"]["blast_radius"] = value
 
-    # --- END: Property-based stat access ---
+    @property
+    def effects(self) -> Dict[str, Any]:
+        """Provides clean access to the on-hit effects dictionary."""
+        return self.attack["data"].get("effects", {})
+
+    # --- END: Property-based Stat Access ---
 
     def _create_sprite(
         self, tile_size: int, tower_data: Dict[str, Any]
@@ -166,7 +172,7 @@ class Tower(Entity):
         """
         super().update(dt, game_state, targeting_manager)
 
-        # --- FIX: If a tower has no attack type (i.e., it's a support tower), skip all attack logic ---
+        # If a tower has no attack type (i.e., it's a pure support tower), skip all attack logic.
         if not self.attack.get("type"):
             return []
 
@@ -197,6 +203,7 @@ class Tower(Entity):
         """
         Delegates target acquisition to the TargetingManager.
         """
+        # Uses the `self.range` property to get the live range, including buffs.
         potential_targets = targeting_manager.get_nearby_enemies(self.pos, self.range)
 
         if not potential_targets:
@@ -212,6 +219,7 @@ class Tower(Entity):
         if not self.current_targets:
             return []
 
+        # Uses the `self.fire_rate` property to get the live fire rate, including buffs.
         if self.fire_rate > 0:
             self.fire_cooldown = 1.0 / self.fire_rate
         else:
