@@ -9,6 +9,7 @@ from .buttons.tower_button import TowerButton
 from .buttons.tab_button import TabButton
 from .panels.upgrade_panel import UpgradePanel
 from .panels.tower_info_panel import TowerInfoPanel
+
 # --- NEW: Import the new PersonaSelectionPanel ---
 from .panels.persona_selection_panel import PersonaSelectionPanel
 from .ui_action import UIAction, ActionType
@@ -215,15 +216,19 @@ class UIManager:
                         self.upgrade_panel.rebuild_layout()
             # --- NEW: Handle opening and closing the persona panel ---
             case ActionType.OPEN_PERSONA_PANEL:
-                selected_tower = self.game_manager.towers.get(game_state.selected_entity_id)
+                selected_tower = self.game_manager.towers.get(
+                    game_state.selected_entity_id
+                )
                 if selected_tower:
                     all_personas = self.game_manager.configs.get("targeting_ai", {})
-                    eligible_personas = selected_tower.get_eligible_personas(all_personas)
+                    eligible_personas = selected_tower.get_eligible_personas(
+                        all_personas
+                    )
                     self.persona_selection_panel = PersonaSelectionPanel(
                         screen_rect=self.screen_rect,
                         all_personas=all_personas,
                         eligible_personas=eligible_personas,
-                        active_persona=selected_tower.current_persona
+                        active_persona=selected_tower.current_persona,
                     )
             case ActionType.CLOSE_PERSONA_PANEL:
                 self.persona_selection_panel = None
@@ -308,7 +313,7 @@ class UIManager:
             self.tower_info_panel.draw(screen)
         if self.upgrade_panel:
             self.upgrade_panel.draw(screen)
-        
+
         # --- NEW: Draw the modal panel last so it's on top ---
         if self.persona_selection_panel:
             self.persona_selection_panel.draw(screen)
