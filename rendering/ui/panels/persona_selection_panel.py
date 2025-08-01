@@ -144,6 +144,12 @@ class PersonaSelectionPanel(UIElement):
         active_persona: str,
     ):
         for persona_id, persona_data in all_personas.items():
+            # --- CRASH FIX: Ensure we only process valid persona data ---
+            # This check gracefully ignores comments (like "//") or any other
+            # non-dictionary entries in the JSON file.
+            if not isinstance(persona_data, dict):
+                continue
+
             is_active = persona_id == active_persona
             is_eligible = persona_id in eligible_personas
             # Rect position will be set in _perform_layout

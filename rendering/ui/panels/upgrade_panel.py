@@ -43,8 +43,8 @@ class UpgradePanel(UIElement):
         self.targeting_ai_config = targeting_ai_config
 
         self.upgrade_buttons: List[UpgradeButton] = []
-        # --- REFACTORED: Replaced button list with a single button state ---
-        self.persona_button_rect = pygame.Rect(0, 0, 0, 0)
+        # --- UI IMPROVEMENT: Separate rect for the button ---
+        self.persona_change_button_rect = pygame.Rect(0, 0, 0, 0)
         self.is_persona_button_hovered = False
 
         self._setup_fonts_and_colors()
@@ -74,7 +74,7 @@ class UpgradePanel(UIElement):
         mouse_pos = pygame.mouse.get_pos()
         self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
         self.is_salvage_hovered = self.salvage_button_rect.collidepoint(mouse_pos)
-        self.is_persona_button_hovered = self.persona_button_rect.collidepoint(
+        self.is_persona_button_hovered = self.persona_change_button_rect.collidepoint(
             mouse_pos
         )
         for button in self.upgrade_buttons:
@@ -94,12 +94,14 @@ class UpgradePanel(UIElement):
         current_y += len(stats_to_display) * 24
         current_y += 15
 
-        # --- REFACTORED: Section 2: Single Targeting Persona Button ---
-        current_y += self.font_header.get_height() + 5
-        self.persona_button_rect = pygame.Rect(
-            self.rect.x + padding, current_y, self.rect.width - (padding * 2), 32
+        # --- UI IMPROVEMENT: Layout for persona info and change button ---
+        current_y += self.font_header.get_height() + 5  # Header
+        current_y += 24  # Space for the "Current: ..." text
+        button_width = self.rect.width - (padding * 2)
+        self.persona_change_button_rect = pygame.Rect(
+            self.rect.x + padding, current_y, button_width, 30
         )
-        current_y += self.persona_button_rect.height + 15
+        current_y += self.persona_change_button_rect.height + 15
 
         # Section 3: Upgrade Buttons
         if self.upgrade_buttons:
@@ -177,7 +179,6 @@ class UpgradePanel(UIElement):
                 return UIAction(type=ActionType.CLOSE_PANEL)
             if self.is_salvage_hovered:
                 return UIAction(type=ActionType.SALVAGE_TOWER)
-            # --- REFACTORED: Check for single persona button click ---
             if self.is_persona_button_hovered:
                 return UIAction(type=ActionType.OPEN_PERSONA_PANEL)
 
@@ -194,23 +195,42 @@ class UpgradePanel(UIElement):
         pygame.draw.rect(screen, self.colors["border"], self.rect, 2, border_radius=5)
 
         self._draw_static_text(screen)
-        self._draw_persona_button(screen)
+        self._draw_persona_section(screen)
         for button in self.upgrade_buttons:
             button.draw(screen, self.game_state)
         self._draw_salvage_button(screen)
         self._draw_close_button(screen)
 
-    def _draw_persona_button(self, screen: pygame.Surface):
+    def _draw_persona_section(self, screen: pygame.Surface):
         padding = 15
 
-        # Draw header
-        header_y = self.persona_button_rect.y - self.font_header.get_height() - 5
+        # --- UI IMPROVEMENT: Draw separated info and button ---
+
+        # 1. Draw Header
+        header_y = (
+            self.persona_change_button_rect.y - 24 - self.font_header.get_height() - 5
+        )
         header_surf = self.font_header.render(
             "Targeting Priority", True, self.colors["header"]
         )
         screen.blit(header_surf, (self.rect.x + padding, header_y))
 
-        # Draw button
+        # 2. Draw Current Persona Info Text
+        info_y = self.persona_change_button_rect.y - 26
+        active_persona_name = self.targeting_ai_config.get(
+            self.tower.current_persona, {}
+        ).get("name", "N/A")
+
+        label_surf = self.font_stat.render("Current:", True, self.colors["stat_label"])
+        value_surf = self.font_stat.render(
+            active_persona_name, True, self.colors["stat_value"]
+        )
+
+        screen.blit(label_surf, (self.rect.x + padding, info_y))
+        value_rect = value_surf.get_rect(topright=(self.rect.right - padding, info_y))
+        screen.blit(value_surf, value_rect)
+
+        # 3. Draw the "Change..." Button
         bg_color = (
             self.colors["persona_bg_hover"]
             if self.is_persona_button_hovered
@@ -218,20 +238,18 @@ class UpgradePanel(UIElement):
         )
         border_color = self.colors["persona_border_default"]
 
-        pygame.draw.rect(screen, bg_color, self.persona_button_rect, border_radius=4)
         pygame.draw.rect(
-            screen, border_color, self.persona_button_rect, 1, border_radius=4
+            screen, bg_color, self.persona_change_button_rect, border_radius=4
+        )
+        pygame.draw.rect(
+            screen, border_color, self.persona_change_button_rect, 1, border_radius=4
         )
 
-        # Draw text
-        active_persona_name = self.targeting_ai_config.get(
-            self.tower.current_persona, {}
-        ).get("name", "N/A")
-        button_text = f"Change... (Current: {active_persona_name})"
+        button_text = "Change Persona..."
         text_surf = self.font_persona.render(
             button_text, True, self.colors["persona_text"]
         )
-        text_rect = text_surf.get_rect(center=self.persona_button_rect.center)
+        text_rect = text_surf.get_rect(center=self.persona_change_button_rect.center)
         screen.blit(text_surf, text_rect)
 
     def _draw_close_button(self, screen: pygame.Surface):
