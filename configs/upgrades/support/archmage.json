@@ -1,5 +1,5 @@
 {
-  "//": "Arch-Mage: An elite support tower that amplifies the magical effects and area of other towers.",
+  "//": "BALANCE PASS 2: Upgrades have been massively buffed to make the Archmage a truly elite support tower and a worthwhile late-game investment.",
   "path_a": {
     "name": "Amplification",
     "description": "Focuses on raw amplification of magical effects and auras.",
@@ -8,14 +8,14 @@
         "id": "archmage_a1",
         "name": "Focusing Crystals",
         "cost": 250,
-        "description": "Increases the potency of the Effect Potency Boost aura.",
+        "description": "Significantly increases the potency of the Effect Potency Boost aura.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
               "path": "auras[0].effects.effect_potency_boost.potency",
               "operation": "add",
-              "amount": 0.1
+              "amount": 0.2
             }
           }
         ]
@@ -24,14 +24,14 @@
         "id": "archmage_a2",
         "name": "Resonant Fields",
         "cost": 380,
-        "description": "Increases the potency of the Aura Size Boost aura.",
+        "description": "Significantly increases the potency of the Aura Size Boost aura.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
               "path": "auras[0].effects.aura_size_boost.potency",
               "operation": "add",
-              "amount": 0.1
+              "amount": 0.15
             }
           }
         ]
@@ -40,14 +40,14 @@
         "id": "archmage_a3",
         "name": "Leyline Attunement",
         "cost": 500,
-        "description": "Increases the Arch-Mage's own aura radius by 20.",
+        "description": "Increases the Arch-Mage's own aura radius by 30.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
               "path": "auras[0].range",
               "operation": "add",
-              "amount": 20
+              "amount": 30
             }
           }
         ]
@@ -63,7 +63,7 @@
             "value": {
               "path": "auras[0].effects.effect_potency_boost.potency",
               "operation": "add",
-              "amount": 0.25
+              "amount": 0.3
             }
           }
         ]
@@ -79,7 +79,7 @@
             "value": {
               "path": "auras[0].effects.effect_potency_boost.potency",
               "operation": "add",
-              "amount": 0.5
+              "amount": 0.7
             }
           },
           {
@@ -87,7 +87,7 @@
             "value": {
               "path": "auras[0].effects.aura_size_boost.potency",
               "operation": "add",
-              "amount": 0.2
+              "amount": 0.3
             }
           }
         ]
@@ -102,14 +102,14 @@
         "id": "archmage_b1",
         "name": "Arcane Reach",
         "cost": 220,
-        "description": "Increases the Arch-Mage's own aura radius by 25.",
+        "description": "Increases the Arch-Mage's own aura radius by 30.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
               "path": "auras[0].range",
               "operation": "add",
-              "amount": 25
+              "amount": 30
             }
           }
         ]
@@ -118,7 +118,7 @@
         "id": "archmage_b2",
         "name": "Empower Projectiles",
         "cost": 450,
-        "description": "The Arch-Mage's aura now also grants a small Damage Boost to nearby towers.",
+        "description": "The Arch-Mage's aura now also grants a significant Damage Boost to nearby towers.",
         "effects": [
           {
             "type": "modify_nested",
@@ -126,10 +126,7 @@
               "path": "auras[0].effects",
               "operation": "add_effect",
               "amount": {
-                "damage_boost": {
-                  "potency": 1.1,
-                  "duration": 0.5
-                }
+                "damage_boost": { "potency": 1.2, "duration": 0.5 }
               }
             }
           }
@@ -139,7 +136,7 @@
         "id": "archmage_b3",
         "name": "Empower Speed",
         "cost": 450,
-        "description": "The Arch-Mage's aura now also grants a small Fire Rate Boost to nearby towers.",
+        "description": "The Arch-Mage's aura now also grants a Fire Rate Boost to nearby towers.",
         "effects": [
           {
             "type": "modify_nested",
@@ -147,10 +144,7 @@
               "path": "auras[0].effects",
               "operation": "add_effect",
               "amount": {
-                "fire_rate_boost": {
-                  "potency": 1.1,
-                  "duration": 0.5
-                }
+                "fire_rate_boost": { "potency": 1.15, "duration": 0.5 }
               }
             }
           }
@@ -167,7 +161,7 @@
             "value": {
               "path": "auras[0].effects.damage_boost.potency",
               "operation": "add",
-              "amount": 0.05
+              "amount": 0.1
             }
           },
           {
@@ -175,7 +169,7 @@
             "value": {
               "path": "auras[0].effects.fire_rate_boost.potency",
               "operation": "add",
-              "amount": 0.05
+              "amount": 0.1
             }
           }
         ]
@@ -191,7 +185,7 @@
             "value": {
               "path": "auras[0].effects.effect_potency_boost.potency",
               "operation": "add",
-              "amount": 0.2
+              "amount": 0.3
             }
           },
           {
@@ -199,7 +193,7 @@
             "value": {
               "path": "auras[0].effects.damage_boost.potency",
               "operation": "add",
-              "amount": 0.1
+              "amount": 0.2
             }
           },
           {
@@ -207,7 +201,7 @@
             "value": {
               "path": "auras[0].effects.fire_rate_boost.potency",
               "operation": "add",
-              "amount": 0.1
+              "amount": 0.15
             }
           }
         ]

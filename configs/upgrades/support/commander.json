@@ -1,5 +1,5 @@
 {
-  "//": "Commander: A high-cost support tower focusing on direct combat buffs for other towers in its radius.",
+  "//": "BALANCE PASS 2: Upgrades have been massively buffed to compensate for the nerfed base tower. The goal is to make the Commander a high-priority, game-changing investment.",
   "path_a": {
     "name": "Offensive Leadership",
     "description": "Focuses on dramatically increasing the damage output of nearby towers.",
@@ -8,14 +8,14 @@
         "id": "commander_a1",
         "name": "Inspirational Tactics",
         "cost": 220,
-        "description": "Increases the potency of the Damage Boost aura.",
+        "description": "Significantly increases the potency of the Damage Boost aura.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
               "path": "auras[0].effects.damage_boost.potency",
               "operation": "add",
-              "amount": 0.05
+              "amount": 0.1
             }
           }
         ]
@@ -24,14 +24,16 @@
         "id": "commander_a2",
         "name": "Rallying Cry",
         "cost": 350,
-        "description": "Increases the potency of the Fire Rate Boost aura.",
+        "description": "Unlocks and buffs a Fire Rate Boost aura.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
-              "path": "auras[0].effects.fire_rate_boost.potency",
-              "operation": "add",
-              "amount": 0.05
+              "path": "auras[0].effects",
+              "operation": "add_effect",
+              "amount": {
+                "fire_rate_boost": { "potency": 1.15, "duration": 0.5 }
+              }
             }
           }
         ]
@@ -40,14 +42,14 @@
         "id": "commander_a3",
         "name": "Expanded Command",
         "cost": 480,
-        "description": "Increases the aura's radius by 25.",
+        "description": "Increases the aura's radius by 30.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
               "path": "auras[0].range",
               "operation": "add",
-              "amount": 25
+              "amount": 30
             }
           }
         ]
@@ -56,12 +58,20 @@
         "id": "commander_a4",
         "name": "Decisive Strategy",
         "cost": 800,
-        "description": "Greatly increases the potency of the Damage Boost aura.",
+        "description": "Greatly increases the potency of the Damage and Fire Rate Boost auras.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
               "path": "auras[0].effects.damage_boost.potency",
+              "operation": "add",
+              "amount": 0.15
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "path": "auras[0].effects.fire_rate_boost.potency",
               "operation": "add",
               "amount": 0.1
             }
@@ -79,7 +89,7 @@
             "value": {
               "path": "auras[0].effects.damage_boost.potency",
               "operation": "add",
-              "amount": 0.15
+              "amount": 0.2
             }
           },
           {
@@ -87,7 +97,7 @@
             "value": {
               "path": "auras[0].effects.fire_rate_boost.potency",
               "operation": "add",
-              "amount": 0.1
+              "amount": 0.15
             }
           },
           {
@@ -95,7 +105,7 @@
             "value": {
               "path": "auras[0].range",
               "operation": "add",
-              "amount": 35
+              "amount": 40
             }
           }
         ]
@@ -110,14 +120,14 @@
         "id": "commander_b1",
         "name": "Advanced Optics",
         "cost": 200,
-        "description": "Increases the potency of the Range Boost aura.",
+        "description": "Unlocks and buffs a Range Boost aura.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
-              "path": "auras[0].effects.range_boost.potency",
-              "operation": "add",
-              "amount": 0.05
+              "path": "auras[0].effects",
+              "operation": "add_effect",
+              "amount": { "range_boost": { "potency": 1.15, "duration": 0.5 } }
             }
           }
         ]
@@ -126,14 +136,14 @@
         "id": "commander_b2",
         "name": "Signal Flares",
         "cost": 300,
-        "description": "Increases the aura's radius by 30.",
+        "description": "Increases the aura's radius by 40.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
               "path": "auras[0].range",
               "operation": "add",
-              "amount": 30
+              "amount": 40
             }
           }
         ]
@@ -165,7 +175,7 @@
             "value": {
               "path": "auras[0].range",
               "operation": "add",
-              "amount": 50
+              "amount": 60
             }
           }
         ]
@@ -181,7 +191,7 @@
             "value": {
               "path": "auras[0].effects.damage_boost.potency",
               "operation": "add",
-              "amount": 0.1
+              "amount": 0.15
             }
           },
           {
@@ -189,15 +199,17 @@
             "value": {
               "path": "auras[0].effects.range_boost.potency",
               "operation": "add",
-              "amount": 0.1
+              "amount": 0.15
             }
           },
           {
             "type": "modify_nested",
             "value": {
-              "path": "auras[0].effects.fire_rate_boost.potency",
-              "operation": "add",
-              "amount": 0.1
+              "path": "auras[0].effects",
+              "operation": "add_effect",
+              "amount": {
+                "fire_rate_boost": { "potency": 1.1, "duration": 0.5 }
+              }
             }
           }
         ]
