@@ -10,12 +10,10 @@
         "description": "Increases the duration of the vulnerability curse by 2 seconds.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "effects",
-              "operation": "modify_nested",
-              "nested_key": "elemental_vulnerability.duration",
-              "nested_op": "add",
+              "path": "attack.data.effects.elemental_vulnerability.duration",
+              "operation": "add",
               "amount": 2.0
             }
           }
@@ -28,12 +26,10 @@
         "description": "Increases the damage amplification of the curse.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "effects",
-              "operation": "modify_nested",
-              "nested_key": "elemental_vulnerability.potency",
-              "nested_op": "add",
+              "path": "attack.data.effects.elemental_vulnerability.potency",
+              "operation": "add",
               "amount": 0.25
             }
           }

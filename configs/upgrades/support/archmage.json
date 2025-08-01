@@ -13,9 +13,8 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.effect_potency_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.effect_potency_boost.potency",
+              "operation": "add",
               "amount": 0.1
             }
           }
@@ -30,9 +29,8 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.aura_size_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.aura_size_boost.potency",
+              "operation": "add",
               "amount": 0.1
             }
           }
@@ -45,12 +43,10 @@
         "description": "Increases the Arch-Mage's own aura radius by 20.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "auras[0]",
-              "operation": "modify_nested",
-              "nested_key": "range",
-              "nested_op": "add",
+              "path": "auras[0].range",
+              "operation": "add",
               "amount": 20
             }
           }
@@ -65,9 +61,8 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.effect_potency_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.effect_potency_boost.potency",
+              "operation": "add",
               "amount": 0.25
             }
           }
@@ -82,18 +77,16 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.effect_potency_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.effect_potency_boost.potency",
+              "operation": "add",
               "amount": 0.5
             }
           },
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.aura_size_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.aura_size_boost.potency",
+              "operation": "add",
               "amount": 0.2
             }
           }
@@ -112,12 +105,10 @@
         "description": "Increases the Arch-Mage's own aura radius by 25.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "auras[0]",
-              "operation": "modify_nested",
-              "nested_key": "range",
-              "nested_op": "add",
+              "path": "auras[0].range",
+              "operation": "add",
               "amount": 25
             }
           }
@@ -130,14 +121,15 @@
         "description": "The Arch-Mage's aura now also grants a small Damage Boost to nearby towers.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects",
+              "path": "auras[0].effects",
               "operation": "add_effect",
-              "effect": {
-                "id": "damage_boost",
-                "potency": 1.1,
-                "duration": 0.5
+              "amount": {
+                "damage_boost": {
+                  "potency": 1.1,
+                  "duration": 0.5
+                }
               }
             }
           }
@@ -150,14 +142,15 @@
         "description": "The Arch-Mage's aura now also grants a small Fire Rate Boost to nearby towers.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects",
+              "path": "auras[0].effects",
               "operation": "add_effect",
-              "effect": {
-                "id": "fire_rate_boost",
-                "potency": 1.1,
-                "duration": 0.5
+              "amount": {
+                "fire_rate_boost": {
+                  "potency": 1.1,
+                  "duration": 0.5
+                }
               }
             }
           }
@@ -172,18 +165,16 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.damage_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.damage_boost.potency",
+              "operation": "add",
               "amount": 0.05
             }
           },
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.fire_rate_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.fire_rate_boost.potency",
+              "operation": "add",
               "amount": 0.05
             }
           }
@@ -198,27 +189,24 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.effect_potency_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.effect_potency_boost.potency",
+              "operation": "add",
               "amount": 0.2
             }
           },
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.damage_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.damage_boost.potency",
+              "operation": "add",
               "amount": 0.1
             }
           },
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.fire_rate_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.fire_rate_boost.potency",
+              "operation": "add",
               "amount": 0.1
             }
           }

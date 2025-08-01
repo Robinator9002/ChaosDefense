@@ -13,9 +13,8 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.damage_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.damage_boost.potency",
+              "operation": "add",
               "amount": 0.05
             }
           }
@@ -30,9 +29,8 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.fire_rate_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.fire_rate_boost.potency",
+              "operation": "add",
               "amount": 0.05
             }
           }
@@ -45,12 +43,10 @@
         "description": "Increases the aura's radius by 25.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "auras[0]",
-              "operation": "modify_nested",
-              "nested_key": "range",
-              "nested_op": "add",
+              "path": "auras[0].range",
+              "operation": "add",
               "amount": 25
             }
           }
@@ -65,9 +61,8 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.damage_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.damage_boost.potency",
+              "operation": "add",
               "amount": 0.1
             }
           }
@@ -82,28 +77,24 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.damage_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.damage_boost.potency",
+              "operation": "add",
               "amount": 0.15
             }
           },
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.fire_rate_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.fire_rate_boost.potency",
+              "operation": "add",
               "amount": 0.1
             }
           },
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "auras[0]",
-              "operation": "modify_nested",
-              "nested_key": "range",
-              "nested_op": "add",
+              "path": "auras[0].range",
+              "operation": "add",
               "amount": 35
             }
           }
@@ -124,9 +115,8 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.range_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.range_boost.potency",
+              "operation": "add",
               "amount": 0.05
             }
           }
@@ -139,12 +129,10 @@
         "description": "Increases the aura's radius by 30.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "auras[0]",
-              "operation": "modify_nested",
-              "nested_key": "range",
-              "nested_op": "add",
+              "path": "auras[0].range",
+              "operation": "add",
               "amount": 30
             }
           }
@@ -159,9 +147,8 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.range_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.range_boost.potency",
+              "operation": "add",
               "amount": 0.1
             }
           }
@@ -174,12 +161,10 @@
         "description": "Dramatically increases the aura's radius.",
         "effects": [
           {
-            "type": "modify_attack_data",
+            "type": "modify_nested",
             "value": {
-              "key": "auras[0]",
-              "operation": "modify_nested",
-              "nested_key": "range",
-              "nested_op": "add",
+              "path": "auras[0].range",
+              "operation": "add",
               "amount": 50
             }
           }
@@ -194,27 +179,24 @@
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.damage_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.damage_boost.potency",
+              "operation": "add",
               "amount": 0.1
             }
           },
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.range_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.range_boost.potency",
+              "operation": "add",
               "amount": 0.1
             }
           },
           {
             "type": "modify_nested",
             "value": {
-              "key": "auras[0].effects.fire_rate_boost",
-              "nested_key": "potency",
-              "nested_op": "add",
+              "path": "auras[0].effects.fire_rate_boost.potency",
+              "operation": "add",
               "amount": 0.1
             }
           }
