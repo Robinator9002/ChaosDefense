@@ -12,6 +12,10 @@ from .entities.tower import Tower
 from .entities.enemies.enemy import Enemy
 from .entities.enemies.boss_enemy import BossEnemy
 from .entities.projectiles.projectile import Projectile
+
+# --- BUG FIX: Import aura entities so the GameManager can recognize them ---
+from .entities.projectiles.persistent_ground_aura import PersistentGroundAura
+from .entities.projectiles.persistent_attached_aura import PersistentAttachedAura
 from .upgrades.upgrade_manager import UpgradeManager
 from .effects.status_effect import StatusEffect
 from .game_ai.targeting.targeting_manager import TargetingManager
@@ -44,13 +48,10 @@ class GameManager:
         self.grid: Optional[Grid] = None
         self.paths: List[List[Tuple[int, int]]] = []
 
-        # --- PERFORMANCE FIX: Entity Storage ---
-        # Storing entities in dictionaries with their unique ID as the key provides
-        # near-instant O(1) lookup time. This is a critical optimization over
-        # lists, which require a slow O(n) linear search for any lookup.
         self.enemies: Dict[uuid.UUID, Enemy] = {}
         self.towers: Dict[uuid.UUID, Tower] = {}
-        self.projectiles: Dict[uuid.UUID, Projectile] = {}
+        # This dictionary will now hold projectiles AND temporary aura effects.
+        self.projectiles: Dict[uuid.UUID, Any] = {}
 
         self._setup_new_game()
 
@@ -92,12 +93,6 @@ class GameManager:
         if self.game_state.game_over:
             return
 
-        # --- PERFORMANCE FIX: Stateful Targeting Manager ---
-        # The TargetingManager is no longer cleared and rebuilt every frame.
-        # Instead, we will update it incrementally as entities are created,
-        # moved, and destroyed. This is a massive performance gain.
-
-        # 1. Update WaveManager to see if a new enemy should be spawned.
         if self.wave_manager:
             spawn_job = self.wave_manager.update(dt, len(self.enemies))
             if spawn_job:
@@ -106,7 +101,6 @@ class GameManager:
                 self.wave_manager.wave_state.current_wave_number
             )
 
-        # 2. Update all entities and collect newly created ones (e.g., projectiles).
         newly_created_entities: List[Any] = []
         for tower in self.towers.values():
             new_entities = tower.update(dt, self.game_state, self.targeting_manager)
@@ -115,25 +109,32 @@ class GameManager:
 
         for enemy in self.enemies.values():
             enemy.update(dt, self.game_state, self.targeting_manager)
-            # NEW: Inform the targeting manager of the enemy's new position.
             self.targeting_manager.update_entity_position(enemy)
 
         for projectile in self.projectiles.values():
             projectile.update(dt, self.game_state, self.targeting_manager)
 
-        # 3. Add newly created entities to our dictionaries and the targeting manager.
+        # --- BUG FIX: Correctly handle all types of created entities ---
+        # The logic now checks if a new entity is a Projectile OR any of the
+        # aura types, ensuring they are all correctly added to the game world.
         for entity in newly_created_entities:
-            if isinstance(entity, Projectile):
+            if isinstance(
+                entity, (Projectile, PersistentGroundAura, PersistentAttachedAura)
+            ):
                 self.projectiles[entity.entity_id] = entity
-                # Projectiles don't need to be in the targeting grid as nothing targets them.
-            # Add other potential created entity types here if needed.
+                # Auras that affect enemies need to be in the targeting grid
+                # so that enemies can find them (if needed in the future).
+                # For now, only auras affect enemies, not the other way around.
+                # Projectiles are not added as nothing targets them.
+                if not isinstance(entity, Projectile):
+                    self.targeting_manager.add_entity(entity)
+            else:
+                logger.warning(f"Unhandled new entity type created: {type(entity)}")
 
-        # 4. Remove dead entities from dictionaries and the targeting manager.
         self._cleanup_dead_entities()
 
     def _cleanup_dead_entities(self):
         """Removes all dead entities from the game dictionaries and targeting manager."""
-        # --- Cleanup Enemies ---
         dead_enemy_ids = [eid for eid, e in self.enemies.items() if not e.is_alive]
         for enemy_id in dead_enemy_ids:
             dead_enemy = self.enemies[enemy_id]
@@ -142,14 +143,16 @@ class GameManager:
             self.targeting_manager.remove_entity(dead_enemy)
             del self.enemies[enemy_id]
 
-        # --- Cleanup Projectiles ---
         dead_projectile_ids = [
             pid for pid, p in self.projectiles.items() if not p.is_alive
         ]
         for proj_id in dead_projectile_ids:
+            # --- BUG FIX: Ensure auras are also removed from the targeting grid ---
+            entity_to_remove = self.projectiles[proj_id]
+            if not isinstance(entity_to_remove, Projectile):
+                self.targeting_manager.remove_entity(entity_to_remove)
             del self.projectiles[proj_id]
 
-        # --- Cleanup Towers ---
         dead_tower_ids = [tid for tid, t in self.towers.items() if not t.is_alive]
         for tower_id in dead_tower_ids:
             dead_tower = self.towers[tower_id]
@@ -160,7 +163,6 @@ class GameManager:
         """Checks for on-death effects, like explosions."""
         for effect in dead_enemy.effect_handler.status_effects:
             if effect.source_entity_id:
-                # Use fast dictionary lookup
                 source_tower = self.towers.get(effect.source_entity_id)
                 if source_tower and source_tower.on_death_explosion:
                     self._create_explosion(
@@ -228,7 +230,6 @@ class GameManager:
             logger.error(f"Could not find definition for entity ID: {entity_id}")
             return
 
-        # Add to dictionary and register with targeting system.
         self.enemies[new_enemy.entity_id] = new_enemy
         self.targeting_manager.add_entity(new_enemy)
 
@@ -253,7 +254,6 @@ class GameManager:
             status_effects_config=self.configs.get("status_effects", {}),
         )
 
-        # Add to dictionary and register with targeting system.
         self.towers[new_tower.entity_id] = new_tower
         self.targeting_manager.add_entity(new_tower)
 
@@ -262,7 +262,6 @@ class GameManager:
 
     def purchase_tower_upgrade(self, tower_id: uuid.UUID, upgrade_id: str):
         """Handles a request to purchase an upgrade for a specific tower."""
-        # --- PERFORMANCE FIX: Use fast O(1) dictionary lookup ---
         target_tower = self.towers.get(tower_id)
         if not target_tower:
             return
@@ -284,7 +283,6 @@ class GameManager:
 
     def salvage_tower(self, tower_id: uuid.UUID):
         """Handles all logic for salvaging a tower."""
-        # --- PERFORMANCE FIX: Use fast O(1) dictionary lookup ---
         target_tower = self.towers.get(tower_id)
         if not target_tower:
             return
@@ -296,13 +294,11 @@ class GameManager:
         if self.grid.is_valid_coord(tile_x, tile_y):
             self.grid.set_tile_type(tile_x, tile_y, "BUILDABLE")
 
-        # Mark the tower for death. It will be removed by _cleanup_dead_entities.
         target_tower.kill()
         self.game_state.clear_selection()
 
     def change_tower_persona(self, tower_id: uuid.UUID, new_persona_id: str):
         """Finds a tower by its ID and requests it to change its persona."""
-        # --- PERFORMANCE FIX: Use fast O(1) dictionary lookup ---
         target_tower = self.towers.get(tower_id)
         if not target_tower:
             logger.error(f"Could not find tower with ID {tower_id} to change persona.")
