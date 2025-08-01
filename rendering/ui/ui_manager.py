@@ -185,7 +185,6 @@ class UIManager:
                     self.game_manager.purchase_tower_upgrade(tower_id, upgrade_id)
                     if self.upgrade_panel:
                         self.upgrade_panel.rebuild_layout()
-                        # --- FIX: Manually update hover states after rebuilding ---
                         self.upgrade_panel.update_hover_states()
             case ActionType.CLOSE_PANEL:
                 game_state.clear_selection()
@@ -199,7 +198,6 @@ class UIManager:
                     self.game_manager.change_tower_persona(tower_id, persona_id)
                     if self.upgrade_panel:
                         self.upgrade_panel.rebuild_layout()
-                        # --- FIX: Also update hover states here ---
                         self.upgrade_panel.update_hover_states()
 
     def update(self, dt: float, game_state: "GameState"):
@@ -209,10 +207,13 @@ class UIManager:
                 not self.upgrade_panel
                 or self.upgrade_panel.tower.entity_id != selected_id
             ):
-                selected_tower = next(
-                    (t for t in self.game_manager.towers if t.entity_id == selected_id),
-                    None,
-                )
+                # --- BUG FIX & PERFORMANCE GAIN ---
+                # The game_manager.towers is now a dictionary. We can perform a
+                # fast, direct lookup using .get() instead of a slow, linear search.
+                # This also fixes the crash where the code was iterating over
+                # dictionary keys (UUIDs) instead of tower objects.
+                selected_tower = self.game_manager.towers.get(selected_id)
+
                 if selected_tower:
                     panel_rect = pygame.Rect(self.screen_rect.width - 270, 10, 260, 0)
                     salvage_rate = self.game_manager.get_salvage_rate()
