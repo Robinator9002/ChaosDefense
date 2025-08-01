@@ -25,8 +25,17 @@ class ActionType(Enum):
     SALVAGE_TOWER = auto()
     # Action to close the currently open panel (e.g., the upgrade panel).
     CLOSE_PANEL = auto()
-    # --- NEW: Action to change a tower's targeting AI persona ---
+    # Action to change a tower's targeting AI persona.
     CHANGE_TARGETING_PERSONA = auto()
+
+    # --- NEW: Actions for the dynamic persona selection UI ---
+    # Action sent from the UpgradePanel to open the persona selection modal.
+    OPEN_PERSONA_PANEL = auto()
+    # Action sent from the PersonaSelectionPanel to close itself.
+    CLOSE_PERSONA_PANEL = auto()
+    # A generic action used by modal panels to absorb clicks and prevent
+    # interaction with elements behind them.
+    UI_CLICK = auto()
 
 
 @dataclass(frozen=True)
@@ -53,7 +62,7 @@ class UIAction:
         if self.type in (
             ActionType.SELECT_TOWER,
             ActionType.PURCHASE_UPGRADE,
-            ActionType.CHANGE_TARGETING_PERSONA,  # Also requires an ID
+            ActionType.CHANGE_TARGETING_PERSONA,
         ):
             if self.entity_id is None:
                 logger.error(
