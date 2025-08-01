@@ -1,6 +1,7 @@
 # game_logic/waves/wave_state.py
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
+from collections import deque
 
 
 @dataclass
@@ -23,9 +24,11 @@ class WaveState:
     victory: bool = False
 
     # --- Spawning System State ---
-    # The queue of enemies waiting to be spawned in the current wave.
-    # Each item is a dictionary (a "spawn job") defining an enemy.
-    spawn_queue: List[Dict[str, Any]] = field(default_factory=list)
+    # --- PERFORMANCE FIX: Per-Lane Spawn Queues ---
+    # Instead of a single list, we now use a dictionary mapping each lane's
+    # index to its own dedicated queue. A `deque` (double-ended queue) is used
+    # for highly efficient O(1) appends and pops from the left.
+    spawn_queues: Dict[int, deque] = field(default_factory=dict)
 
     # Tracks the spawn cooldown for each path (lane).
     # The key is the path_index (int), the value is the remaining cooldown (float).
@@ -33,7 +36,6 @@ class WaveState:
 
     def __post_init__(self):
         """Called by the dataclass constructor after the instance is created."""
-        # This can be used for any initial setup logic if needed in the future.
         pass
 
     def reset_for_next_wave(self, time_between_waves: float):
@@ -42,5 +44,6 @@ class WaveState:
         self.time_until_next_wave = time_between_waves
 
     def initialize_lane_cooldowns(self, num_paths: int):
-        """Sets up the lane cooldown dictionary based on the number of paths."""
+        """Sets up the lane cooldown and spawn queue dictionaries."""
         self.lane_cooldowns = {i: 0.0 for i in range(num_paths)}
+        self.spawn_queues = {i: deque() for i in range(num_paths)}

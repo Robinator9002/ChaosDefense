@@ -2,8 +2,6 @@
 import logging
 from typing import List, Dict, Any, Optional
 
-# --- Refactor Imports ---
-# Import the new specialized classes that will handle the logic.
 from .wave_state import WaveState
 from .wave_generator import WaveGenerator
 from .boss_handler import BossHandler
@@ -20,7 +18,7 @@ class WaveManager:
     - Maintaining the central wave state (`WaveState`).
     - Managing the high-level timing between waves.
     - Delegating the creation of wave content to `WaveGenerator` and `BossHandler`.
-    - Managing the staggered spawning of enemies from the spawn queue.
+    - Managing the staggered spawning of enemies from efficient, per-lane queues.
     """
 
     def __init__(
@@ -28,8 +26,8 @@ class WaveManager:
         difficulty_config: Dict[str, Any],
         wave_scaling_config: Dict[str, Any],
         enemy_types: Dict[str, Any],
-        boss_types: Dict[str, Any],  # NEW
-        allowed_boss_types: List[str],  # NEW
+        boss_types: Dict[str, Any],
+        allowed_boss_types: List[str],
         player_difficulty: int,
         initial_level_difficulty: int,
         num_paths: int,
@@ -43,7 +41,6 @@ class WaveManager:
         self.num_paths = num_paths
         self.base_enemy_types = enemy_types
 
-        # --- Initialize Specialized Handlers ---
         self.wave_state = WaveState(effective_level_difficulty=initial_level_difficulty)
         self.wave_state.initialize_lane_cooldowns(num_paths)
 
@@ -57,13 +54,15 @@ class WaveManager:
 
     def update(self, dt: float, current_enemy_count: int) -> Optional[Dict[str, Any]]:
         """
-        Updates timers and determines if an enemy should be spawned from the queue.
+        Updates timers and determines if an enemy should be spawned from the queues.
         """
         if self.wave_state.game_over or self.wave_state.victory:
             return None
 
         # --- Inter-Wave Timer Logic ---
-        if not self.wave_state.spawn_queue and current_enemy_count == 0:
+        # Check if all spawn queues are empty.
+        all_queues_empty = all(not q for q in self.wave_state.spawn_queues.values())
+        if all_queues_empty and current_enemy_count == 0:
             if self.wave_state.current_wave_number >= self.max_waves:
                 self.wave_state.victory = True
                 logger.info("VICTORY! All waves cleared.")
@@ -74,30 +73,31 @@ class WaveManager:
                 self._prepare_next_wave()
             return None
 
-        # --- Intra-Wave Spawning Logic ---
+        # --- Intra-Wave Spawning Logic (PERFORMANCE FIX) ---
+        # This logic is now highly efficient. Instead of searching one long list,
+        # we iterate through each lane and check its specific queue.
         self.wave_state.lane_cooldowns = {
             lane: max(0.0, cd - dt)
             for lane, cd in self.wave_state.lane_cooldowns.items()
         }
 
-        if self.wave_state.spawn_queue:
-            for i, enemy_job in enumerate(self.wave_state.spawn_queue):
-                lane_index = enemy_job["path_index"]
-                if self.wave_state.lane_cooldowns.get(lane_index, 0) <= 0:
-                    spawn_data = self.wave_state.spawn_queue.pop(i)
-                    self.wave_state.lane_cooldowns[lane_index] = (
-                        self._calculate_spawn_cooldown()
-                    )
-                    return spawn_data
+        for lane_index, queue in self.wave_state.spawn_queues.items():
+            # Check if this lane is ready to spawn and has enemies waiting.
+            if self.wave_state.lane_cooldowns.get(lane_index, 0) <= 0 and queue:
+                # Pop the next enemy from the left of the deque (fast O(1) operation).
+                spawn_data = queue.popleft()
+                self.wave_state.lane_cooldowns[lane_index] = (
+                    self._calculate_spawn_cooldown()
+                )
+                return spawn_data  # Return one spawn job per frame.
 
         return None
 
     def _prepare_next_wave(self):
         """
         Orchestrates the creation of the next wave by delegating to the
-        appropriate handler (Boss or Standard).
+        appropriate handler and populating the per-lane spawn queues.
         """
-        # 1. Update the core wave state.
         self.wave_state.reset_for_next_wave(
             self.difficulty_settings["time_between_waves"]
         )
@@ -106,30 +106,35 @@ class WaveManager:
             f"--- Preparing Wave {self.wave_state.current_wave_number}/{self.max_waves} ---"
         )
 
-        # 2. High-level decision: Is this a boss wave or a standard wave?
+        spawn_jobs: List[Dict[str, Any]] = []
         if self.boss_handler.check_for_boss_wave(self.wave_state):
-            # Delegate to the BossHandler to generate the scripted wave.
-            self.wave_state.spawn_queue = self.boss_handler.generate_boss_wave(
+            spawn_jobs = self.boss_handler.generate_boss_wave(
                 self.wave_state, self.num_paths
             )
         else:
-            # For a standard wave, first determine the pool of available enemies.
-            # The BossHandler may add bosses to this pool if they've met their
-            # spawn_difficulty threshold.
             available_enemies = self.boss_handler.update_available_enemies(
                 self.wave_state, self.base_enemy_types
             )
-            # Delegate to the WaveGenerator to create a random wave.
-            self.wave_state.spawn_queue = self.wave_generator.generate_standard_wave(
+            spawn_jobs = self.wave_generator.generate_standard_wave(
                 self.wave_state, self.num_paths, available_enemies
             )
+
+        # --- PERFORMANCE FIX: Populate Per-Lane Queues ---
+        # Instead of putting all jobs in one list, we sort them into the
+        # correct deque based on their path_index.
+        for i in range(self.num_paths):
+            self.wave_state.spawn_queues[i].clear()
+
+        for job in spawn_jobs:
+            path_index = job.get("path_index")
+            if path_index is not None and path_index in self.wave_state.spawn_queues:
+                self.wave_state.spawn_queues[path_index].append(job)
 
     def _update_difficulty(self):
         """Increments the effective level difficulty based on the wave interval."""
         increase_interval = self.difficulty_settings[
             "level_difficulty_increase_interval"
         ]
-        # Ensure interval is at least 1 to avoid division by zero.
         if (
             increase_interval > 0
             and (self.wave_state.current_wave_number - 1) % increase_interval == 0
@@ -143,7 +148,6 @@ class WaveManager:
     def _calculate_spawn_cooldown(self) -> float:
         """
         Calculates the time between individual enemy spawns on a single lane.
-        This logic remains in the manager as it's part of the core spawning rhythm.
         """
         cooldown_cfg = self.wave_generator.wave_scaling_config["spawn_cooldown"]
         cooldown = (
