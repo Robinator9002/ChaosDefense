@@ -259,9 +259,9 @@
         "range": 120,
         "target_type": "TOWER",
         "effects": {
-          "damage_boost": { "potency": 100.15, "duration": 0.5 },
-          "range_boost": { "potency": 100.1, "duration": 0.5 },
-          "fire_rate_boost": { "potency": 100.1, "duration": 0.5 }
+          "damage_boost": { "potency": 1.15, "duration": 0.5 },
+          "range_boost": { "potency": 1.1, "duration": 0.5 },
+          "fire_rate_boost": { "potency": 1.1, "duration": 0.5 }
         }
       }
     ]
