@@ -1,12 +1,14 @@
 # game_logic/game_ai/director_ai.py
 import logging
 from typing import Dict, Any, Optional, List
+import pygame
 
 # Using TYPE_CHECKING to avoid circular imports for type hinting
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..entities.enemies.enemy import Enemy
+    from ..entities.tower import Tower
     from ..game_state import GameState
 
 # Get a logger instance for this module
@@ -40,12 +42,7 @@ class DirectorAI:
         self.wave_scaling_config = wave_scaling_config
 
         # --- Intelligence Data Stores ---
-        # This will store statistics on how well each enemy type is performing.
-        # Example: { "scout": {"leaked": 5, "died": 20}, "tank": {"leaked": 0, "died": 10} }
         self.enemy_performance_stats: Dict[str, Dict[str, int]] = {}
-
-        # This will store an analysis of the player's defenses on each path.
-        # Example: { 0: {"threat_score": 150.5}, 1: {"threat_score": 450.2} }
         self.path_threat_analysis: Dict[int, Dict[str, float]] = {}
 
         logger.info("Director AI initialized. The stage is set.")
@@ -54,35 +51,64 @@ class DirectorAI:
         """
         Records that an enemy was successfully defeated by the player.
         This is a key feedback metric indicating the player's strengths.
-
-        Args:
-            enemy (Enemy): The enemy entity that was defeated.
         """
-        # This is a placeholder for the logic to be implemented in Phase 1, Step 1.2
-        pass
+        enemy_type = enemy.enemy_type_id
+        if enemy_type not in self.enemy_performance_stats:
+            self.enemy_performance_stats[enemy_type] = {"leaked": 0, "died": 0}
+        self.enemy_performance_stats[enemy_type]["died"] += 1
+        logger.debug(
+            f"AI recorded death of: {enemy_type}. Stats: {self.enemy_performance_stats[enemy_type]}"
+        )
 
     def record_enemy_leak(self, enemy: "Enemy"):
         """
         Records that an enemy successfully reached the end of the path.
         This is a key feedback metric indicating the player's weaknesses.
-
-        Args:
-            enemy (Enemy): The enemy entity that reached the base.
         """
-        # This is a placeholder for the logic to be implemented in Phase 1, Step 1.2
-        pass
+        enemy_type = enemy.enemy_type_id
+        if enemy_type not in self.enemy_performance_stats:
+            self.enemy_performance_stats[enemy_type] = {"leaked": 0, "died": 0}
+        self.enemy_performance_stats[enemy_type]["leaked"] += 1
+        logger.warning(
+            f"AI recorded LEAK of: {enemy_type}. Stats: {self.enemy_performance_stats[enemy_type]}"
+        )
 
-    def analyze_player_defenses(self, towers: Dict[Any, Any], paths: List[List[Any]]):
+    def analyze_player_defenses(
+        self, towers: Dict[Any, "Tower"], paths: List[List[Any]]
+    ):
         """
         Analyzes the player's current tower setup to assess the threat level
-        on each path.
-
-        Args:
-            towers (Dict): A dictionary of all active tower entities.
-            paths (List): A list of all available enemy paths.
+        on each path. A higher score means a more well-defended path.
         """
-        # This is a placeholder for the logic to be implemented in Phase 3
-        pass
+        self.path_threat_analysis.clear()
+
+        for i, path in enumerate(paths):
+            path_threat = 0.0
+            path_points = [pygame.Vector2(p[0], p[1]) for p in path]
+
+            for tower in towers.values():
+                # Check if the tower can hit any part of this path
+                can_hit_path = False
+                # Sample points along the path for efficiency
+                for point in path_points[::5]:  # Check every 5th point
+                    if tower.pos.distance_to(point) <= tower.range:
+                        can_hit_path = True
+                        break
+
+                if can_hit_path:
+                    # Calculate a heuristic threat score for the tower
+                    dps = tower.damage * tower.fire_rate
+                    # Add value for AoE and special abilities
+                    threat = dps * (1 + (tower.blast_radius / 100))
+                    if tower.armor_shred > 0:
+                        threat *= 1.2
+                    if any("slow" in effect for effect in tower.effects):
+                        threat *= 1.1
+                    path_threat += threat
+
+            self.path_threat_analysis[i] = {"threat_score": path_threat}
+
+        logger.info(f"AI Defense Analysis complete: {self.path_threat_analysis}")
 
     def compose_next_wave(
         self, game_state: "GameState", enemy_pool: Dict[str, Any]
@@ -90,14 +116,16 @@ class DirectorAI:
         """
         The core decision-making function of the AI. Based on all gathered
         intelligence, it composes the list of spawn jobs for the next wave.
-
-        Args:
-            game_state (GameState): The current state of the game.
-            enemy_pool (Dict[str, Any]): The dictionary of all available enemies.
-
-        Returns:
-            An optional list of spawn jobs. Returning None signals to the
-            WaveManager that it should fall back to the default random generator.
         """
-        # This is a placeholder for the logic to be implemented in Phase 2
+        # For now, we will let the AI "sleep" for the first few waves to let
+        # the player get established.
+        if game_state.current_wave_number < 3:
+            return None
+
+        # This is where the core heuristic logic will live.
+        # It will use self.enemy_performance_stats and self.path_threat_analysis
+        # to make intelligent decisions via the WaveComposer.
+
+        # For now, we return None to use the fallback generator.
+        # In the next phase, this will return a full wave plan.
         return None
