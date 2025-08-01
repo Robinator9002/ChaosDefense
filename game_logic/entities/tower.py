@@ -4,7 +4,7 @@ import logging
 import uuid
 import random
 import math
-import copy  # <-- IMPORT THE COPY MODULE
+import copy
 from typing import List, Optional, Dict, Any, TYPE_CHECKING, Callable
 
 from .entity import Entity
@@ -23,6 +23,10 @@ class Tower(Entity):
     """
     Represents a universal, data-driven defensive tower. Its stats and behaviors
     are defined by configuration data, and this class brings them to life.
+
+    REFACTORED: No longer uses a static list of available personas. Instead,
+    it can dynamically determine which personas are eligible based on its
+    current abilities (e.g., having a blast radius makes 'ARTILLERY' eligible).
     """
 
     def __init__(
@@ -45,19 +49,16 @@ class Tower(Entity):
         self.cost = tower_type_data.get("cost", 0)
         self.status_effects_config = status_effects_config
 
-        # --- CRITICAL FIX: DEEP COPY ---
-        # We must create a deep copy of the mutable data from the config file.
-        # If we don't, every tower of the same type will share the exact same
-        # dictionary in memory, causing upgrades on one tower to affect all of them.
         self.attack = copy.deepcopy(tower_type_data.get("attack", {}))
         self.auras = copy.deepcopy(tower_type_data.get("auras", []))
 
         self.attack.setdefault("data", {})
 
         # --- Targeting & AI ---
-        ai_config = tower_type_data.get("ai_config", {})
-        self.available_personas = ai_config.get("available_personas", [])
-        self.current_persona = ai_config.get("default_persona", "EXECUTIONER")
+        # --- REFACTORED: Removed static persona list. ---
+        # The default persona is now hard-coded as a fallback. The UI and
+        # dynamic eligibility system will handle the actual logic.
+        self.current_persona = "EXECUTIONER"
         self.current_targets: List["Enemy"] = []
 
         # --- State & Cooldowns ---
@@ -171,16 +172,39 @@ class Tower(Entity):
             return self._fire()
         return []
 
+    def get_eligible_personas(self, all_personas_config: Dict[str, Any]) -> List[str]:
+        """
+        Dynamically determines which AI personas are valid for this tower
+        based on its current, fully-upgraded state.
+        """
+        eligible = []
+        for persona_id in all_personas_config.keys():
+            if persona_id == "ARTILLERY":
+                # Eligible if the tower has any area-of-effect capability.
+                if self.blast_radius > 0:
+                    eligible.append(persona_id)
+            elif persona_id == "CONTAGION":
+                # Eligible if the tower can apply any status effect. This checks
+                # base effects and effects added by upgrades.
+                has_debuffs = (
+                    len(self.attack.get("data", {}).get("effects", {})) > 0
+                    or len(self.on_hit_effects) > 0
+                    or len(self.on_blast_effects) > 0
+                )
+                if has_debuffs:
+                    eligible.append(persona_id)
+            else:
+                # All other personas are considered universally applicable.
+                eligible.append(persona_id)
+        return eligible
+
     def set_persona(self, new_persona_id: str):
-        if new_persona_id in self.available_personas:
-            self.current_persona = new_persona_id
-            logger.info(
-                f"Tower {self.entity_id} changed persona to '{new_persona_id}'."
-            )
-        else:
-            logger.warning(
-                f"Attempted to set invalid persona '{new_persona_id}' for tower {self.entity_id}."
-            )
+        """
+        Sets the tower's current targeting persona. The UI is responsible for
+        ensuring the requested persona is eligible before calling this.
+        """
+        self.current_persona = new_persona_id
+        logger.info(f"Tower {self.entity_id} changed persona to '{new_persona_id}'.")
 
     def _find_new_targets(self, targeting_manager: "TargetingManager"):
         potential_targets = targeting_manager.get_nearby_enemies(self.pos, self.range)
