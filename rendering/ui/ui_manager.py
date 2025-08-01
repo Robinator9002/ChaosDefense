@@ -9,6 +9,8 @@ from .buttons.tower_button import TowerButton
 from .buttons.tab_button import TabButton
 from .panels.upgrade_panel import UpgradePanel
 from .panels.tower_info_panel import TowerInfoPanel
+# --- NEW: Import the new PersonaSelectionPanel ---
+from .panels.persona_selection_panel import PersonaSelectionPanel
 from .ui_action import UIAction, ActionType
 
 if TYPE_CHECKING:
@@ -32,6 +34,8 @@ class UIManager:
         self.assets_path = assets_path
         self.upgrade_panel: Optional[UpgradePanel] = None
         self.tower_info_panel: Optional[TowerInfoPanel] = None
+        # --- NEW: Add state for the persona selection modal ---
+        self.persona_selection_panel: Optional[PersonaSelectionPanel] = None
         self.tower_categories: Dict[str, List[Dict[str, Any]]] = OrderedDict()
         self.category_tabs: List[TabButton] = []
         self.build_buttons: List[TowerButton] = []
@@ -143,6 +147,15 @@ class UIManager:
             self.build_buttons.append(button)
 
     def handle_event(self, event: pygame.event.Event, game_state: "GameState") -> bool:
+        # --- REFACTORED: Prioritize modal panels ---
+        # If the persona selection panel is open, it gets exclusive access to events.
+        if self.persona_selection_panel:
+            action = self.persona_selection_panel.handle_event(event, game_state)
+            if action:
+                self._process_ui_action(action, game_state)
+            # Always return True to block other UI/game interactions while modal is open
+            return True
+
         if self.upgrade_panel:
             action = self.upgrade_panel.handle_event(event, game_state)
             if action:
@@ -196,9 +209,27 @@ class UIManager:
                 persona_id = action.entity_id
                 if tower_id and persona_id:
                     self.game_manager.change_tower_persona(tower_id, persona_id)
+                    # Close the panel and rebuild the upgrade panel to reflect the change
+                    self.persona_selection_panel = None
                     if self.upgrade_panel:
                         self.upgrade_panel.rebuild_layout()
-                        self.upgrade_panel.update_hover_states()
+            # --- NEW: Handle opening and closing the persona panel ---
+            case ActionType.OPEN_PERSONA_PANEL:
+                selected_tower = self.game_manager.towers.get(game_state.selected_entity_id)
+                if selected_tower:
+                    all_personas = self.game_manager.configs.get("targeting_ai", {})
+                    eligible_personas = selected_tower.get_eligible_personas(all_personas)
+                    self.persona_selection_panel = PersonaSelectionPanel(
+                        screen_rect=self.screen_rect,
+                        all_personas=all_personas,
+                        eligible_personas=eligible_personas,
+                        active_persona=selected_tower.current_persona
+                    )
+            case ActionType.CLOSE_PERSONA_PANEL:
+                self.persona_selection_panel = None
+            case ActionType.UI_CLICK:
+                # This action is used by modals to absorb clicks. Do nothing.
+                pass
 
     def update(self, dt: float, game_state: "GameState"):
         selected_id = game_state.selected_entity_id
@@ -207,11 +238,6 @@ class UIManager:
                 not self.upgrade_panel
                 or self.upgrade_panel.tower.entity_id != selected_id
             ):
-                # --- BUG FIX & PERFORMANCE GAIN ---
-                # The game_manager.towers is now a dictionary. We can perform a
-                # fast, direct lookup using .get() instead of a slow, linear search.
-                # This also fixes the crash where the code was iterating over
-                # dictionary keys (UUIDs) instead of tower objects.
                 selected_tower = self.game_manager.towers.get(selected_id)
 
                 if selected_tower:
@@ -282,3 +308,7 @@ class UIManager:
             self.tower_info_panel.draw(screen)
         if self.upgrade_panel:
             self.upgrade_panel.draw(screen)
+        
+        # --- NEW: Draw the modal panel last so it's on top ---
+        if self.persona_selection_panel:
+            self.persona_selection_panel.draw(screen)
