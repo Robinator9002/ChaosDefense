@@ -2,15 +2,13 @@
 import pygame
 import uuid
 import logging
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Dict
 
 from ..effects.effect_handler import EffectHandler
 from ..effects.status_effect import StatusEffect
 
 if TYPE_CHECKING:
     from ..game_state import GameState
-
-    # --- MODIFIED: Update import path for new file location ---
     from ..game_ai.targeting.targeting_manager import TargetingManager
 
 
@@ -21,9 +19,9 @@ class Entity:
     """
     The base class for all game objects that exist on the map.
 
-    REFACTORED: Now includes the logic to broadcast auras, allowing any
-    subclass (Tower or Enemy) to buff nearby allies in a data-driven and
-    performant way by leveraging the TargetingManager.
+    REFACTORED: Now includes a sprite caching system to prevent expensive
+    on-the-fly scaling operations every frame, improving rendering performance
+    when the camera is zoomed.
     """
 
     def __init__(self, x: float, y: float, max_hp: int, sprite: pygame.Surface = None):
@@ -35,21 +33,28 @@ class Entity:
         self.current_hp = max_hp
         self.is_alive = True
         self.entity_id = uuid.uuid4()
-        self.effect_handler = EffectHandler(self)
-
-        # These attributes will be populated by subclasses (Tower, Enemy)
-        # based on their specific configuration data.
-        self.auras: List[dict] = []
-        self.status_effects_config: dict = {}
 
         if sprite:
             self.sprite = sprite
         else:
+            # Create a default placeholder sprite if none is provided
             self.sprite = pygame.Surface((32, 32))
             self.sprite.fill((255, 0, 255))
             self.sprite.set_colorkey((0, 0, 0))
 
         self.rect = self.sprite.get_rect(center=self.pos)
+
+        # --- NEW: Sprite cache for rendering optimization ---
+        # The key will be the zoom level (float), the value will be the pre-scaled sprite surface.
+        self._sprite_cache: Dict[float, pygame.Surface] = {}
+
+        # The EffectHandler must be initialized *after* all stats on the subclass
+        # have been set, so it can take an accurate snapshot.
+        self.effect_handler = EffectHandler(self)
+
+        self.auras: List[dict] = []
+        self.status_effects_config: dict = {}
+
         logger.debug(
             f"Entity {self.__class__.__name__} created with ID {self.entity_id} at {self.pos}"
         )
@@ -61,9 +66,7 @@ class Entity:
         Updates the entity's logic, including effects and aura broadcasting.
         """
         self.effect_handler.update(dt)
-
         self._broadcast_auras(targeting_manager)
-
         self.rect.center = self.pos
 
     def _broadcast_auras(self, targeting_manager: "TargetingManager"):
@@ -81,7 +84,6 @@ class Entity:
             if not all([aura_range > 0, target_type, effects_to_apply]):
                 continue
 
-            # Use the targeting manager for a performant query
             allies_in_range = []
             if target_type == "TOWER":
                 allies_in_range = targeting_manager.get_nearby_towers(
@@ -93,7 +95,6 @@ class Entity:
                 )
 
             for ally in allies_in_range:
-                # Don't apply aura to self
                 if ally is self:
                     continue
 
@@ -111,22 +112,31 @@ class Entity:
 
     def draw(self, screen: pygame.Surface, camera_offset: pygame.Vector2, zoom: float):
         """
-        Draws the entity on the screen, applying camera transformations.
+        Draws the entity on the screen, applying camera transformations and
+        using a cache for scaled sprites to optimize performance.
         """
         if not self.is_alive:
             return
 
-        scaled_pos = self.pos * zoom
-        screen_pos = scaled_pos + camera_offset
+        screen_pos = (self.pos * zoom) + camera_offset
 
-        if zoom != 1.0:
-            new_size = (int(self.rect.width * zoom), int(self.rect.height * zoom))
-            scaled_sprite = pygame.transform.scale(self.sprite, new_size)
-            scaled_rect = scaled_sprite.get_rect(center=screen_pos)
-            screen.blit(scaled_sprite, scaled_rect)
-        else:
+        if zoom == 1.0:
+            # If no zoom, draw directly with no scaling.
             self.rect.center = screen_pos
             screen.blit(self.sprite, self.rect)
+        else:
+            # --- OPTIMIZED: Use the sprite cache ---
+            # Check if a pre-scaled sprite for this zoom level already exists.
+            if zoom not in self._sprite_cache:
+                # If not, create it once and store it in the cache.
+                new_size = (int(self.rect.width * zoom), int(self.rect.height * zoom))
+                # Use scale for performance; smoothscale is too slow for many entities.
+                self._sprite_cache[zoom] = pygame.transform.scale(self.sprite, new_size)
+
+            # Retrieve the pre-scaled sprite from the cache.
+            scaled_sprite = self._sprite_cache[zoom]
+            scaled_rect = scaled_sprite.get_rect(center=screen_pos)
+            screen.blit(scaled_sprite, scaled_rect)
 
     def apply_status_effect(self, new_effect: "StatusEffect"):
         """
@@ -150,7 +160,9 @@ class Entity:
         Marks the entity as no longer alive.
         """
         self.is_alive = False
-        logger.info(f"Entity {self.entity_id} has been killed.")
+        # Clear the cache to free up memory when the entity is no longer needed.
+        self._sprite_cache.clear()
+        logger.debug(f"Entity {self.entity_id} has been killed.")
 
     def get_distance_to(self, other_entity: "Entity") -> float:
         """
