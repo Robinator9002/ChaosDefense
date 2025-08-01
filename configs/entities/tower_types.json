@@ -160,13 +160,13 @@
       "type": "persistent_ground_aura",
       "data": {
         "range": 80,
-        "fire_rate": 0.8,
+        "fire_rate": 1.2,
         "radius": 60,
         "duration": 1,
-        "dps": 15,
-        "tick_rate": 10,
-        "bonus_damage_vs_armor_multiplier": -0.5,
-        "effects": { "fire": { "potency": 10, "duration": 2.0 } }
+        "dps": 20,
+        "tick_rate": 15,
+        "bonus_damage_vs_armor_multiplier": -0.3,
+        "effects": { "fire": { "potency": 15, "duration": 2.0 } }
       }
     }
   },
@@ -191,11 +191,11 @@
       "type": "persistent_attached_aura",
       "data": {
         "range": 180,
-        "fire_rate": 0.1,
+        "fire_rate": 0.15,
         "radius": 90,
-        "duration": 2.5,
-        "dps": 2,
-        "tick_rate": 1,
+        "duration": 3,
+        "dps": 20,
+        "tick_rate": 1.5,
         "bonus_damage_vs_armor_multiplier": 0.3,
         "effects": { "slow": { "potency": 0.2, "duration": 1.5 } }
       }
