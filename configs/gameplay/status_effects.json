@@ -92,5 +92,21 @@
     "stacking": "refresh",
     "description": "Increases the radius of aura-based attacks.",
     "params": { "stat": "aura_size_multiplier" }
+  },
+
+  "//": "--- NEW: ENEMY BUFFS ---",
+  "regeneration": {
+    "name": "Regeneration",
+    "type": "heal_over_time",
+    "stacking": "stack_intensity",
+    "description": "Heals the affected unit over time.",
+    "params": { "tick_interval": 1.0 }
+  },
+  "armor_boost": {
+    "name": "Armor Boost",
+    "type": "stat_buff",
+    "stacking": "stack_potency",
+    "description": "Increases enemy armor.",
+    "params": { "stat": "armor" }
   }
 }

@@ -1,0 +1,56 @@
+{
+  "//": "This file defines the new 'Buffer' enemy archetypes. These are support units that provide auras to enhance their allies.",
+
+  "regenerator": {
+    "//": "ROLE: A high-priority support unit that provides slow health regeneration to nearby enemies.",
+    "name": "Regenerator",
+    "min_level_difficulty": 4,
+    "render_props": { "size": 24, "color": [120, 230, 120] },
+    "base_stats": {
+      "hp": 80,
+      "speed": 50,
+      "bounty": 15,
+      "damage": 1,
+      "armor": 5
+    },
+    "scaling_per_level_add": { "hp": 8, "speed": 1, "bounty": 1, "armor": 0.5 },
+    "auras": [
+      {
+        "range": 100,
+        "target_type": "ENEMY",
+        "effects": {
+          "regeneration": { "potency": 4, "duration": 1.1 }
+        }
+      }
+    ]
+  },
+
+  "bulwark": {
+    "//": "ROLE: A defensive support unit that grants a flat armor bonus to nearby enemies, making swarms much tougher.",
+    "name": "Bulwark",
+    "min_level_difficulty": 6,
+    "render_props": { "size": 28, "color": [200, 200, 220] },
+    "base_stats": {
+      "hp": 120,
+      "speed": 45,
+      "bounty": 20,
+      "damage": 2,
+      "armor": 10
+    },
+    "scaling_per_level_add": {
+      "hp": 12,
+      "speed": 0,
+      "bounty": 1.5,
+      "armor": 1
+    },
+    "auras": [
+      {
+        "range": 90,
+        "target_type": "ENEMY",
+        "effects": {
+          "armor_boost": { "potency": 5, "duration": 1.1 }
+        }
+      }
+    ]
+  }
+}
