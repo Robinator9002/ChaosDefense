@@ -1,5 +1,5 @@
 {
-  "//": "Level Design Overhaul: Added 'allowed_boss_types' to each level's generation parameters to create thematic boss encounters.",
+  "//": "LEVEL DESIGN OVERHAUL: Replaced the simple 'num_paths' integer with a more descriptive 'paths_config' dictionary. This allows for dynamic and varied map layouts by specifying exactly what kind and how many paths the level generator should create.",
 
   "Forest": {
     "//": "ROLE: Introductory Level. Spawns 'soldier' type bosses.",
@@ -7,7 +7,9 @@
     "generation_params": {
       "grid_width": 100,
       "grid_height": 50,
-      "num_paths": 2,
+      "paths_config": {
+        "elbow": 2
+      },
       "level_difficulty": 4,
       "starting_gold": 200,
       "base_hp": 25,
@@ -44,7 +46,10 @@
     "generation_params": {
       "grid_width": 80,
       "grid_height": 50,
-      "num_paths": 3,
+      "paths_config": {
+        "wandering": 1,
+        "elbow": 2
+      },
       "level_difficulty": 2,
       "starting_gold": 300,
       "base_hp": 20,
@@ -90,7 +95,9 @@
     "generation_params": {
       "grid_width": 70,
       "grid_height": 55,
-      "num_paths": 2,
+      "paths_config": {
+        "elbow": 2
+      },
       "level_difficulty": 3,
       "starting_gold": 400,
       "base_hp": 15,
@@ -133,7 +140,9 @@
     "generation_params": {
       "grid_width": 90,
       "grid_height": 60,
-      "num_paths": 1,
+      "paths_config": {
+        "wandering": 1
+      },
       "level_difficulty": 4,
       "starting_gold": 500,
       "base_hp": 1,
