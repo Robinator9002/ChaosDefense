@@ -4,46 +4,46 @@ import math
 from collections import defaultdict
 from typing import List, Dict, Tuple, TYPE_CHECKING, Any, Callable
 import pygame
+import uuid
 
-# --- NEW: Import the priority sorting functions ---
-# We will create this file in the next step.
 from . import targeting_priorities
 
 if TYPE_CHECKING:
-    # --- MODIFIED: Updated import paths for new file location ---
     from ...entities.entity import Entity
     from ...entities.tower import Tower
-    from game_logic.entities.enemies.enemy import Enemy
+    from ...entities.enemies.enemy import Enemy
 
 logger = logging.getLogger(__name__)
 
 
 class TargetingManager:
     """
-    A centralized intelligence system for all entities on the battlefield.
+    A centralized, stateful intelligence system for all entities.
 
-    This manager uses a spatial hash grid to dramatically accelerate proximity
-    queries. It also contains the logic for sorting potential targets based on
-    a tower's currently selected AI persona, which is defined in data.
+    This manager uses a persistent spatial hash grid to dramatically accelerate
+    proximity queries. Instead of being rebuilt every frame, it is now updated
+    incrementally as entities are added, removed, or moved. This is a critical
+    performance optimization.
     """
 
     def __init__(self, cell_size: int, targeting_ai_config: Dict[str, Any]):
         """
         Initializes the TargetingManager.
-
-        Args:
-            cell_size (int): The width and height of each grid cell for the
-                             spatial hash.
-            targeting_ai_config (Dict[str, Any]): The loaded contents of
-                                                 targeting_ai.json.
         """
         self.cell_size = cell_size
         self.targeting_ai_config = targeting_ai_config
+
+        # --- The spatial hash grids ---
+        # These dictionaries map a cell coordinate (tuple) to a list of entities in that cell.
         self.enemy_grid: Dict[Tuple[int, int], List["Enemy"]] = defaultdict(list)
         self.tower_grid: Dict[Tuple[int, int], List["Tower"]] = defaultdict(list)
 
-        # This dispatch table maps the function name string from the config
-        # to the actual sorting function in the targeting_priorities module.
+        # --- PERFORMANCE FIX: Entity State Tracking ---
+        # This dictionary tracks the last known cell for each entity. This allows us
+        # to know if an entity has moved to a new cell, requiring an update.
+        # Key: entity.entity_id (uuid), Value: (cell_x, cell_y) (Tuple[int, int])
+        self._entity_cell_map: Dict[uuid.UUID, Tuple[int, int]] = {}
+
         self.sorters: Dict[str, Callable] = {
             "sort_by_first": targeting_priorities.sort_by_first,
             "sort_by_last": targeting_priorities.sort_by_last,
@@ -63,19 +63,70 @@ class TargetingManager:
             int(position.y // self.cell_size),
         )
 
-    def clear(self):
-        """Clears all grids. Must be called at the start of each frame."""
-        self.enemy_grid.clear()
-        self.tower_grid.clear()
-
-    def register_entity(self, entity: "Entity"):
-        """Registers an entity into the appropriate spatial grid."""
+    def add_entity(self, entity: "Entity"):
+        """
+        Adds a new entity to the appropriate spatial grid and tracks its cell.
+        This is called once when an entity is created.
+        """
         cell_coords = self._get_cell_coords(entity.pos)
-        # Use Method Resolution Order to robustly check for inherited types.
+
         if "Enemy" in [cls.__name__ for cls in entity.__class__.__mro__]:
             self.enemy_grid[cell_coords].append(entity)
         elif "Tower" in [cls.__name__ for cls in entity.__class__.__mro__]:
             self.tower_grid[cell_coords].append(entity)
+
+        self._entity_cell_map[entity.entity_id] = cell_coords
+
+    def remove_entity(self, entity: "Entity"):
+        """
+        Removes an entity from the spatial grid and stops tracking it.
+        This is called once when an entity is destroyed.
+        """
+        if entity.entity_id not in self._entity_cell_map:
+            return
+
+        last_known_cell = self._entity_cell_map[entity.entity_id]
+
+        try:
+            if "Enemy" in [cls.__name__ for cls in entity.__class__.__mro__]:
+                if entity in self.enemy_grid[last_known_cell]:
+                    self.enemy_grid[last_known_cell].remove(entity)
+            elif "Tower" in [cls.__name__ for cls in entity.__class__.__mro__]:
+                if entity in self.tower_grid[last_known_cell]:
+                    self.tower_grid[last_known_cell].remove(entity)
+        except ValueError:
+            logger.warning(
+                f"Attempted to remove entity {entity.entity_id} which was not in its tracked cell."
+            )
+
+        del self._entity_cell_map[entity.entity_id]
+
+    def update_entity_position(self, entity: "Entity"):
+        """
+        Checks if a moving entity has crossed into a new cell and updates the
+        grid accordingly. This is called every frame for moving entities.
+        """
+        if entity.entity_id not in self._entity_cell_map:
+            return  # Should not happen for moving entities, but as a safeguard.
+
+        last_known_cell = self._entity_cell_map[entity.entity_id]
+        current_cell = self._get_cell_coords(entity.pos)
+
+        if last_known_cell != current_cell:
+            # The entity has moved to a new cell.
+            # We must remove it from the old cell's list and add it to the new one.
+            try:
+                if "Enemy" in [cls.__name__ for cls in entity.__class__.__mro__]:
+                    if entity in self.enemy_grid[last_known_cell]:
+                        self.enemy_grid[last_known_cell].remove(entity)
+                    self.enemy_grid[current_cell].append(entity)
+                # Add logic for moving towers here if they ever exist
+            except ValueError:
+                logger.warning(
+                    f"Attempted to update entity {entity.entity_id} which was not in its tracked cell."
+                )
+
+            self._entity_cell_map[entity.entity_id] = current_cell
 
     def get_nearby_enemies(
         self, position: pygame.Vector2, radius: float
@@ -103,6 +154,7 @@ class TargetingManager:
 
         for x in range(min_x, max_x + 1):
             for y in range(min_y, max_y + 1):
+                # Using .get() is safe for cells that might be empty
                 for entity in grid.get((x, y), []):
                     if (
                         entity.is_alive
@@ -131,6 +183,8 @@ class TargetingManager:
             return targets
 
         # For sorters that need global context, provide all enemies.
+        # This is less efficient than getting from the grid, but only runs when a
+        # tower is actually sorting, not every frame.
         all_enemies = [enemy for cell in self.enemy_grid.values() for enemy in cell]
 
         return sorter(targets, tower, all_enemies)
