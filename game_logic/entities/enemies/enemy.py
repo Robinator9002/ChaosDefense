@@ -1,7 +1,7 @@
 # game_logic/entities/enemies/enemy.py
 import pygame
 import logging
-from typing import List, Tuple, TYPE_CHECKING, Dict, Any
+from typing import List, Tuple, TYPE_CHECKING, Dict, Any, Optional
 
 from ..entity import Entity
 
@@ -40,6 +40,8 @@ class Enemy(Entity):
         render_props = enemy_type_data.get("render_props", {})
 
         self.name = enemy_type_data.get("name", "Unknown Enemy")
+        # --- NEW: Store the enemy type ID for the AI ---
+        self.enemy_type_id = enemy_type_data.get("id", "unknown")
         self.level = level
 
         hp_increase = scaling.get("hp", 0)
@@ -83,10 +85,6 @@ class Enemy(Entity):
         self.auras = enemy_type_data.get("auras", [])
         self.status_effects_config = status_effects_config
 
-        # --- FIX: Add tower-specific stats to prevent crashes in EffectHandler ---
-        # This is a workaround. The EffectHandler should ideally be robust enough
-        # not to require these on every entity. However, adding them here ensures
-        # compatibility with the current handler implementation.
         self.base_damage = 0
         self.damage = 0
         self.base_range = 0
@@ -117,18 +115,23 @@ class Enemy(Entity):
 
     def update(
         self, dt: float, game_state: "GameState", targeting_manager: "TargetingManager"
-    ):
+    ) -> Optional["Enemy"]:
         """
         The main update loop for the enemy entity.
+
+        Returns:
+            Optional[Enemy]: Returns `self` if the enemy has reached the end of
+                             the path (leaked), otherwise returns `None`. This
+                             provides a signal to the GameManager.
         """
         if not self.is_alive:
-            return
+            return None
 
         super().update(dt, game_state, targeting_manager)
 
         # --- Movement Logic ---
         if self.current_waypoint_index >= len(self.pixel_path):
-            return
+            return None
 
         target_pos = self.pixel_path[self.current_waypoint_index]
         direction = target_pos - self.pos
@@ -138,13 +141,19 @@ class Enemy(Entity):
             self.pos = target_pos
             self.current_waypoint_index += 1
             if self.current_waypoint_index >= len(self.pixel_path):
-                self._on_reach_end(game_state)
-                return
+                return self._on_reach_end(game_state)
         else:
             self.pos += direction.normalize() * self.speed * dt
 
-    def _on_reach_end(self, game_state: "GameState"):
-        """Handles logic for when the enemy reaches the end of its path."""
+        return None
+
+    def _on_reach_end(self, game_state: "GameState") -> "Enemy":
+        """
+        Handles logic for when the enemy reaches the end of its path.
+
+        Returns:
+            Enemy: Returns `self` to signal to the caller that this enemy leaked.
+        """
         logger.warning(
             f"Enemy {self.name} ({self.entity_id}) reached the end. Dealing {self.damage_to_base} damage."
         )
@@ -152,3 +161,4 @@ class Enemy(Entity):
         if game_state.base_hp <= 0:
             game_state.end_game()
         self.kill()
+        return self
