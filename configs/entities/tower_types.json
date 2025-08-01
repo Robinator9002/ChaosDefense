@@ -191,13 +191,13 @@
       "type": "persistent_attached_aura",
       "data": {
         "range": 180,
-        "fire_rate": 0.1,
+        "fire_rate": 0.15,
         "radius": 90,
         "duration": 3.0,
         "dps": 2,
         "tick_rate": 1,
         "bonus_damage_vs_armor_multiplier": 0.5,
-        "effects": { "slow": { "potency": 0.1, "duration": 1.5 } }
+        "effects": { "slow": { "potency": 0.2, "duration": 1.5 } }
       }
     }
   },

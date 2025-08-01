@@ -1,17 +1,18 @@
 {
+  "//": "BALANCE PASS 2: Upgrades have been significantly buffed to compensate for the nerfed base tower, creating a more meaningful sense of progression and specialization.",
   "path_a": {
     "name": "Scorched Earth",
-    "description": "Focuses on increasing the size and intensity of the firewall.",
+    "description": "Focuses on increasing the size and intensity of a single, massive firewall.",
     "upgrades": [
       {
         "id": "inferno_a1",
         "name": "Lingering Flames",
         "cost": 120,
-        "description": "Increases the duration of the firewall by 1 second.",
+        "description": "Increases the duration of the firewall by 1.5 seconds.",
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "duration", "operation": "add", "amount": 1.0 }
+            "value": { "key": "duration", "operation": "add", "amount": 1.5 }
           }
         ]
       },
@@ -35,26 +36,26 @@
         "id": "inferno_a3",
         "name": "Intense Heat",
         "cost": 250,
-        "description": "Significantly increases the damage per second of the firewall.",
+        "description": "Significantly increases the damage per second of the firewall by 15.",
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "dps", "operation": "add", "amount": 10 }
+            "value": { "key": "dps", "operation": "add", "amount": 15 }
           }
         ]
       },
       {
         "id": "inferno_a4",
         "name": "Flash Point",
-        "cost": 300,
-        "description": "Firewall placement now creates an initial burst of damage in the area.",
+        "cost": 320,
+        "description": "Firewall placement now creates an initial burst of 100 damage in the area.",
         "effects": [
           {
             "type": "modify_attack_data",
             "value": {
               "key": "initial_burst_damage",
               "operation": "set",
-              "amount": 75
+              "amount": 100
             }
           }
         ]
@@ -62,16 +63,22 @@
       {
         "id": "inferno_a5",
         "name": "Firestorm",
-        "cost": 500,
-        "description": "The firewall is now a raging inferno, dealing extreme damage and covering a huge area.",
+        "cost": 600,
+        "description": "The firewall becomes a raging inferno that makes enemies vulnerable, taking increased damage from all sources.",
         "effects": [
           {
             "type": "modify_attack_data",
-            "value": { "key": "dps", "operation": "add", "amount": 30 }
+            "value": { "key": "dps", "operation": "add", "amount": 25 }
           },
           {
-            "type": "modify_attack_data",
-            "value": { "key": "radius", "operation": "multiply", "amount": 1.3 }
+            "type": "modify_nested",
+            "value": {
+              "path": "attack.data.effects",
+              "operation": "add_effect",
+              "amount": {
+                "vulnerability": { "potency": 1.2, "duration": 1.0 }
+              }
+            }
           }
         ]
       }
@@ -79,41 +86,13 @@
   },
   "path_b": {
     "name": "Rapid Ignition",
-    "description": "Focuses on placing more, smaller firewalls more frequently.",
+    "description": "Focuses on placing more, smaller firewalls more frequently and making the burn more potent.",
     "upgrades": [
       {
         "id": "inferno_b1",
         "name": "Kindling",
         "cost": 100,
-        "description": "Increases the rate of fire by 25%.",
-        "effects": [
-          {
-            "type": "modify_attack_data",
-            "value": {
-              "key": "fire_rate",
-              "operation": "multiply",
-              "amount": 1.25
-            }
-          }
-        ]
-      },
-      {
-        "id": "inferno_b2",
-        "name": "Fuel Air Mixture",
-        "cost": 160,
-        "description": "Increases damage per second by 5.",
-        "effects": [
-          {
-            "type": "modify_attack_data",
-            "value": { "key": "dps", "operation": "add", "amount": 5 }
-          }
-        ]
-      },
-      {
-        "id": "inferno_b3",
-        "name": "Combustion Engine",
-        "cost": 220,
-        "description": "Further increases the rate of fire by 30%.",
+        "description": "Increases the rate of fire by 30%.",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -126,17 +105,45 @@
         ]
       },
       {
+        "id": "inferno_b2",
+        "name": "Fuel Air Mixture",
+        "cost": 160,
+        "description": "Increases damage per second by 10.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": { "key": "dps", "operation": "add", "amount": 10 }
+          }
+        ]
+      },
+      {
+        "id": "inferno_b3",
+        "name": "Combustion Engine",
+        "cost": 220,
+        "description": "Further increases the rate of fire by 40%.",
+        "effects": [
+          {
+            "type": "modify_attack_data",
+            "value": {
+              "key": "fire_rate",
+              "operation": "multiply",
+              "amount": 1.4
+            }
+          }
+        ]
+      },
+      {
         "id": "inferno_b4",
         "name": "Heat Shimmer",
         "cost": 280,
-        "description": "Enemies leaving the firewall are slowed briefly.",
+        "description": "Enemies leaving the firewall are slowed significantly for 2 seconds.",
         "effects": [
           {
             "type": "modify_attack_data",
             "value": {
               "key": "on_exit_effect",
               "operation": "set",
-              "effect": { "id": "slow", "potency": 0.4, "duration": 1.5 }
+              "amount": { "id": "slow", "potency": 0.5, "duration": 2.0 }
             }
           }
         ]
@@ -144,8 +151,8 @@
       {
         "id": "inferno_b5",
         "name": "Wall of Fire",
-        "cost": 450,
-        "description": "Can place firewalls extremely rapidly, creating a true wall of fire.",
+        "cost": 550,
+        "description": "Can place firewalls extremely rapidly and makes the burn effect much more potent.",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -153,6 +160,14 @@
               "key": "fire_rate",
               "operation": "multiply",
               "amount": 1.5
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "path": "attack.data.effects.fire.potency",
+              "operation": "multiply",
+              "amount": 2.0
             }
           }
         ]
