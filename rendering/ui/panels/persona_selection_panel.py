@@ -49,8 +49,7 @@ class _PersonaButton(UIElement):
     def handle_event(
         self, event: pygame.event.Event, game_state=None
     ) -> Optional[UIAction]:
-        # The base class handle_event is not called here, as the parent panel
-        # now calculates the hover state based on the scroll position.
+        # The parent panel now calculates the hover state based on the scroll position.
         if self.is_eligible and not self.is_active:
             if (
                 event.type == pygame.MOUSEBUTTONDOWN
@@ -201,39 +200,31 @@ class PersonaSelectionPanel(UIElement):
     def handle_event(
         self, event: pygame.event.Event, game_state=None
     ) -> Optional[UIAction]:
-        # --- CRASH FIX: Separated event handling by type ---
-        # MOUSEMOTION events are now handled in their own block to safely update
-        # hover states without crashing on other event types.
         if event.type == pygame.MOUSEMOTION:
             self.is_close_hovered = self.close_button_rect.collidepoint(event.pos)
             for button in self.buttons:
-                # The panel is responsible for setting hover state because it knows the scroll offset
                 on_screen_rect = button.rect.move(
                     self.rect.x, self.rect.y + 60 - self.scroll_y
                 )
                 button.is_hovered = on_screen_rect.collidepoint(event.pos)
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            # Handle mouse wheel scrolling
             if self.is_scrollable and self.rect.collidepoint(event.pos):
                 if event.button == 4:  # Scroll up
                     self.scroll_y = max(0, self.scroll_y - 35)
                 elif event.button == 5:  # Scroll down
                     self.scroll_y = min(self.max_scroll, self.scroll_y + 35)
 
-            # Handle left clicks
             if event.button == 1:
                 if self.is_close_hovered:
                     return UIAction(type=ActionType.CLOSE_PERSONA_PANEL)
 
                 for button in self.buttons:
-                    # Use the hover state calculated during MOUSEMOTION
                     if button.is_hovered:
                         action = button.handle_event(event, game_state)
                         if action:
                             return action
 
-                # Absorb clicks on the panel background
                 if self.rect.collidepoint(event.pos):
                     return UIAction(type=ActionType.UI_CLICK)
 
@@ -255,29 +246,39 @@ class PersonaSelectionPanel(UIElement):
         title_rect = title_surf.get_rect(centerx=self.rect.centerx, y=self.rect.y + 20)
         screen.blit(title_surf, title_rect)
 
-        content_area = self.rect.inflate(-2, -68)
-        content_area.top += 60
+        # --- FIX: Define the clipping area precisely ---
+        # The content area is the space below the header and above the bottom padding.
+        content_area_rect = pygame.Rect(
+            self.rect.x + 1,
+            self.rect.y + 60,  # 60 is header height
+            self.rect.width - 2,
+            self.visible_height,  # This is calculated correctly in _perform_layout
+        )
 
-        screen.set_clip(content_area)
+        # Set the clipping area to prevent buttons from drawing outside the content box
+        screen.set_clip(content_area_rect)
 
         for button in self.buttons:
-            on_screen_pos = (
-                self.rect.x + button.rect.x,
-                self.rect.y + 60 + button.rect.y - self.scroll_y,
-            )
+            # Calculate the button's on-screen position, accounting for scroll
+            on_screen_pos_y = content_area_rect.y + button.rect.y - self.scroll_y
+            on_screen_pos = (self.rect.x + button.rect.x, on_screen_pos_y)
 
+            # Simple culling: only process if the button is vertically visible
             if (
-                on_screen_pos[1] < self.rect.bottom
-                and on_screen_pos[1] + button.rect.height > self.rect.top + 60
+                on_screen_pos_y < content_area_rect.bottom
+                and on_screen_pos_y + button.rect.height > content_area_rect.top
             ):
-                temp_rect = button.rect.copy()
-                temp_rect.topleft = on_screen_pos
+                # Create a temporary rect for drawing at the correct on-screen position
+                draw_rect = button.rect.copy()
+                draw_rect.topleft = on_screen_pos
 
+                # Temporarily update the button's main rect for its own draw call
                 original_rect = button.rect
-                button.rect = temp_rect
+                button.rect = draw_rect
                 button.draw(screen)
-                button.rect = original_rect
+                button.rect = original_rect  # Restore original layout rect
 
+        # Reset clipping area to draw the rest of the UI
         screen.set_clip(None)
 
         if self.is_scrollable:
@@ -310,7 +311,6 @@ class PersonaSelectionPanel(UIElement):
             )
             handle_height = max(20, handle_height)
 
-            # Prevent division by zero if max_scroll is 0
             scroll_ratio = self.scroll_y / self.max_scroll if self.max_scroll > 0 else 0
             handle_y = track_rect.y + (track_rect.height - handle_height) * scroll_ratio
 
