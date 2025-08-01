@@ -8,8 +8,8 @@
       "grid_width": 100,
       "grid_height": 50,
       "num_paths": 2,
-      "level_difficulty": 40,
-      "starting_gold": 20000,
+      "level_difficulty": 4,
+      "starting_gold": 200,
       "base_hp": 25,
       "allowed_boss_types": ["soldier"],
       "features": {
