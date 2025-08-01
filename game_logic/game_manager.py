@@ -11,6 +11,9 @@ from .waves.wave_manager import WaveManager
 from .entities.tower import Tower
 from .entities.enemies.enemy import Enemy
 from .entities.enemies.boss_enemy import BossEnemy
+
+# --- NEW: Import the BufferEnemy class ---
+from .entities.enemies.buffer_enemy import BufferEnemy
 from .entities.projectiles.projectile import Projectile
 
 # --- BUG FIX: Import aura entities so the GameManager can recognize them ---
@@ -81,6 +84,8 @@ class GameManager:
             wave_scaling_config=self.configs["wave_scaling"],
             enemy_types=self.configs["enemy_types"],
             boss_types=self.configs["boss_types"],
+            # --- NEW: Pass buffer types to the WaveManager ---
+            buffer_types=self.configs["buffer_types"],
             allowed_boss_types=gen_params.get("allowed_boss_types", []),
             player_difficulty=player_difficulty,
             initial_level_difficulty=level_difficulty,
@@ -213,6 +218,17 @@ class GameManager:
                 path=path,
                 tile_size=self.tile_size,
                 level=enemy_spawn_level,
+                difficulty_modifier=difficulty_mod,
+                status_effects_config=status_effects_cfg,
+            )
+        # --- NEW: Check for buffer enemy types ---
+        elif entity_id in self.configs["buffer_types"]:
+            config = self.configs["buffer_types"][entity_id]
+            new_enemy = BufferEnemy(
+                enemy_type_data=config,
+                level=enemy_spawn_level,
+                path=path,
+                tile_size=self.tile_size,
                 difficulty_modifier=difficulty_mod,
                 status_effects_config=status_effects_cfg,
             )
