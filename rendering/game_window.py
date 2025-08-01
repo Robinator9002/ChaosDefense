@@ -127,7 +127,7 @@ class Game:
                     if self.is_panning:
                         self._handle_pan(event)
                 elif event.type == pygame.KEYDOWN:
-                    self._handle_keyboard_input(event)  # MODIFIED: Pass the whole event
+                    self._handle_keyboard_input(event)
 
     def _handle_mouse_down(self, event):
         """Handles all mouse down events, routing them based on the button."""
@@ -151,25 +151,18 @@ class Game:
     def _handle_keyboard_input(self, event: pygame.event.Event):
         """
         Handles all keyboard presses, routing them to the appropriate system.
-        This is now the central hub for all keyboard-based UI and game control.
         """
         mods = pygame.key.get_mods()
         is_ctrl_pressed = mods & pygame.KMOD_CTRL
 
-        # --- NEW: UI Navigation Hotkeys ---
-        # These keys are for navigating the UI and are processed first.
-
-        # Cycle through tower categories (e.g., Ctrl+Tab)
         if event.key == pygame.K_TAB and is_ctrl_pressed:
             self.ui_manager.cycle_category()
-            return  # Consume the event
+            return
 
-        # Cycle through towers in the current category (e.g., Tab)
         if event.key == pygame.K_TAB and not is_ctrl_pressed:
             self.ui_manager.cycle_tower_selection(self.game_manager.game_state)
-            return  # Consume the event
+            return
 
-        # --- NEW: Direct Category Selection (F-Keys and Ctrl+Numbers) ---
         f_key_map = {
             pygame.K_F1: 0,
             pygame.K_F2: 1,
@@ -182,7 +175,6 @@ class Game:
             pygame.K_F9: 8,
             pygame.K_F10: 9,
         }
-
         if event.key in f_key_map:
             self.ui_manager.set_active_category_by_index(f_key_map[event.key])
             return
@@ -199,13 +191,10 @@ class Game:
             pygame.K_9: 8,
             pygame.K_0: 9,
         }
-
         if is_ctrl_pressed and event.key in num_key_map:
             self.ui_manager.set_active_category_by_index(num_key_map[event.key])
             return
 
-        # --- Tower Build Hotkeys (Number keys without Ctrl) ---
-        # This is the original functionality.
         if not is_ctrl_pressed and event.key in num_key_map:
             hotkey_index = num_key_map[event.key]
             if 0 <= hotkey_index < len(self.ui_manager.hotkey_map):
@@ -233,7 +222,8 @@ class Game:
 
         world_pos = self._screen_to_world(pygame.Vector2(event.pos))
         clicked_on_tower = False
-        for tower in self.game_manager.towers:
+        # We iterate through the dictionary's values here for collision checks.
+        for tower in self.game_manager.towers.values():
             if tower.rect.collidepoint(world_pos):
                 if game_state.selected_entity_id == tower.entity_id:
                     game_state.clear_selection()
@@ -271,10 +261,15 @@ class Game:
         if self.sprite_renderer:
             self.sprite_renderer.draw(self.screen, self.camera_offset, self.zoom)
 
+        # --- BUG FIX: Correctly handle dictionary data structures for rendering ---
+        # The performance refactor changed entity storage from lists to dictionaries.
+        # We can no longer use the '+' operator to concatenate them. Instead, we
+        # get the .values() from each dictionary, convert them to lists, and then
+        # concatenate those lists to create a single iterable for drawing.
         all_entities = (
-            self.game_manager.enemies
-            + self.game_manager.towers
-            + self.game_manager.projectiles
+            list(self.game_manager.enemies.values())
+            + list(self.game_manager.towers.values())
+            + list(self.game_manager.projectiles.values())
         )
         for entity in all_entities:
             entity.draw(self.screen, self.camera_offset, self.zoom)
