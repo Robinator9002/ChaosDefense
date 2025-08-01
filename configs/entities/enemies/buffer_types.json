@@ -1,25 +1,25 @@
 {
-  "//": "This file defines the new 'Buffer' enemy archetypes. These are support units that provide auras to enhance their allies.",
+  "//": "BALANCE PASS 1: Buffer enemies are now rarer, stronger, and appear later in the game. Their stats have been increased to make them high-priority targets when they do spawn.",
 
   "regenerator": {
     "//": "ROLE: A high-priority support unit that provides slow health regeneration to nearby enemies.",
     "name": "Regenerator",
-    "min_level_difficulty": 4,
+    "min_level_difficulty": 8,
     "render_props": { "size": 24, "color": [120, 230, 120] },
     "base_stats": {
-      "hp": 80,
+      "hp": 150,
       "speed": 50,
-      "bounty": 15,
+      "bounty": 35,
       "damage": 1,
       "armor": 5
     },
-    "scaling_per_level_add": { "hp": 8, "speed": 1, "bounty": 1, "armor": 0.5 },
+    "scaling_per_level_add": { "hp": 25, "speed": 1, "bounty": 2, "armor": 1 },
     "auras": [
       {
-        "range": 100,
+        "range": 110,
         "target_type": "ENEMY",
         "effects": {
-          "regeneration": { "potency": 4, "duration": 1.1 }
+          "regeneration": { "potency": 8, "duration": 1.1 }
         }
       }
     ]
@@ -28,27 +28,27 @@
   "bulwark": {
     "//": "ROLE: A defensive support unit that grants a flat armor bonus to nearby enemies, making swarms much tougher.",
     "name": "Bulwark",
-    "min_level_difficulty": 6,
+    "min_level_difficulty": 10,
     "render_props": { "size": 28, "color": [200, 200, 220] },
     "base_stats": {
-      "hp": 120,
+      "hp": 250,
       "speed": 45,
-      "bounty": 20,
+      "bounty": 50,
       "damage": 2,
-      "armor": 10
+      "armor": 15
     },
     "scaling_per_level_add": {
-      "hp": 12,
+      "hp": 40,
       "speed": 0,
-      "bounty": 1.5,
-      "armor": 1
+      "bounty": 3,
+      "armor": 1.5
     },
     "auras": [
       {
-        "range": 90,
+        "range": 100,
         "target_type": "ENEMY",
         "effects": {
-          "armor_boost": { "potency": 5, "duration": 1.1 }
+          "armor_boost": { "potency": 8, "duration": 1.1 }
         }
       }
     ]
