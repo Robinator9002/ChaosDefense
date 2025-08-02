@@ -9,8 +9,6 @@ from typing import List, Optional, Dict, Any, TYPE_CHECKING, Callable, Tuple
 
 from .entity import Entity
 from ..attacks import attack_handlers
-
-# --- NEW: Import panel_utils to access the get_nested_value function ---
 from rendering.common.panels.panel_utils import get_nested_value
 
 
@@ -45,9 +43,6 @@ class Tower(Entity):
         super().__init__(x, y, max_hp=100)
 
         self.tower_type_id = tower_type_id
-        # --- NEW: Store base config data ---
-        # Storing the original config allows us to reference it later, for example,
-        # when building the displayable stats list.
         self.tower_type_data = tower_type_data
         self.name = self.tower_type_data.get("name", "Unknown Tower")
         self.cost = self.tower_type_data.get("cost", 0)
@@ -162,48 +157,70 @@ class Tower(Entity):
             return self._fire()
         return []
 
-    # --- NEW: Centralized method for UI stat display (Issue #6) ---
-    def get_displayable_stats(self) -> List[Tuple[str, Any, Optional[str]]]:
+    # --- MODIFIED: Return signature now includes tooltip description ---
+    def get_displayable_stats(
+        self,
+    ) -> List[Tuple[str, Any, Optional[str], Optional[str]]]:
         """
         Gathers all relevant stats for display in UI panels.
 
-        This method acts as the single source of truth for UI stat presentation.
-        It combines the base stats defined in the tower's config with any special
-        properties the tower has gained from upgrades, ensuring the UI is always
-        in sync with the tower's actual capabilities.
-
         Returns:
             A list of tuples, where each tuple contains:
-            (stat_label, live_value, formatting_key)
+            (stat_label, live_value, formatting_key, tooltip_description)
         """
         stats = []
-        # 1. Get the base list of stats from the tower's original config.
         stat_definitions = self.tower_type_data.get("info_panel_stats", [])
         for stat_info in stat_definitions:
             label = stat_info.get("label")
             value_path = stat_info.get("value_path")
-            # Use the utility to get the live value from the tower instance.
             live_value = get_nested_value(self, value_path) if value_path else None
             if label and live_value is not None:
-                stats.append((label, live_value, stat_info.get("format")))
+                # Append the description from the config to the tuple
+                stats.append(
+                    (
+                        label,
+                        live_value,
+                        stat_info.get("format"),
+                        stat_info.get("description"),
+                    )
+                )
 
-        # 2. Programmatically add special stats if they are active.
-        # This makes the UI automatically adapt to new upgrades.
+        # Add special stats with their own hardcoded tooltips
         if self.pierce_count > 0 and not any(s[0] == "Pierce" for s in stats):
-            stats.append(("Pierce", self.pierce_count, None))
+            stats.append(
+                (
+                    "Pierce",
+                    self.pierce_count,
+                    None,
+                    "The number of enemies this tower's projectiles can pass through.",
+                )
+            )
         if self.projectiles_per_shot > 1 and not any(
             s[0] == "Projectiles" for s in stats
         ):
-            stats.append(("Projectiles", self.projectiles_per_shot, None))
+            stats.append(
+                (
+                    "Projectiles",
+                    self.projectiles_per_shot,
+                    None,
+                    "The number of projectiles fired in a single attack.",
+                )
+            )
         if self.armor_shred > 0 and not any(s[0] == "Armor Shred" for s in stats):
-            stats.append(("Armor Shred", self.armor_shred, None))
+            stats.append(
+                (
+                    "Armor Shred",
+                    self.armor_shred,
+                    None,
+                    "Permanently reduces an enemy's armor on hit.",
+                )
+            )
 
         return stats
 
     def get_eligible_personas(self, all_personas_config: Dict[str, Any]) -> List[str]:
         """
-        Dynamically determines which AI personas are valid for this tower
-        based on its current, fully-upgraded state.
+        Dynamically determines which AI personas are valid for this tower.
         """
         eligible = []
         for persona_id in all_personas_config.keys():

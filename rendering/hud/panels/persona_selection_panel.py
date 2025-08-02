@@ -10,6 +10,7 @@ from rendering.text.text_renderer import render_text_wrapped
 if TYPE_CHECKING:
     from rendering.text.font_manager import FontManager
     from game_logic.game_state import GameState
+    from rendering.common.tooltips import TooltipManager
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,6 @@ logger = logging.getLogger(__name__)
 class _PersonaButton(UIElement):
     """
     Private helper class for a button in the persona selection panel.
-    REFACTORED: Now fully theme-driven.
     """
 
     def __init__(
@@ -78,7 +78,7 @@ class _PersonaButton(UIElement):
             )
             name_color = self.colors.get("text_primary")
             desc_color = self.colors.get("text_secondary")
-        else:  # Ineligible
+        else:
             bg_color = self.colors.get("panel_primary")
             border_color = self.colors.get("border_primary")
             name_color = self.colors.get("text_disabled")
@@ -108,7 +108,7 @@ class _PersonaButton(UIElement):
 class PersonaSelectionPanel(UIElement):
     """
     A modal panel for selecting a tower's AI persona.
-    REFACTORED: Now fully theme-driven and robustly handles layout and scrolling.
+    MODIFIED: Now integrated with the TooltipManager.
     """
 
     def __init__(
@@ -119,12 +119,14 @@ class PersonaSelectionPanel(UIElement):
         active_persona: str,
         ui_theme: Dict[str, Any],
         font_manager: "FontManager",
+        tooltip_manager: "TooltipManager",
     ):
         panel_width = 400
         super().__init__(pygame.Rect(0, 0, panel_width, 0))
         self.screen_rect = screen_rect
         self.ui_theme = ui_theme
         self.font_manager = font_manager
+        self.tooltip_manager = tooltip_manager
         self.buttons: List[_PersonaButton] = []
 
         self._load_theme_assets()
@@ -198,20 +200,31 @@ class PersonaSelectionPanel(UIElement):
             button.rect.size = (button_width, button_height)
             current_y += button_height + spacing
 
-    def handle_event(
-        self, event: pygame.event.Event, game_state: "GameState"
-    ) -> Optional[UIAction]:
-        mouse_pos = event.pos if hasattr(event, "pos") else pygame.mouse.get_pos()
+    def update(self, dt: float, game_state: "GameState"):
+        """Updates hover states and manages tooltip requests for persona buttons."""
+        mouse_pos = pygame.mouse.get_pos()
         self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
 
+        hovered_item = False
         for button in self.buttons:
             on_screen_rect = button.rect.move(
                 self.rect.x, self.rect.y + 60 - self.scroll_y
             )
             button.is_hovered = on_screen_rect.collidepoint(mouse_pos)
 
+            if button.is_hovered and button.description:
+                self.tooltip_manager.request_tooltip(button.description, on_screen_rect)
+                hovered_item = True
+                break
+
+        if not hovered_item:
+            self.tooltip_manager.cancel_tooltip()
+
+    def handle_event(
+        self, event: pygame.event.Event, game_state: "GameState"
+    ) -> Optional[UIAction]:
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if self.is_scrollable and self.rect.collidepoint(mouse_pos):
+            if self.is_scrollable and self.rect.collidepoint(pygame.mouse.get_pos()):
                 if event.button == 4:
                     self.scroll_y = max(0, self.scroll_y - 35)
                 elif event.button == 5:
@@ -224,7 +237,7 @@ class PersonaSelectionPanel(UIElement):
                         action = button.handle_event(event, game_state)
                         if action:
                             return action
-                if self.rect.collidepoint(mouse_pos):
+                if self.rect.collidepoint(pygame.mouse.get_pos()):
                     return UIAction(type=ActionType.UI_CLICK)
         return None
 
@@ -262,20 +275,9 @@ class PersonaSelectionPanel(UIElement):
                 on_screen_pos_y < content_area_rect.bottom
                 and on_screen_pos_y + button.rect.height > content_area_rect.top
             ):
-                # --- FIX (Step 1.1): Use a temporary rect for drawing ---
-                # This is the crucial fix for the disappearing buttons bug.
-                # We create a new rect for drawing that has the correct on-screen
-                # position, but we leave the button's original `rect` (which is
-                # relative to the content area) unmodified. This prevents the
-                # layout calculations from breaking on the next frame.
                 draw_rect = button.rect.copy()
                 draw_rect.topleft = (self.rect.x + button.rect.x, on_screen_pos_y)
 
-                # We pass this temporary rect to the button's draw method.
-                # (This requires a small modification to the _PersonaButton.draw method)
-
-                # To avoid modifying the _PersonaButton class, we'll do the drawing here
-                # by temporarily changing the button's rect and changing it back.
                 original_rect = button.rect
                 button.rect = draw_rect
                 button.draw(screen)

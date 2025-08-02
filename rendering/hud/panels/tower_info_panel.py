@@ -1,7 +1,7 @@
 # rendering/hud/panels/tower_info_panel.py
 import pygame
 import logging
-from typing import Dict, Any, TYPE_CHECKING
+from typing import Dict, Any, TYPE_CHECKING, List, Optional
 
 from rendering.common.ui.ui_element import UIElement
 from rendering.text.text_renderer import render_text_wrapped
@@ -10,15 +10,28 @@ from rendering.common.panels.panel_utils import get_nested_value, format_stat_va
 if TYPE_CHECKING:
     from game_logic.game_state import GameState
     from rendering.text.font_manager import FontManager
+    from rendering.common.tooltips import TooltipManager
 
 logger = logging.getLogger(__name__)
+
+
+class _StatLine(UIElement):
+    """A helper UIElement to manage a single line of text in the stats display."""
+
+    def __init__(
+        self, rect: pygame.Rect, label: str, value_str: str, tooltip_text: Optional[str]
+    ):
+        super().__init__(rect)
+        self.label = label
+        self.value_str = value_str
+        self.tooltip_text = tooltip_text
 
 
 class TowerInfoPanel(UIElement):
     """
     A UI panel that displays detailed information about a tower type
     selected from the build menu, before it is placed.
-    REFACTORED: Now fully theme-driven for consistent styling.
+    MODIFIED: Now integrated with the TooltipManager.
     """
 
     def __init__(
@@ -28,6 +41,7 @@ class TowerInfoPanel(UIElement):
         targeting_ai_config: Dict[str, Any],
         ui_theme: Dict[str, Any],
         font_manager: "FontManager",
+        tooltip_manager: "TooltipManager",
     ):
         """
         Initializes the TowerInfoPanel.
@@ -37,6 +51,9 @@ class TowerInfoPanel(UIElement):
         self.targeting_ai_config = targeting_ai_config
         self.ui_theme = ui_theme
         self.font_manager = font_manager
+        self.tooltip_manager = tooltip_manager
+
+        self.stat_lines: List[_StatLine] = []
 
         self._load_theme_assets()
         self._calculate_and_set_dynamic_height()
@@ -52,6 +69,7 @@ class TowerInfoPanel(UIElement):
 
     def _calculate_and_set_dynamic_height(self):
         """Calculates the total required height for all content and resizes the panel."""
+        self.stat_lines.clear()
         padding = self.layout.get("padding_medium", 15)
         spacing = self.layout.get("spacing_medium", 10)
 
@@ -71,11 +89,30 @@ class TowerInfoPanel(UIElement):
         stats_to_display = self.tower_data.get("info_panel_stats", [])
         if stats_to_display:
             total_height += self.font_header.get_height() + (spacing / 2)
-            total_height += len(stats_to_display) * 22  # Approx height per stat line
+            stat_line_y = total_height + self.rect.y
+            for stat_info in stats_to_display:
+                line_rect = pygame.Rect(
+                    self.rect.x + padding,
+                    stat_line_y,
+                    self.rect.width - padding * 2,
+                    22,
+                )
+                label = stat_info.get("label", "N/A")
+                value_path = stat_info.get("value_path")
+                value = (
+                    get_nested_value(self.tower_data, value_path)
+                    if value_path
+                    else "N/A"
+                )
+                value_str = format_stat_value(value, stat_info.get("format"))
+                description = stat_info.get("description")
+                self.stat_lines.append(
+                    _StatLine(line_rect, f"{label}:", value_str, description)
+                )
+                stat_line_y += 22
+                total_height += 22
             total_height += spacing
 
-        # This logic for available personas is now deprecated in favor of dynamic eligibility
-        # but we'll leave the space calculation for now in case it's reused.
         personas = self.tower_data.get("ai_config", {}).get("available_personas", [])
         if personas:
             total_height += self.font_header.get_height() + (spacing / 2)
@@ -83,6 +120,22 @@ class TowerInfoPanel(UIElement):
 
         total_height += padding
         self.rect.height = total_height
+
+    def update(self, dt: float, game_state: "GameState"):
+        """Updates hover states and requests tooltips for stats."""
+        mouse_pos = pygame.mouse.get_pos()
+        hovered_item = False
+        for stat_line in self.stat_lines:
+            stat_line.is_hovered = stat_line.rect.collidepoint(mouse_pos)
+            if stat_line.is_hovered and stat_line.tooltip_text:
+                self.tooltip_manager.request_tooltip(
+                    stat_line.tooltip_text, stat_line.rect
+                )
+                hovered_item = True
+                break
+
+        if not hovered_item:
+            self.tooltip_manager.cancel_tooltip()
 
     def draw(self, screen: pygame.Surface):
         """Draws the panel and all its components using theme styles."""
@@ -92,10 +145,6 @@ class TowerInfoPanel(UIElement):
         border_width = self.layout.get("border_width_standard", 2)
 
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-
-        # --- FIX (Step 1.2): Convert list-based color to tuple before concatenation ---
-        # The color is loaded from JSON as a list. We must cast it to a tuple
-        # before we can add the alpha tuple `(230,)` to it. This resolves the TypeError.
         panel_surf.fill(tuple(bg_color) + (230,))
         screen.blit(panel_surf, self.rect.topleft)
 
@@ -111,7 +160,6 @@ class TowerInfoPanel(UIElement):
         spacing = self.layout.get("spacing_medium", 10)
         current_y = self.rect.y + padding
 
-        # Title and Cost
         title_surf = self.font_title.render(
             self.tower_data.get("name", "N/A"), True, self.colors.get("text_primary")
         )
@@ -124,7 +172,6 @@ class TowerInfoPanel(UIElement):
         screen.blit(cost_surf, cost_rect)
         current_y += title_surf.get_height() + spacing
 
-        # Description
         description = self.tower_data.get("description", "")
         desc_max_width = self.rect.width - (padding * 2)
         wrapped_desc = render_text_wrapped(
@@ -138,37 +185,25 @@ class TowerInfoPanel(UIElement):
             current_y += line_surf.get_height()
         current_y += spacing
 
-        # Statistics
-        stats_to_display = self.tower_data.get("info_panel_stats", [])
-        if stats_to_display:
+        if self.stat_lines:
             header_surf = self.font_header.render(
                 "Statistics", True, self.colors.get("text_primary")
             )
             screen.blit(header_surf, (self.rect.x + padding, current_y))
             current_y += header_surf.get_height() + (spacing / 2)
 
-            for stat_info in stats_to_display:
-                label = stat_info.get("label", "N/A")
-                value_path = stat_info.get("value_path")
-                value = (
-                    get_nested_value(self.tower_data, value_path)
-                    if value_path
-                    else "N/A"
-                )
-                if value is None:
-                    continue
-                value_str = format_stat_value(value, stat_info.get("format"))
+            for stat_line in self.stat_lines:
+                label_color = self.colors.get("text_secondary")
+                value_color = self.colors.get("text_primary")
+                if stat_line.is_hovered and stat_line.tooltip_text:
+                    label_color = self.colors.get("text_accent")
+                    value_color = self.colors.get("text_accent")
 
-                label_surf = self.font_stat.render(
-                    f"{label}:", True, self.colors.get("text_secondary")
-                )
+                label_surf = self.font_stat.render(stat_line.label, True, label_color)
                 value_surf = self.font_stat.render(
-                    value_str, True, self.colors.get("text_primary")
+                    stat_line.value_str, True, value_color
                 )
 
-                screen.blit(label_surf, (self.rect.x + padding, current_y))
-                value_rect = value_surf.get_rect(
-                    topright=(self.rect.right - padding, current_y)
-                )
+                screen.blit(label_surf, stat_line.rect.topleft)
+                value_rect = value_surf.get_rect(topright=stat_line.rect.topright)
                 screen.blit(value_surf, value_rect)
-                current_y += 22
