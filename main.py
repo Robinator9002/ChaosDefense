@@ -44,21 +44,19 @@ def load_config(path: Path) -> dict:
 
 def main():
     """Main function to set up and run the game."""
-    # --- FIX: Initialize Pygame and its font module at the very start ---
-    # This ensures that all Pygame modules are ready before any other code
-    # that might depend on them (like the FontManager) is executed.
     pygame.init()
     pygame.font.init()
 
     logger.info("--- Loading All Game Configurations ---")
     try:
         ui_theme = load_config(CONFIG_PATH / "ui" / "ui_theme.json")
+        game_settings = load_config(CONFIG_PATH / "gameplay/game_settings.json")
 
         upgrade_root_dir = CONFIG_PATH / "upgrades"
         all_upgrade_defs = load_all_upgrades([upgrade_root_dir])
 
         all_configs: Dict[str, Dict] = {
-            "game_settings": load_config(CONFIG_PATH / "gameplay/game_settings.json"),
+            "game_settings": game_settings,
             "level_styles": load_config(CONFIG_PATH / "levels/level_styles.json"),
             "enemy_types": load_config(
                 CONFIG_PATH / "entities/enemies/enemy_types.json"
@@ -88,7 +86,12 @@ def main():
     font_manager = FontManager(ui_theme.get("fonts", {}))
 
     logger.info("--- Initializing Progression Systems ---")
-    player_data_manager = PlayerDataManager(SAVES_PATH / "player_data.json")
+    # --- MODIFIED: Pass game_settings to the PlayerDataManager constructor ---
+    # This resolves the dependency introduced in Step 2.2, allowing the manager
+    # to read initial player stats from the config file when creating a new save.
+    player_data_manager = PlayerDataManager(
+        save_path=SAVES_PATH / "player_data.json", game_settings=game_settings
+    )
     progression_manager = ProgressionManager(
         player_data_manager=player_data_manager,
         all_tower_configs=all_configs["tower_types"],
