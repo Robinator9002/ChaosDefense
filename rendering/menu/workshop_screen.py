@@ -172,9 +172,7 @@ class WorkshopScreen:
         button_width, button_height, spacing = 400, 90, 20
         columns = 2
 
-        current_y = spacing  # Start with some padding
-
-        # Tower Blueprints Header
+        current_y = spacing
         current_y += self.section_font.get_height() + spacing
 
         # Grid layout for buttons
@@ -193,7 +191,6 @@ class WorkshopScreen:
                 TowerUnlockButton(button_rect, tower_info, self._purchase_tower)
             )
 
-        # Calculate total content height
         num_rows = (len(self.tower_buttons) + columns - 1) // columns
         self.content_height = (
             (num_rows * (button_height + spacing))
@@ -201,7 +198,6 @@ class WorkshopScreen:
             + spacing
         )
 
-        # Determine if scrolling is needed
         self.is_scrollable = self.content_height > self.visible_height
         self.max_scroll = max(0, self.content_height - self.visible_height)
         self.scroll_y = min(self.scroll_y, self.max_scroll)
@@ -213,32 +209,31 @@ class WorkshopScreen:
     def _purchase_tower(self, tower_id: str):
         """Callback for when a purchase is attempted."""
         if self.progression_manager.purchase_tower(tower_id):
-            # Rebuild the layout to reflect the new unlocked state
             self._build_layout()
 
     def handle_event(self, event: pygame.event.Event):
         """Delegates events to all interactive elements."""
-        # --- Handle Scrolling ---
+        # --- BUG FIX: Only check event.pos for mouse events ---
+        mouse_pos = pygame.mouse.get_pos()
+
         if self.is_scrollable and event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 4:  # Scroll up
                 self.scroll_y = max(0, self.scroll_y - 35)
             elif event.button == 5:  # Scroll down
                 self.scroll_y = min(self.max_scroll, self.scroll_y + 35)
 
-        # --- Handle Button Events ---
         current_currency = self.progression_manager.get_player_data().meta_currency
 
-        # Calculate on-screen rects for hover detection
         header_height = self.screen_rect.height * 0.15
         for button in self.tower_buttons:
             on_screen_rect = button.rect.move(0, header_height - self.scroll_y)
-            button.is_hovered = on_screen_rect.collidepoint(event.pos)
+            button.is_hovered = on_screen_rect.collidepoint(mouse_pos)
 
             can_afford = current_currency >= button.cost
             if button.handle_event(event, can_afford):
-                return  # Event handled
+                return
 
-        self.back_button.handle_event(event, game_state=None)
+        self.back_button.is_hovered = self.back_button.rect.collidepoint(mouse_pos)
         if (
             self.back_button.is_hovered
             and event.type == pygame.MOUSEBUTTONDOWN
@@ -271,19 +266,18 @@ class WorkshopScreen:
             0, header_height, self.screen_rect.width, self.visible_height
         )
 
-        # Draw section header
         section_surf = self.section_font.render(
             "Tower Blueprints", True, self.colors["section_header"]
         )
+        # Draw the header relative to the content area, but affected by scroll
         screen.blit(section_surf, (50, header_height + 20 - self.scroll_y))
 
-        # Set clipping area to prevent content from drawing outside the panel
         screen.set_clip(content_area_rect)
 
         current_currency = self.progression_manager.get_player_data().meta_currency
         for button in self.tower_buttons:
-            # Create a temporary rect for drawing at the correct on-screen position
             original_rect = button.rect.copy()
+            # Position the button within the scrollable content area
             button.rect.topleft = (
                 original_rect.x,
                 original_rect.y + header_height - self.scroll_y,
@@ -292,9 +286,8 @@ class WorkshopScreen:
             can_afford = current_currency >= button.cost
             button.draw(screen, can_afford)
 
-            button.rect = original_rect  # Restore original layout rect
+            button.rect = original_rect
 
-        # Reset clipping area to draw the rest of the UI
         screen.set_clip(None)
 
         if self.is_scrollable:
@@ -317,7 +310,7 @@ class WorkshopScreen:
         """Draws a custom scrollbar for the content area."""
         track_width = 10
         track_rect = pygame.Rect(
-            area.right - track_width - 5, area.top, track_width, area.height
+            area.right - track_width - 15, area.top + 5, track_width, area.height - 10
         )
         pygame.draw.rect(
             screen, self.colors["scrollbar_track"], track_rect, border_radius=5
