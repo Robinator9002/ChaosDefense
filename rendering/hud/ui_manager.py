@@ -9,14 +9,14 @@ from .buttons.tower_button import TowerButton
 from .buttons.tab_button import TabButton
 from .panels.upgrade_panel import UpgradePanel
 from .panels.tower_info_panel import TowerInfoPanel
-
-# --- NEW: Import the new PersonaSelectionPanel ---
 from .panels.persona_selection_panel import PersonaSelectionPanel
-from rendering.common.ui.ui_action import UIAction, ActionType
+from ..common.ui.ui_action import UIAction, ActionType
 
 if TYPE_CHECKING:
     from game_logic.game_state import GameState
     from game_logic.game_manager import GameManager
+    from game_logic.progression.progression_manager import ProgressionManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -25,23 +25,33 @@ class UIManager:
     """
     Manages all UI elements, featuring a dynamic, tab-based interface for
     tower selection and informational panels for selected towers.
+
+    REFACTORED: Now integrates with the ProgressionManager to only display
+    towers that the player has unlocked.
     """
 
     def __init__(
-        self, screen_rect: pygame.Rect, game_manager: "GameManager", assets_path: Path
+        self,
+        screen_rect: pygame.Rect,
+        game_manager: "GameManager",
+        progression_manager: "ProgressionManager",
+        assets_path: Path,
     ):
         self.screen_rect = screen_rect
         self.game_manager = game_manager
+        self.progression_manager = progression_manager
         self.assets_path = assets_path
+
         self.upgrade_panel: Optional[UpgradePanel] = None
         self.tower_info_panel: Optional[TowerInfoPanel] = None
-        # --- NEW: Add state for the persona selection modal ---
         self.persona_selection_panel: Optional[PersonaSelectionPanel] = None
+
         self.tower_categories: Dict[str, List[Dict[str, Any]]] = OrderedDict()
         self.category_tabs: List[TabButton] = []
         self.build_buttons: List[TowerButton] = []
         self.hotkey_map: List[str] = []
         self.active_category: Optional[str] = None
+
         self._discover_and_group_towers()
         self._build_dynamic_ui()
 
@@ -83,27 +93,41 @@ class UIManager:
         self._rebuild_tower_buttons()
 
     def _discover_and_group_towers(self):
-        logger.info("Discovering tower categories from configuration...")
+        """
+        Discovers all tower categories from the configuration files and then
+        filters them based on what the player has unlocked.
+        """
+        logger.info(
+            "Discovering and filtering tower categories based on player progression..."
+        )
         tower_types = self.game_manager.configs.get("tower_types", {})
+        player_data = self.progression_manager.get_player_data()
+        unlocked_towers = player_data.unlocked_towers
+
         ordered_categories = []
         if isinstance(tower_types, dict):
-            for data in tower_types.values():
-                if isinstance(data, dict):
+            # First pass: identify all categories that have at least one unlocked tower.
+            for tower_id, data in tower_types.items():
+                if isinstance(data, dict) and tower_id in unlocked_towers:
                     category = data.get("category", "uncategorized")
                     if category not in ordered_categories:
                         ordered_categories.append(category)
+
         for category in ordered_categories:
             self.tower_categories[category] = []
+
         if isinstance(tower_types, dict):
+            # Second pass: populate the categories with the unlocked towers.
             for tower_id, tower_data in tower_types.items():
-                if isinstance(tower_data, dict):
+                if isinstance(tower_data, dict) and tower_id in unlocked_towers:
                     category = tower_data.get("category", "uncategorized")
-                    tower_data_with_id = {"id": tower_id, **tower_data}
                     if category in self.tower_categories:
+                        tower_data_with_id = {"id": tower_id, **tower_data}
                         self.tower_categories[category].append(tower_data_with_id)
+
         self.active_category = ordered_categories[0] if ordered_categories else None
         logger.info(
-            f"Discovered categories in order: {list(self.tower_categories.keys())}"
+            f"Final buildable categories for player: {list(self.tower_categories.keys())}"
         )
 
     def _build_dynamic_ui(self):
@@ -148,13 +172,10 @@ class UIManager:
             self.build_buttons.append(button)
 
     def handle_event(self, event: pygame.event.Event, game_state: "GameState") -> bool:
-        # --- REFACTORED: Prioritize modal panels ---
-        # If the persona selection panel is open, it gets exclusive access to events.
         if self.persona_selection_panel:
             action = self.persona_selection_panel.handle_event(event, game_state)
             if action:
                 self._process_ui_action(action, game_state)
-            # Always return True to block other UI/game interactions while modal is open
             return True
 
         if self.upgrade_panel:
@@ -210,11 +231,9 @@ class UIManager:
                 persona_id = action.entity_id
                 if tower_id and persona_id:
                     self.game_manager.change_tower_persona(tower_id, persona_id)
-                    # Close the panel and rebuild the upgrade panel to reflect the change
                     self.persona_selection_panel = None
                     if self.upgrade_panel:
                         self.upgrade_panel.rebuild_layout()
-            # --- NEW: Handle opening and closing the persona panel ---
             case ActionType.OPEN_PERSONA_PANEL:
                 selected_tower = self.game_manager.towers.get(
                     game_state.selected_entity_id
@@ -233,7 +252,6 @@ class UIManager:
             case ActionType.CLOSE_PERSONA_PANEL:
                 self.persona_selection_panel = None
             case ActionType.UI_CLICK:
-                # This action is used by modals to absorb clicks. Do nothing.
                 pass
 
     def update(self, dt: float, game_state: "GameState"):
@@ -244,7 +262,6 @@ class UIManager:
                 or self.upgrade_panel.tower.entity_id != selected_id
             ):
                 selected_tower = self.game_manager.towers.get(selected_id)
-
                 if selected_tower:
                     panel_rect = pygame.Rect(self.screen_rect.width - 270, 10, 260, 0)
                     salvage_rate = self.game_manager.get_salvage_rate()
@@ -313,7 +330,5 @@ class UIManager:
             self.tower_info_panel.draw(screen)
         if self.upgrade_panel:
             self.upgrade_panel.draw(screen)
-
-        # --- NEW: Draw the modal panel last so it's on top ---
         if self.persona_selection_panel:
             self.persona_selection_panel.draw(screen)
