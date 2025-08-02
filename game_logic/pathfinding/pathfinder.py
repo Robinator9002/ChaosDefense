@@ -148,7 +148,14 @@ class Pathfinder:
                     continue
 
                 tile = grid.get_tile(neighbor[0], neighbor[1])
-                if tile.tile_key in ["BORDER", "MOUNTAIN"] and neighbor != end:
+
+                # --- FIX (Step 2.1): Make the base zone impassable for pathfinding ---
+                # By adding "BASE_ZONE" to this list of impassable tile keys, we prevent
+                # the A* algorithm from ever routing a path through the player's base.
+                # The `neighbor != end` condition is still important to allow paths to
+                # terminate at a target point right next to an obstacle.
+                impassable_keys = ["BORDER", "MOUNTAIN", "BASE_ZONE"]
+                if tile.tile_key in impassable_keys and neighbor != end:
                     continue
 
                 tentative_g_score = g_score[current] + cost_func(neighbor)
