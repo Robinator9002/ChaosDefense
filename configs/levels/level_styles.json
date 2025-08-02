@@ -1,5 +1,5 @@
 {
-  "//": "LEVEL DESIGN OVERHAUL: Replaced the simple 'num_paths' integer with a more descriptive 'paths_config' dictionary. This allows for dynamic and varied map layouts by specifying exactly what kind and how many paths the level generator should create.",
+  "//": "LEVEL DESIGN OVERHAUL: Added a 'description' field to each level's generation_params to be used in the new UI preview panel.",
 
   "Forest": {
     "//": "ROLE: Introductory Level. Spawns 'soldier' type bosses.",
@@ -7,11 +7,12 @@
     "generation_params": {
       "grid_width": 100,
       "grid_height": 50,
+      "description": "A dense, wooded area with two predictable paths. A standard training ground for new commanders.",
       "paths_config": {
         "elbow": 2
       },
-      "level_difficulty": 100,
-      "starting_gold": 20000,
+      "level_difficulty": 1,
+      "starting_gold": 200,
       "base_hp": 25,
       "allowed_boss_types": ["soldier"],
       "features": {
@@ -46,6 +47,7 @@
     "generation_params": {
       "grid_width": 80,
       "grid_height": 50,
+      "description": "A treacherous canyon with multiple intersecting paths. Expect fast-moving threats and varied enemy compositions.",
       "paths_config": {
         "wandering": 1,
         "elbow": 2
@@ -95,6 +97,7 @@
     "generation_params": {
       "grid_width": 70,
       "grid_height": 55,
+      "description": "A subterranean network of crystalline caves. The tight corridors and heavily armored foes demand high-impact defenses.",
       "paths_config": {
         "elbow": 2
       },
@@ -140,6 +143,7 @@
     "generation_params": {
       "grid_width": 90,
       "grid_height": 60,
+      "description": "A single, winding path through a volatile volcanic landscape. Your base has minimal health; no mistakes allowed.",
       "paths_config": {
         "wandering": 1
       },
