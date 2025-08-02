@@ -27,8 +27,6 @@ class ProgressionManager:
         self.player_data_manager = player_data_manager
         self.all_tower_configs = all_tower_configs
 
-        # Define the global upgrades available for purchase.
-        # In a larger game, this could also be loaded from a JSON file.
         self.global_upgrades: Dict[str, Dict[str, Any]] = {
             "starting_gold_1": {
                 "name": "Bonus Gold I",
@@ -56,10 +54,11 @@ class ProgressionManager:
         """Convenience method to get the current player data."""
         return self.player_data_manager.get_data()
 
+    # --- MODIFIED: Logic updated to include already-unlocked base towers (Your Plan / Step 2.4) ---
     def get_unlockable_towers(self) -> List[Dict[str, Any]]:
         """
-        Gets a list of all towers that can be unlocked, along with their
-        status and cost.
+        Gets a list of all towers for the Workshop, including purchasable
+        towers and towers the player already owns.
 
         Returns:
             List[Dict[str, Any]]: A list of dictionaries, each representing a tower.
@@ -68,26 +67,30 @@ class ProgressionManager:
         player_data = self.get_player_data()
 
         for tower_id, config in self.all_tower_configs.items():
-            # --- BUG FIX: Ensure the config value is a dictionary ---
-            # This gracefully skips any top-level keys in the JSON that are not
-            # tower definitions, such as comments (e.g., "//": "comment text").
             if not isinstance(config, dict):
                 continue
 
-            # Towers are considered unlockable if they have a 'unlock_cost' defined.
-            if "unlock_cost" in config:
+            is_unlocked = tower_id in player_data.unlocked_towers
+            has_unlock_cost = "unlock_cost" in config
+
+            # A tower should appear in the workshop if it's a purchasable unlock,
+            # OR if it's a base tower that the player already has. This ensures
+            # base towers without an `unlock_cost` are still displayed.
+            if has_unlock_cost or is_unlocked:
                 unlockable.append(
                     {
                         "id": tower_id,
                         "name": config.get("name", "Unknown"),
-                        "cost": config.get("unlock_cost", 9999),
-                        "unlocked": tower_id in player_data.unlocked_towers,
+                        # Use unlock_cost if it exists; otherwise, it's a base tower
+                        # with no cost to display in the Workshop.
+                        "cost": config.get("unlock_cost", 0),
+                        "unlocked": is_unlocked,
                         "description": config.get("description", ""),
                     }
                 )
 
-        # Sort to show locked towers first
-        return sorted(unlockable, key=lambda x: x["unlocked"])
+        # Sort to show locked towers first, then by their cost.
+        return sorted(unlockable, key=lambda x: (x["unlocked"], x["cost"]))
 
     def purchase_tower(self, tower_id: str) -> bool:
         """
@@ -122,37 +125,18 @@ class ProgressionManager:
         )
         return False
 
-    # --- MODIFIED: Replaced `apply_global_upgrades` with a method that returns modifiers ---
-    # This is the first step in fixing the mutable config state bug (Issue #12).
-    # This method no longer modifies any game state directly. Instead, it calculates
-    # the effects of all purchased global upgrades and returns them in a structured
-    # dictionary. The GameManager will then be responsible for applying these modifiers
-    # to new game instances, ensuring the original configs are never touched.
     def get_global_upgrade_modifiers(self) -> Dict[str, Any]:
         """
         Calculates the total effect of all purchased global upgrades.
-
-        This method is called at the start of a new game to get a summary
-        of modifications to apply, without directly changing any game state.
-
-        Returns:
-            Dict[str, Any]: A dictionary of modifiers to be applied by the
-                            GameManager. e.g.,
-                            {
-                                'game_state_mods': {'gold': 50, 'base_hp': 5},
-                                'tower_stat_mods': {'turret': {'damage': 2}}
-                            }
         """
         player_data = self.get_player_data()
         logger.info("Calculating global upgrade modifiers from purchased upgrades...")
 
-        # Initialize a structure to hold the calculated modifiers.
         modifiers: Dict[str, Any] = {
             "game_state_mods": {"gold": 0, "base_hp": 0},
             "tower_stat_mods": {},
         }
 
-        # Iterate through all upgrades the player has purchased.
         for upgrade_id in player_data.purchased_upgrades:
             if upgrade_id == "starting_gold_1":
                 modifiers["game_state_mods"]["gold"] += 50
@@ -161,10 +145,8 @@ class ProgressionManager:
             elif upgrade_id == "base_hp_1":
                 modifiers["game_state_mods"]["base_hp"] += 5
             elif upgrade_id == "turret_damage_1":
-                # For tower-specific mods, ensure the tower's key exists.
                 if "turret" not in modifiers["tower_stat_mods"]:
                     modifiers["tower_stat_mods"]["turret"] = {}
-                # Add to the existing modifier value, or initialize it.
                 current_mod = modifiers["tower_stat_mods"]["turret"].get("damage", 0)
                 modifiers["tower_stat_mods"]["turret"]["damage"] = current_mod + 2
 
