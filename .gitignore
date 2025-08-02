@@ -32,3 +32,6 @@ dist/
 # --- Testing ---
 .pytest_cache/
 .coverage
+
+# --- Save Files ---
+player_data.json
