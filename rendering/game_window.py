@@ -259,7 +259,6 @@ class Game:
 
         pygame.display.flip()
 
-    # --- MODIFIED: Logic updated to handle both hover and placement states ---
     def _draw_range_indicator(self):
         """
         Draws a semi-transparent circle on the map to show a tower's range.
@@ -270,11 +269,9 @@ class Game:
             return
 
         tower_data = None
-        # --- NEW: Prioritize the tower selected for placement ---
         if self.game_manager.game_state.selected_tower_to_build:
             tower_id = self.game_manager.game_state.selected_tower_to_build
             tower_data = self.all_configs.get("tower_types", {}).get(tower_id)
-        # --- FALLBACK: If nothing is selected, check for a hovered button ---
         elif self.ui_manager.hovered_tower_button:
             tower_data = self.ui_manager.hovered_tower_button.tower_data
 
@@ -284,7 +281,7 @@ class Game:
         try:
             tower_range = tower_data["attack"]["data"]["range"]
         except KeyError:
-            return  # Tower might be a support type with no "attack" data
+            return
 
         mouse_pos = pygame.mouse.get_pos()
         world_pos = self.camera.screen_to_world(pygame.Vector2(mouse_pos))
@@ -304,19 +301,23 @@ class Game:
             temp_surface = pygame.Surface(
                 (scaled_radius * 2, scaled_radius * 2), pygame.SRCALPHA
             )
-            color = self.ui_theme.get("colors", {}).get("text_primary", (255, 255, 255))
 
-            # Draw a filled, highly transparent circle for the area
+            # --- FIX: Convert color list to tuple before adding alpha tuple ---
+            # This resolves the TypeError caused by trying to concatenate a list and a tuple.
+            color_list = self.ui_theme.get("colors", {}).get(
+                "text_primary", [255, 255, 255]
+            )
+            color_tuple = tuple(color_list)
+
             pygame.draw.circle(
                 temp_surface,
-                color + (30,),
+                color_tuple + (30,),
                 (scaled_radius, scaled_radius),
                 scaled_radius,
             )
-            # Draw a less transparent border for clarity
             pygame.draw.circle(
                 temp_surface,
-                color + (100,),
+                color_tuple + (100,),
                 (scaled_radius, scaled_radius),
                 scaled_radius,
                 width=2,
