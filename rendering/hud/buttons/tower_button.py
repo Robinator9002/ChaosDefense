@@ -117,7 +117,8 @@ class TowerButton(UIElement):
 
         # Determine border color and width
         if is_selected:
-            border_color = self.colors.get("border_accent")
+            # --- FIX: Use border_interactive_selected for a more pleasing look ---
+            border_color = self.colors.get("border_interactive_selected")
             border_width = self.layout.get("border_width_selected", 3)
         elif self.is_hovered:
             border_color = self.colors.get("border_interactive_selected")

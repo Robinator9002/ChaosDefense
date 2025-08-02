@@ -294,7 +294,9 @@ class Game:
         panel_rect = pygame.Rect(5, 5, panel_width, panel_height)
 
         panel_surf = pygame.Surface(panel_rect.size, pygame.SRCALPHA)
-        panel_surf.fill(colors.get("panel_primary", (0, 0, 0)) + (200,))
+        # --- FIX: Convert the list from the theme to a tuple before concatenation ---
+        bg_color_list = colors.get("panel_primary", [0, 0, 0])
+        panel_surf.fill(tuple(bg_color_list) + (200,))
         self.screen.blit(panel_surf, panel_rect.topleft)
 
         current_x = panel_rect.left + padding

@@ -78,7 +78,9 @@ class FontManager:
             # Ensure the cache is empty if initialization fails
             self._font_cache.clear()
 
-    def get_font(self, name: str, default_size: int = 14) -> pygame.font.Font:
+    def get_font(
+        self, name: str, default_size: int = 14, **kwargs: Any
+    ) -> pygame.font.Font:
         """
         Retrieves a pre-loaded font object from the cache.
 
@@ -86,6 +88,9 @@ class FontManager:
             name (str): The semantic name of the font (e.g., 'title_large').
             default_size (int): A fallback size if the requested font name
                                 does not exist.
+            **kwargs: Catches any extra keyword arguments (like 'bold=True')
+                      to prevent a TypeError without affecting the logic,
+                      as font styles are now defined in the theme config.
 
         Returns:
             A pygame.font.Font object. If the requested font is not found,

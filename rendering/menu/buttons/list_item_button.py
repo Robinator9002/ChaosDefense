@@ -77,9 +77,9 @@ class ListItemButton(UIElement):
             title_color = self.colors.get("text_disabled")
             text_color_secondary = self.colors.get("text_disabled")
         elif self.is_selected:
-            # Selected state has a prominent accent color border
+            # Selected state has a border color that matches the new theme, not the old yellow
             bg_color = self.colors.get("panel_secondary")
-            border_color = self.colors.get("border_accent")
+            border_color = self.colors.get("border_interactive_selected")
             border_width = self.layout.get("border_width_selected", 3)
         elif self.is_hovered:
             # Hover state for interactive feedback
