@@ -37,6 +37,10 @@ class Tower(Entity):
         tower_type_id: str,
         tower_type_data: Dict[str, Any],
         status_effects_config: Dict[str, Any],
+        # --- NEW: Accept global modifiers ---
+        # This dictionary contains stat modifications from permanent workshop upgrades.
+        # It's passed in by the GameManager to prevent modifying the original config files.
+        global_mods: Dict[str, Any] = None,
     ):
         """
         Initializes a new Tower entity based on its configuration data.
@@ -49,15 +53,26 @@ class Tower(Entity):
         self.cost = tower_type_data.get("cost", 0)
         self.status_effects_config = status_effects_config
 
+        # --- MODIFIED: Use deepcopy to ensure base config is never altered ---
+        # This is critical for preventing in-game upgrades on one tower from
+        # affecting the base stats of another tower of the same type.
         self.attack = copy.deepcopy(tower_type_data.get("attack", {}))
         self.auras = copy.deepcopy(tower_type_data.get("auras", []))
 
         self.attack.setdefault("data", {})
 
+        # --- MODIFIED: Apply global modifiers upon creation ---
+        # This is the final step in fixing the mutable config state bug (Issue #12).
+        # We apply any permanent workshop upgrades directly to this tower's instance data.
+        if global_mods:
+            logger.debug(f"Applying global mods to {self.name}: {global_mods}")
+            # Example: Add bonus damage from a workshop upgrade.
+            if "damage" in global_mods:
+                self.attack["data"]["damage"] = self.attack["data"].get(
+                    "damage", 0
+                ) + global_mods.get("damage", 0)
+
         # --- Targeting & AI ---
-        # --- REFACTORED: Removed static persona list. ---
-        # The default persona is now hard-coded as a fallback. The UI and
-        # dynamic eligibility system will handle the actual logic.
         self.current_persona = "EXECUTIONER"
         self.current_targets: List["Enemy"] = []
 
@@ -180,12 +195,9 @@ class Tower(Entity):
         eligible = []
         for persona_id in all_personas_config.keys():
             if persona_id == "ARTILLERY":
-                # Eligible if the tower has any area-of-effect capability.
                 if self.blast_radius > 0:
                     eligible.append(persona_id)
             elif persona_id == "CONTAGION":
-                # Eligible if the tower can apply any status effect. This checks
-                # base effects and effects added by upgrades.
                 has_debuffs = (
                     len(self.attack.get("data", {}).get("effects", {})) > 0
                     or len(self.on_hit_effects) > 0
@@ -194,7 +206,6 @@ class Tower(Entity):
                 if has_debuffs:
                     eligible.append(persona_id)
             else:
-                # All other personas are considered universally applicable.
                 eligible.append(persona_id)
         return eligible
 
