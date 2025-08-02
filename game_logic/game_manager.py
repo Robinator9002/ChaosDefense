@@ -119,14 +119,23 @@ class GameManager:
 
     def get_buildable_towers(self) -> List[str]:
         """
-        Retrieves a list of tower IDs that the player has unlocked and can build.
-        This method now correctly consults the ProgressionManager to respect
-        the player's save data, fixing the "instant unlock" bug.
+        Retrieves a list of tower IDs that the player has unlocked, sorted
+        according to their definition order in the configuration file. This
+        fixes both the instant unlock and incorrect sorting bugs.
         """
         # --- FIX (Step 1.2): Get unlocked towers from player save data ---
         player_data = self.progression_manager.get_player_data()
-        # We sort the list to ensure the UI tower buttons appear in a consistent order.
-        return sorted(list(player_data.unlocked_towers))
+        unlocked_set = player_data.unlocked_towers
+
+        # Get all tower IDs in the order they are defined in tower_types.json
+        # In modern Python (3.7+), dict keys maintain insertion order.
+        all_tower_ids_in_order = self.configs.get("tower_types", {}).keys()
+
+        # Filter this ordered list to include only the ones the player has unlocked.
+        buildable_towers = [
+            tower_id for tower_id in all_tower_ids_in_order if tower_id in unlocked_set
+        ]
+        return buildable_towers
 
     def end_game_session(self, victory: bool):
         """
@@ -392,8 +401,6 @@ class GameManager:
 
     def get_salvage_rate(self) -> float:
         """Safely retrieves the current salvage refund percentage."""
-        # --- FIX: We can no longer rely on `self.wave_manager` here as it is not always guaranteed to exist when this function is called.
-        # We will instead retrieve the difficulty settings directly from `self.configs` as it is a guaranteed attribute.
         difficulty_setting = self.configs.get("difficulty_scaling", {}).get(
             str(self.game_settings.get("difficulty", 1)), {}
         )
