@@ -9,6 +9,9 @@ from ..components.scrollable_grid import ScrollableGrid
 from ..panels.preview_panel import PreviewPanel
 from rendering.common.panels.panel_utils import get_nested_value, format_stat_value
 
+# --- NEW: Import the consolidated ListItemButton ---
+from ..buttons.list_item_button import ListItemButton
+
 if TYPE_CHECKING:
     from rendering.text.font_manager import FontManager
 
@@ -16,9 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class WorkshopButton(UIElement):
-    """
-    A generic button for the Workshop screen, used for category filters.
-    """
+    """A generic button for the Workshop screen, used for category filters."""
 
     def __init__(
         self,
@@ -71,116 +72,13 @@ class WorkshopButton(UIElement):
         screen.blit(text_surf, text_rect)
 
 
-class TowerUnlockButton(UIElement):
-    """
-    A UI element for unlocking a new tower in The Workshop.
-    """
-
-    def __init__(
-        self,
-        rect: pygame.Rect,
-        tower_info: Dict[str, Any],
-        ui_theme: Dict[str, Any],
-        font_manager: "FontManager",
-    ):
-        super().__init__(rect)
-        self.tower_info = tower_info
-        self.name = tower_info["name"]
-        self.is_unlocked = tower_info["unlocked"]
-        self.is_selected = False
-
-        self.colors = ui_theme.get("colors", {})
-        self.layout = ui_theme.get("layout", {})
-        self.font_name = font_manager.get_font("body_medium_bold")
-        self.font_cost = font_manager.get_font("body_medium_bold")
-        self.font_stat_label = font_manager.get_font("body_tiny")
-        self.font_stat_value = font_manager.get_font("body_tiny_bold")
-
-        self._prepare_stat_surfaces()
-
-    def _prepare_stat_surfaces(self):
-        """Pre-renders the stat text for drawing."""
-        self.stat_surfaces = []
-        stats_to_display = self.tower_info.get("info_panel_stats", [])
-        stat_label_color = self.colors.get("text_secondary")
-        stat_value_color = self.colors.get("text_primary")
-
-        for stat_info in stats_to_display[:3]:
-            label = stat_info.get("label", "N/A")
-            value_path = stat_info.get("value_path")
-            value = (
-                get_nested_value(self.tower_info, value_path) if value_path else "N/A"
-            )
-            if value is None:
-                continue
-            value_str = format_stat_value(value, stat_info.get("format"))
-            label_surf = self.font_stat_label.render(
-                f"{label}:", True, stat_label_color
-            )
-            value_surf = self.font_stat_value.render(value_str, True, stat_value_color)
-            self.stat_surfaces.append((label_surf, value_surf))
-
-    def draw(self, screen: pygame.Surface, can_afford: bool):
-        border_radius = self.layout.get("border_radius_large", 8)
-        border_width = self.layout.get("border_width_standard", 2)
-        padding = self.layout.get("padding_medium", 15)
-
-        if self.is_unlocked:
-            bg_color = self.colors.get("panel_primary")
-            border_color = self.colors.get("text_success")
-            name_color = self.colors.get("text_success")
-        else:
-            name_color = self.colors.get("text_primary")
-            if self.is_selected:
-                bg_color = self.colors.get("panel_secondary")
-                border_color = self.colors.get("border_accent")
-                border_width = self.layout.get("border_width_selected", 3)
-            else:
-                bg_color = (
-                    self.colors.get("panel_interactive_hover")
-                    if self.is_hovered
-                    else self.colors.get("panel_primary")
-                )
-                border_color = self.colors.get("border_primary")
-
-        pygame.draw.rect(screen, bg_color, self.rect, border_radius=border_radius)
-        pygame.draw.rect(
-            screen, border_color, self.rect, border_width, border_radius=border_radius
-        )
-
-        name_surf = self.font_name.render(self.name, True, name_color)
-        screen.blit(name_surf, (self.rect.x + padding, self.rect.y + 10))
-
-        if self.is_unlocked:
-            status_surf = self.font_cost.render(
-                "UNLOCKED", True, self.colors.get("text_success")
-            )
-        else:
-            cost_color = (
-                self.colors.get("text_accent")
-                if can_afford
-                else self.colors.get("text_error")
-            )
-            cost_text = f"{self.tower_info['cost']} CS"
-            status_surf = self.font_cost.render(cost_text, True, cost_color)
-        status_rect = status_surf.get_rect(
-            topright=(self.rect.right - padding, self.rect.y + 12)
-        )
-        screen.blit(status_surf, status_rect)
-
-        current_y = self.rect.y + 40
-        for label_surf, value_surf in self.stat_surfaces:
-            screen.blit(label_surf, (self.rect.x + padding, current_y))
-            value_rect = value_surf.get_rect(
-                topright=(self.rect.right - padding, current_y)
-            )
-            screen.blit(value_surf, value_rect)
-            current_y += 18
+# --- REMOVED: The old TowerUnlockButton class is now obsolete ---
 
 
 class WorkshopScreen:
     """
     Manages The Workshop UI.
+    REFACTORED: Now uses the consolidated ListItemButton for its tower list.
     """
 
     def __init__(
@@ -197,10 +95,10 @@ class WorkshopScreen:
         self.font_manager = font_manager
         self.back_callback = back_callback
 
-        self.all_unlockable_towers = self.progression_manager.get_unlockable_towers()
-        self.filtered_towers: List[Dict[str, Any]] = []
-        self.tower_buttons: List[TowerUnlockButton] = []
-        self.selected_tower: Optional[TowerUnlockButton] = None
+        self.filtered_towers_data: List[Dict[str, Any]] = []
+        # --- MODIFIED: The list now holds the new, generic button type ---
+        self.tower_buttons: List[ListItemButton] = []
+        self.selected_tower_button: Optional[ListItemButton] = None
         self.active_filter = "All"
         self.filter_buttons: List[WorkshopButton] = []
 
@@ -244,45 +142,83 @@ class WorkshopScreen:
         self.back_button = UIElement(back_button_rect)
 
     def _build_layout(self):
-        self.all_unlockable_towers = self.progression_manager.get_unlockable_towers()
+        """Filters tower data and builds the UI with new ListItemButtons."""
+        # First, get the latest tower data
+        all_unlockable_towers = self.progression_manager.get_unlockable_towers()
+        all_tower_configs = self.progression_manager.all_tower_configs
+
+        # Filter the raw data
         if self.active_filter.lower() == "all":
-            self.filtered_towers = self.all_unlockable_towers
+            self.filtered_towers_data = all_unlockable_towers
         else:
-            all_tower_configs = self.progression_manager.all_tower_configs
-            self.filtered_towers = [
+            self.filtered_towers_data = [
                 t
-                for t in self.all_unlockable_towers
+                for t in all_unlockable_towers
                 if all_tower_configs.get(t["id"], {}).get("category")
                 == self.active_filter
             ]
 
+        # Now, create the button objects from the filtered data
         self.tower_buttons.clear()
-        for tower_info in self.filtered_towers:
-            full_config = self.progression_manager.all_tower_configs.get(
-                tower_info["id"], {}
-            )
-            tower_info_full = {**full_config, **tower_info}
-            button = TowerUnlockButton(
-                pygame.Rect(0, 0, 0, 0),
-                tower_info_full,
-                self.ui_theme,
-                self.font_manager,
+        for tower_data in self.filtered_towers_data:
+            full_config = all_tower_configs.get(tower_data["id"], {})
+            tower_info_full = {**full_config, **tower_data}
+
+            # --- NEW: Prepare data specifically for the ListItemButton ---
+            player_currency = self.progression_manager.get_player_data().meta_currency
+            can_afford = player_currency >= tower_info_full.get("cost", 0)
+
+            status_text = f"{tower_info_full.get('cost', 0)} CS"
+            if tower_info_full.get("unlocked"):
+                status_text = "UNLOCKED"
+
+            stats = []
+            stats_to_display = tower_info_full.get("info_panel_stats", [])
+            for stat_info in stats_to_display[:3]:
+                label = stat_info.get("label", "N/A")
+                value_path = stat_info.get("value_path")
+                value = (
+                    get_nested_value(tower_info_full, value_path)
+                    if value_path
+                    else "N/A"
+                )
+                if value is None:
+                    continue
+                value_str = format_stat_value(value, stat_info.get("format"))
+                stats.append((label, value_str))
+
+            button_data = {
+                "id": tower_info_full.get("id"),
+                "title": tower_info_full.get("name", "N/A"),
+                "is_locked": False,  # Workshop items are never "locked", just not purchased
+                "can_afford": can_afford,
+                "status_text": status_text,
+                "stats": stats,
+            }
+
+            button = ListItemButton(
+                pygame.Rect(0, 0, 0, 0), button_data, self.ui_theme, self.font_manager
             )
             self.tower_buttons.append(button)
-        self.grid.update_item_count(len(self.tower_buttons))
 
+        self.grid.update_item_count(len(self.tower_buttons))
+        self._build_filter_buttons()
+
+    def _build_filter_buttons(self):
+        """Creates the category filter buttons."""
         self.filter_buttons.clear()
+        all_tower_configs = self.progression_manager.all_tower_configs
+        all_unlockable_towers = self.progression_manager.get_unlockable_towers()
         all_categories = sorted(
             list(
                 set(
-                    self.progression_manager.all_tower_configs.get(t["id"], {}).get(
-                        "category", "N/A"
-                    )
-                    for t in self.all_unlockable_towers
+                    all_tower_configs.get(t["id"], {}).get("category", "N/A")
+                    for t in all_unlockable_towers
                 )
             )
         )
         categories = ["All"] + [cat for cat in all_categories if cat != "N/A"]
+
         btn_width, btn_height, btn_spacing = (
             120,
             35,
@@ -308,7 +244,7 @@ class WorkshopScreen:
 
     def set_filter(self, category: str):
         self.active_filter = category
-        self.selected_tower = None
+        self.selected_tower_button = None
         self.preview_panel.set_item(None, "", lambda: None)
         self._build_layout()
 
@@ -317,60 +253,64 @@ class WorkshopScreen:
             self.set_filter(self.active_filter)
 
     def handle_event(self, event: pygame.event.Event):
-        # --- FIX: Restructured event handling for clarity and correctness ---
+        """Handles user input for the workshop screen."""
         mouse_pos = pygame.mouse.get_pos()
 
-        # 1. Always update hover states for all elements based on current mouse position
+        # Update hover states for all interactive elements
+        self.back_button.is_hovered = self.back_button.rect.collidepoint(mouse_pos)
         for btn in self.filter_buttons:
             btn.is_hovered = btn.rect.collidepoint(mouse_pos)
-        self.back_button.is_hovered = self.back_button.rect.collidepoint(mouse_pos)
 
-        hovered_button = None
+        hovered_button_index: Optional[int] = None
         for i, button in enumerate(self.tower_buttons):
             layout_rect = self.grid.get_item_rect(i)
             on_screen_rect = layout_rect.move(0, -self.grid.scroll_y)
+            button.rect.topleft = on_screen_rect.topleft
             if self.grid.area.contains(on_screen_rect):
-                button.rect.topleft = on_screen_rect.topleft
                 button.is_hovered = on_screen_rect.collidepoint(mouse_pos)
                 if button.is_hovered:
-                    hovered_button = button
+                    hovered_button_index = i
             else:
                 button.is_hovered = False
 
-        # 2. Delegate events to child components that need to manage their own state
+        # Delegate events to child components
         self.grid.handle_scroll_event(event)
         self.preview_panel.handle_event(event)
-
         for btn in self.filter_buttons:
             btn.handle_event(event)
 
-        # 3. Handle primary actions (clicks) for this screen
+        # Handle primary actions (clicks)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.back_button.is_hovered:
                 self.back_callback()
-                return  # Event handled
+                return
 
-            # --- FIX: Added click detection for tower buttons to set the selection ---
-            if hovered_button:
-                self.selected_tower = hovered_button
+            if hovered_button_index is not None:
+                self.selected_tower_button = self.tower_buttons[hovered_button_index]
                 for btn in self.tower_buttons:
-                    btn.is_selected = btn == self.selected_tower
+                    btn.is_selected = btn == self.selected_tower_button
+
+                # Get the full data for the preview panel
+                selected_tower_data = self.filtered_towers_data[hovered_button_index]
+                full_config = self.progression_manager.all_tower_configs.get(
+                    selected_tower_data["id"], {}
+                )
+                tower_info_full = {**full_config, **selected_tower_data}
 
                 can_afford = (
                     self.progression_manager.get_player_data().meta_currency
-                    >= self.selected_tower.tower_info["cost"]
+                    >= tower_info_full["cost"]
                 )
+
                 self.preview_panel.set_item(
-                    item_data=self.selected_tower.tower_info,
-                    button_text=f"Unlock ({self.selected_tower.tower_info['cost']} CS)",
-                    button_action=lambda: self._purchase_tower(
-                        self.selected_tower.tower_info["id"]
-                    ),
-                    is_button_enabled=not self.selected_tower.is_unlocked
-                    and can_afford,
+                    item_data=tower_info_full,
+                    button_text=f"Unlock ({tower_info_full['cost']} CS)",
+                    button_action=lambda: self._purchase_tower(tower_info_full["id"]),
+                    is_button_enabled=not tower_info_full["unlocked"] and can_afford,
                 )
 
     def draw(self, screen: pygame.Surface):
+        # Draw static elements
         title_surf = self.font_title.render(
             "The Workshop", True, self.colors.get("text_primary")
         )
@@ -404,16 +344,16 @@ class WorkshopScreen:
         )
         screen.blit(back_surf, back_surf.get_rect(center=self.back_button.rect.center))
 
+        # Draw child components
         self.preview_panel.draw(screen)
         for btn in self.filter_buttons:
             btn.draw(screen)
 
+        # Draw scrollable content
         screen.set_clip(self.grid.area)
-        player_currency = self.progression_manager.get_player_data().meta_currency
-        for i, button in enumerate(self.tower_buttons):
-            layout_rect = self.grid.get_item_rect(i)
-            button.rect.topleft = (layout_rect.x, layout_rect.y - self.grid.scroll_y)
-            button.draw(screen, player_currency >= button.tower_info["cost"])
+        for button in self.tower_buttons:
+            # The button's rect is updated in handle_event, so we can just draw it
+            button.draw(screen)
         screen.set_clip(None)
 
         self.grid.draw_scrollbar(screen)
