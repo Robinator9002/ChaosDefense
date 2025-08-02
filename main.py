@@ -17,7 +17,7 @@ from rendering.text.font_manager import FontManager
 PROJECT_ROOT = Path(__file__).parent
 CONFIG_PATH = PROJECT_ROOT / "configs"
 ASSETS_PATH = PROJECT_ROOT / "assets"
-SAVES_PATH = PROJECT_ROOT / "saves"
+SAVES_PATH = CONFIG_PATH / "saves"
 
 
 # --- Basic Logging Setup ---
