@@ -57,6 +57,11 @@ class UIManager:
         self.upgrade_panel: Optional[UpgradePanel] = None
         self.persona_panel: Optional[PersonaSelectionPanel] = None
 
+        # --- NEW: Track hovered tower button for range preview ---
+        # This attribute will hold a reference to the tower button the mouse
+        # is currently over, allowing the GameWindow to draw its range.
+        self.hovered_tower_button: Optional[TowerButton] = None
+
         self._build_static_ui()
         self._build_dynamic_ui()
 
@@ -162,22 +167,12 @@ class UIManager:
         self._rebuild_tower_buttons()
         logger.info(f"Active category changed to: {self.active_tab}")
 
-    # --- NEW: Decoupled method for hotkey selection (Issue #8) ---
     def select_tower_by_hotkey(self, index: int, game_state: "GameState"):
         """
         Selects a tower for building based on a numerical hotkey index (0-9).
-
-        This provides a clean interface for the InputHandler, which no longer
-        needs to know about the internal `hotkey_map` list. It simply tells
-        the UIManager which hotkey was pressed.
-
-        Args:
-            index (int): The zero-based index of the hotkey (e.g., 0 for key '1').
-            game_state (GameState): The current game state object to modify.
         """
         if 0 <= index < len(self.hotkey_map):
             tower_id = self.hotkey_map[index]
-            # Toggle selection: if the same tower is selected, clear it.
             if game_state.selected_tower_to_build == tower_id:
                 game_state.clear_selection()
             else:
@@ -345,8 +340,15 @@ class UIManager:
             self.persona_panel.update(dt, game_state)
         elif self.upgrade_panel:
             self.upgrade_panel.update(dt, game_state)
+
+        # --- MODIFIED: Update hovered tower button state ---
+        # This loop now serves two purposes: updating the button animations
+        # and checking which button is currently hovered for the range preview.
+        self.hovered_tower_button = None
         for button in self.tower_buttons:
             button.update(dt, game_state)
+            if button.is_hovered:
+                self.hovered_tower_button = button
 
     def draw(self, screen: pygame.Surface, game_state: "GameState"):
         panel_rect = pygame.Rect(

@@ -252,15 +252,79 @@ class Game:
                 for entity in all_entities:
                     entity.draw(self.screen, cam_offset, cam_zoom)
 
+                self._draw_range_indicator()
+
                 self._draw_top_gui()
                 self.ui_manager.draw(self.screen, self.game_manager.game_state)
 
         pygame.display.flip()
 
-    # --- MODIFIED: Complete overhaul of the top HUD (Your Plan / Step 2.3) ---
-    # This method has been rewritten to create a more visually appealing and
-    # theme-aligned panel with icons and a better layout, replacing the
-    # previous simple text implementation.
+    # --- MODIFIED: Logic updated to handle both hover and placement states ---
+    def _draw_range_indicator(self):
+        """
+        Draws a semi-transparent circle on the map to show a tower's range.
+        This works when hovering a tower button OR when a tower is selected
+        for placement.
+        """
+        if not self.ui_manager or not self.camera or not self.game_manager:
+            return
+
+        tower_data = None
+        # --- NEW: Prioritize the tower selected for placement ---
+        if self.game_manager.game_state.selected_tower_to_build:
+            tower_id = self.game_manager.game_state.selected_tower_to_build
+            tower_data = self.all_configs.get("tower_types", {}).get(tower_id)
+        # --- FALLBACK: If nothing is selected, check for a hovered button ---
+        elif self.ui_manager.hovered_tower_button:
+            tower_data = self.ui_manager.hovered_tower_button.tower_data
+
+        if not tower_data:
+            return
+
+        try:
+            tower_range = tower_data["attack"]["data"]["range"]
+        except KeyError:
+            return  # Tower might be a support type with no "attack" data
+
+        mouse_pos = pygame.mouse.get_pos()
+        world_pos = self.camera.screen_to_world(pygame.Vector2(mouse_pos))
+
+        tile_size = self.game_manager.tile_size
+        tile_x = int(world_pos.x // tile_size)
+        tile_y = int(world_pos.y // tile_size)
+        snapped_world_pos = pygame.Vector2(
+            tile_x * tile_size + tile_size / 2,
+            tile_y * tile_size + tile_size / 2,
+        )
+
+        screen_pos = (snapped_world_pos * self.camera.zoom) + self.camera.offset
+        scaled_radius = int(tower_range * self.camera.zoom)
+
+        if scaled_radius > 1:
+            temp_surface = pygame.Surface(
+                (scaled_radius * 2, scaled_radius * 2), pygame.SRCALPHA
+            )
+            color = self.ui_theme.get("colors", {}).get("text_primary", (255, 255, 255))
+
+            # Draw a filled, highly transparent circle for the area
+            pygame.draw.circle(
+                temp_surface,
+                color + (30,),
+                (scaled_radius, scaled_radius),
+                scaled_radius,
+            )
+            # Draw a less transparent border for clarity
+            pygame.draw.circle(
+                temp_surface,
+                color + (100,),
+                (scaled_radius, scaled_radius),
+                scaled_radius,
+                width=2,
+            )
+
+            blit_pos = (screen_pos.x - scaled_radius, screen_pos.y - scaled_radius)
+            self.screen.blit(temp_surface, blit_pos)
+
     def _draw_top_gui(self):
         """Draws the static user interface elements like gold, hp, and wave count."""
         if not self.game_manager or not self.game_manager.game_state:
@@ -274,8 +338,6 @@ class Game:
         spacing = layout.get("spacing_medium", 10)
         font = self.font_manager.get_font("body_large")
 
-        # Define content for each stat pod (icon_drawer, text, color_key)
-        # The wave text is now more compact, showing only the current wave.
         wave_text = f"{state.current_wave_number}"
         if wave_mgr:
             wave_text += f" / {wave_mgr.max_waves}"
@@ -286,11 +348,9 @@ class Game:
             (self._draw_wave_icon, wave_text, "text_primary"),
         ]
 
-        # Calculate total width required for all pods
         total_width = padding
         for _, text, _ in stat_pods_data:
             text_width = font.size(text)[0]
-            # Width of pod = icon_size + spacing + text_width + padding
             total_width += 30 + spacing + text_width + padding * 2
 
         panel_height = 50
@@ -299,7 +359,6 @@ class Game:
         bg_color = tuple(colors.get("panel_primary", [0, 0, 0])) + (220,)
         panel_surf.fill(bg_color)
 
-        # Draw border for the main panel
         pygame.draw.rect(
             panel_surf,
             colors.get("border_primary"),
@@ -309,7 +368,6 @@ class Game:
         )
         self.screen.blit(panel_surf, panel_rect.topleft)
 
-        # Draw each stat pod inside the main panel
         current_x = panel_rect.left + padding
         for icon_drawer, text, color_key in stat_pods_data:
             icon_rect = pygame.Rect(current_x, panel_rect.centery - 15, 30, 30)
@@ -323,9 +381,7 @@ class Game:
 
             current_x = text_rect.right + padding
 
-    # --- NEW: Helper methods to draw procedural icons for the HUD ---
     def _draw_heart_icon(self, surface, rect, color):
-        """Draws a simple heart shape inside the given rect."""
         x, y, w, h = rect
         p = [
             (x + w / 2, y + h),
@@ -338,7 +394,6 @@ class Game:
         pygame.draw.polygon(surface, color, p)
 
     def _draw_coin_icon(self, surface, rect, color):
-        """Draws a simple coin shape inside the given rect."""
         pygame.draw.circle(surface, color, rect.center, rect.width / 2)
         pygame.draw.circle(
             surface,
@@ -348,11 +403,10 @@ class Game:
         )
 
     def _draw_wave_icon(self, surface, rect, color):
-        """Draws a simple wave-like symbol inside the given rect."""
         start_y = rect.centery
         points = []
         for i in range(rect.width):
-            angle = (i / rect.width) * 2 * 3.14159 * 2  # Two full cycles
+            angle = (i / rect.width) * 2 * 3.14159 * 2
             y_offset = (rect.height / 4) * pygame.math.Vector2(0, 1).rotate(
                 -angle * 180 / 3.14159
             )[1]
