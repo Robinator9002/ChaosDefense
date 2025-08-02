@@ -1,0 +1,65 @@
+{
+  "//": "ChaosDefense UI Theme v1.0 - The single source of truth for all menu and HUD styling.",
+
+  "colors": {
+    "//": "A centralized color palette. Names should be semantic, not literal (e.g., 'text_primary' not 'light_grey').",
+    "background_primary": [15, 20, 25],
+    "panel_primary": [25, 30, 40],
+    "panel_secondary": [40, 50, 60],
+    "panel_interactive_hover": [60, 75, 90],
+
+    "border_primary": [80, 90, 100],
+    "border_interactive_selected": [150, 180, 200],
+    "border_accent": [255, 215, 0],
+
+    "text_primary": [220, 220, 230],
+    "text_secondary": [160, 160, 170],
+    "text_disabled": [100, 100, 110],
+    "text_accent": [255, 215, 0],
+    "text_success": [180, 230, 190],
+    "text_error": [220, 80, 80],
+
+    "button_primary_bg": [40, 80, 50],
+    "button_primary_hover": [60, 110, 75],
+    "button_disabled_bg": [40, 45, 50],
+
+    "scrollbar_track": [30, 35, 45],
+    "scrollbar_handle": [80, 90, 100]
+  },
+
+  "fonts": {
+    "//": "Font definitions. The FontManager will use these keys to provide font objects.",
+    "default_font_family": "segoeui",
+    "definitions": {
+      "title_large": { "size": 72, "style": ["bold"] },
+      "title_medium": { "size": 52, "style": ["bold"] },
+      "title_small": { "size": 28, "style": ["bold"] },
+
+      "body_large": { "size": 24, "style": ["bold"] },
+      "body_medium": { "size": 18, "style": [] },
+      "body_small": { "size": 16, "style": [] },
+      "body_tiny": { "size": 14, "style": [] },
+
+      "button_large": { "size": 24, "style": ["bold"] },
+      "button_medium": { "size": 18, "style": ["bold"] }
+    }
+  },
+
+  "layout": {
+    "//": "Common metrics for padding, spacing, and other layout properties to ensure consistency.",
+    "padding_large": 20,
+    "padding_medium": 15,
+    "padding_small": 10,
+
+    "spacing_large": 20,
+    "spacing_medium": 10,
+
+    "border_radius_large": 8,
+    "border_radius_small": 5,
+
+    "border_width_standard": 2,
+    "border_width_selected": 3,
+
+    "scrollbar_width": 10
+  }
+}
