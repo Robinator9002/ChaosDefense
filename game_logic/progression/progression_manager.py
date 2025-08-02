@@ -122,31 +122,51 @@ class ProgressionManager:
         )
         return False
 
-    def apply_global_upgrades(self, game_manager: Any):
+    # --- MODIFIED: Replaced `apply_global_upgrades` with a method that returns modifiers ---
+    # This is the first step in fixing the mutable config state bug (Issue #12).
+    # This method no longer modifies any game state directly. Instead, it calculates
+    # the effects of all purchased global upgrades and returns them in a structured
+    # dictionary. The GameManager will then be responsible for applying these modifiers
+    # to new game instances, ensuring the original configs are never touched.
+    def get_global_upgrade_modifiers(self) -> Dict[str, Any]:
         """
-        Applies the effects of purchased global upgrades to a new game instance.
-        This method is called at the start of a new game.
+        Calculates the total effect of all purchased global upgrades.
 
-        Args:
-            game_manager (GameManager): The main game manager instance.
+        This method is called at the start of a new game to get a summary
+        of modifications to apply, without directly changing any game state.
+
+        Returns:
+            Dict[str, Any]: A dictionary of modifiers to be applied by the
+                            GameManager. e.g.,
+                            {
+                                'game_state_mods': {'gold': 50, 'base_hp': 5},
+                                'tower_stat_mods': {'turret': {'damage': 2}}
+                            }
         """
         player_data = self.get_player_data()
-        logger.info("Applying purchased global upgrades...")
+        logger.info("Calculating global upgrade modifiers from purchased upgrades...")
 
+        # Initialize a structure to hold the calculated modifiers.
+        modifiers: Dict[str, Any] = {
+            "game_state_mods": {"gold": 0, "base_hp": 0},
+            "tower_stat_mods": {},
+        }
+
+        # Iterate through all upgrades the player has purchased.
         for upgrade_id in player_data.purchased_upgrades:
             if upgrade_id == "starting_gold_1":
-                game_manager.game_state.gold += 50
+                modifiers["game_state_mods"]["gold"] += 50
             elif upgrade_id == "starting_gold_2":
-                game_manager.game_state.gold += 100
+                modifiers["game_state_mods"]["gold"] += 100
             elif upgrade_id == "base_hp_1":
-                game_manager.game_state.base_hp += 5
-            # More complex upgrades can modify the base tower configs before towers are built
+                modifiers["game_state_mods"]["base_hp"] += 5
             elif upgrade_id == "turret_damage_1":
-                if "turret" in game_manager.configs["tower_types"]:
-                    game_manager.configs["tower_types"]["turret"]["attack"]["data"][
-                        "damage"
-                    ] += 2
+                # For tower-specific mods, ensure the tower's key exists.
+                if "turret" not in modifiers["tower_stat_mods"]:
+                    modifiers["tower_stat_mods"]["turret"] = {}
+                # Add to the existing modifier value, or initialize it.
+                current_mod = modifiers["tower_stat_mods"]["turret"].get("damage", 0)
+                modifiers["tower_stat_mods"]["turret"]["damage"] = current_mod + 2
 
-        logger.info(
-            f"Global upgrades applied. Starting Gold: {game_manager.game_state.gold}, Base HP: {game_manager.game_state.base_hp}"
-        )
+        logger.info(f"Global modifiers calculated: {modifiers}")
+        return modifiers

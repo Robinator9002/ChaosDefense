@@ -49,9 +49,7 @@ class GameManager:
         self.progression_manager = progression_manager
         self.current_level_id = level_id
 
-        self.game_settings = self.configs[
-            "game_settings"
-        ]  # --- FIX: Make game_settings a class attribute ---
+        self.game_settings = self.configs["game_settings"]
         self.tile_size = self.game_settings.get("tile_size", 32)
         self.game_state: GameState = GameState()
         self.level_manager: LevelManager = LevelManager(self.configs["level_styles"])
@@ -62,9 +60,7 @@ class GameManager:
         self.targeting_manager: TargetingManager = TargetingManager(
             cell_size=120, targeting_ai_config=targeting_ai_config
         )
-        player_difficulty = self.game_settings.get(
-            "difficulty", 1
-        )  # --- FIX: Access from class attribute ---
+        player_difficulty = self.game_settings.get("difficulty", 1)
         self.director_ai: DirectorAI = DirectorAI(
             difficulty_settings=self.configs["difficulty_scaling"].get(
                 str(player_difficulty)
@@ -74,6 +70,12 @@ class GameManager:
         self.wave_manager: Optional[WaveManager] = None
         self.grid: Optional[Grid] = None
         self.paths: List[List[Tuple[int, int]]] = []
+
+        # --- NEW: Store global modifiers ---
+        # This dictionary holds all modifications from permanent workshop upgrades.
+        # It is fetched once at the start of a game and used to modify game state
+        # and new tower instances without altering the base configuration files.
+        self.global_modifiers = self.progression_manager.get_global_upgrade_modifiers()
 
         self.enemies: Dict[uuid.UUID, Enemy] = {}
         self.towers: Dict[uuid.UUID, Tower] = {}
@@ -99,9 +101,17 @@ class GameManager:
             self.game_state.end_game()
             return
 
-        player_difficulty = self.game_settings.get(
-            "difficulty", 1
-        )  # --- FIX: Access from class attribute ---
+        # --- MODIFIED: Apply game state modifiers from global upgrades ---
+        # This ensures that bonuses like starting gold and HP are added to the
+        # fresh GameState object for this specific game session.
+        game_state_mods = self.global_modifiers.get("game_state_mods", {})
+        self.game_state.gold += game_state_mods.get("gold", 0)
+        self.game_state.base_hp += game_state_mods.get("base_hp", 0)
+        logger.info(
+            f"Applied global modifiers. New state: Gold={self.game_state.gold}, HP={self.game_state.base_hp}"
+        )
+
+        player_difficulty = self.game_settings.get("difficulty", 1)
         level_difficulty = gen_params.get("level_difficulty", 1)
         self.wave_manager = WaveManager(
             difficulty_config=self.configs["difficulty_scaling"],
@@ -123,15 +133,9 @@ class GameManager:
         according to their definition order in the configuration file. This
         fixes both the instant unlock and incorrect sorting bugs.
         """
-        # --- FIX (Step 1.2): Get unlocked towers from player save data ---
         player_data = self.progression_manager.get_player_data()
         unlocked_set = player_data.unlocked_towers
-
-        # Get all tower IDs in the order they are defined in tower_types.json
-        # In modern Python (3.7+), dict keys maintain insertion order.
         all_tower_ids_in_order = self.configs.get("tower_types", {}).keys()
-
-        # Filter this ordered list to include only the ones the player has unlocked.
         buildable_towers = [
             tower_id for tower_id in all_tower_ids_in_order if tower_id in unlocked_set
         ]
@@ -144,9 +148,7 @@ class GameManager:
         """
         logger.info(f"Game session ended. Victory: {victory}")
         waves_cleared = self.game_state.current_wave_number
-
         player_data = self.progression_manager.get_player_data()
-
         shards_per_wave = 5
         victory_bonus = 100 if victory else 0
         total_shards_earned = (waves_cleared * shards_per_wave) + victory_bonus
@@ -340,6 +342,14 @@ class GameManager:
         if not self.game_state.spend_gold(tower_data.get("cost", 9999)):
             return False
 
+        # --- MODIFIED: Pass tower-specific modifiers to the Tower constructor ---
+        # This is the second half of the mutable config fix. We retrieve the
+        # specific modifiers for this tower type and pass them along. The Tower
+        # class will now be responsible for applying them.
+        tower_mods = self.global_modifiers.get("tower_stat_mods", {}).get(
+            tower_type_id, {}
+        )
+
         new_tower = Tower(
             x=tile_x * self.tile_size + self.tile_size / 2,
             y=tile_y * self.tile_size + self.tile_size / 2,
@@ -347,6 +357,7 @@ class GameManager:
             tower_type_id=tower_type_id,
             tower_type_data=tower_data,
             status_effects_config=self.configs.get("status_effects", {}),
+            global_mods=tower_mods,  # Pass the modifiers here
         )
 
         self.towers[new_tower.entity_id] = new_tower
