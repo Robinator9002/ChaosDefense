@@ -110,6 +110,13 @@ class GameManager:
         )
         logger.info("--- Game Manager setup complete ---")
 
+    def get_buildable_towers(self) -> List[str]:
+        """
+        Retrieves a list of all buildable tower IDs from the game configuration.
+        This method is needed by the UIManager to populate tower buttons.
+        """
+        return list(self.configs.get("tower_types", {}).keys())
+
     def end_game_session(self, victory: bool):
         """
         Calculates and awards meta-currency and unlocks the next level upon

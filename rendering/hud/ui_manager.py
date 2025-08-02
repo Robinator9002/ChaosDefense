@@ -80,8 +80,9 @@ class UIManager:
 
         # Get all tower types that can be built
         buildable_tower_ids = self.game_manager.get_buildable_towers()
-        all_tower_configs = self.game_manager.all_configs.get("tower_types", {})
-        targeting_ai_config = self.game_manager.all_configs.get("targeting_ai", {})
+        # --- FIX: Use self.game_manager.configs instead of .all_configs ---
+        all_tower_configs = self.game_manager.configs.get("tower_types", {})
+        targeting_ai_config = self.game_manager.configs.get("targeting_ai", {})
 
         # Categorize towers for tabs
         categories = sorted(
@@ -173,11 +174,11 @@ class UIManager:
             self.upgrade_panel = UpgradePanel(
                 panel_rect,
                 tower,
-                self.game_manager.all_configs["tower_types"].get(tower.tower_type_id),
+                self.game_manager.configs["tower_types"].get(tower.tower_type_id),
                 self.game_manager.upgrade_manager,
                 self.game_manager.game_state,
                 self.game_manager.game_settings.get("salvage_refund_percentage", 0.5),
-                self.game_manager.all_configs.get("targeting_ai", {}),
+                self.game_manager.configs.get("targeting_ai", {}),
                 self.ui_theme,
                 self.font_manager,
             )
@@ -191,8 +192,8 @@ class UIManager:
         """Opens the persona selection modal."""
         if self.upgrade_panel and self.upgrade_panel.tower:
             tower = self.upgrade_panel.tower
-            all_personas = self.game_manager.all_configs.get("targeting_ai", {})
-            eligible_personas = tower.ai_config.get("available_personas", [])
+            all_personas = self.game_manager.configs.get("targeting_ai", {})
+            eligible_personas = tower.get_eligible_personas(all_personas)
             active_persona = tower.current_persona
             self.persona_panel = PersonaSelectionPanel(
                 self.screen_rect,
@@ -210,7 +211,9 @@ class UIManager:
     def _change_persona(self, persona_id: str):
         """Changes the persona for the selected tower."""
         if self.upgrade_panel and self.upgrade_panel.tower:
-            self.upgrade_panel.tower.current_persona = persona_id
+            self.game_manager.change_tower_persona(
+                self.upgrade_panel.tower.entity_id, persona_id
+            )
             self._close_persona_panel()
 
     def on_resize(self, new_screen_rect: pygame.Rect):
@@ -245,11 +248,11 @@ class UIManager:
                 if action.type == ActionType.CLOSE_PANEL:
                     self._close_panel()
                 elif action.type == ActionType.SALVAGE_TOWER:
-                    self.game_manager.sell_tower(self.upgrade_panel.tower.id)
+                    self.game_manager.salvage_tower(self.upgrade_panel.tower.entity_id)
                     self._close_panel()
                 elif action.type == ActionType.PURCHASE_UPGRADE:
-                    self.game_manager.purchase_upgrade(
-                        self.upgrade_panel.tower.id, action.entity_id
+                    self.game_manager.purchase_tower_upgrade(
+                        self.upgrade_panel.tower.entity_id, action.entity_id
                     )
                     self.upgrade_panel.rebuild_layout()
                 elif action.type == ActionType.OPEN_PERSONA_PANEL:
@@ -281,8 +284,8 @@ class UIManager:
             action = button.handle_event(event, game_state)
             if action:
                 if action.type == ActionType.SELECT_TOWER:
-                    game_state.set_selected_tower_to_build(action.entity_id)
-                    tower_data = self.game_manager.all_configs["tower_types"].get(
+                    game_state.selected_tower_to_build = action.entity_id
+                    tower_data = self.game_manager.configs["tower_types"].get(
                         action.entity_id
                     )
                     # Open the info panel for the selected tower type
@@ -298,7 +301,7 @@ class UIManager:
                     self.info_panel = TowerInfoPanel(
                         panel_rect,
                         tower_data,
-                        self.game_manager.all_configs.get("targeting_ai", {}),
+                        self.game_manager.configs.get("targeting_ai", {}),
                         self.ui_theme,
                         self.font_manager,
                     )
