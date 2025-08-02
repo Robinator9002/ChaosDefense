@@ -29,24 +29,18 @@ class GameState:
     base_hp: int = 20
     current_wave_number: int = 0
     game_over: bool = False
+    # --- NEW: Victory flag ---
+    # This flag is set to True when the player successfully clears all waves.
+    victory: bool = False
 
     # --- Player Intent and Selection State ---
-    # Stores the ID of the tower type selected from the build UI.
-    # e.g., "turret", "cannon". This is used when placing a new tower.
     selected_tower_to_build: Optional[str] = None
-
-    # Stores the unique ID of an entity the player has selected on the map.
-    # This is now CRITICAL for the upgrade system. When the player clicks on a
-    # placed tower, its entity_id will be stored here. The UI will monitor
-    # this field to know when to display the UpgradePanel for that tower.
     selected_entity_id: Optional[uuid.UUID] = None
 
     # --- Level Data ---
-    # This will hold the generated level grid object.
     level_grid: Optional["Grid"] = None
 
     # --- Miscellaneous State ---
-    # A general-purpose dictionary for flags or other dynamic state if needed.
     flags: dict = field(default_factory=dict)
 
     def __post_init__(self):
