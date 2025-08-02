@@ -175,6 +175,20 @@ class UIManager:
             )
             self.tower_buttons.append(button)
 
+    # --- FIX (Step 1.4): Add the missing method for hotkey category selection ---
+    def set_active_category_by_index(self, index: int):
+        """
+        Sets the active tab based on a hotkey index and rebuilds the tower buttons.
+        This method is called by the InputHandler to handle F-key presses.
+        """
+        if index < 0 or index >= len(self.tab_buttons):
+            logger.warning(f"Hotkey index {index} is out of range. Ignoring.")
+            return
+
+        self.active_tab = self.tab_buttons[index].category_name
+        self._rebuild_tower_buttons()
+        logger.info(f"Active category changed to: {self.active_tab}")
+
     def _open_upgrade_panel(self, tower_id: str):
         """Opens the upgrade panel for a selected tower."""
         tower = self.game_manager.towers.get(tower_id)
@@ -322,6 +336,23 @@ class UIManager:
                         self.font_manager,
                     )
                 return True
+
+        # --- FIX (Step 2.3): Logic to open upgrade panel when a placed tower is selected ---
+        # We need to detect if the selected entity ID in the game state changes.
+        # This is a better place to handle this than in the event loop itself.
+        if game_state.selected_entity_id:
+            # Only open the panel if a new tower has been selected, and no other panel is open.
+            if (
+                not self.upgrade_panel
+                or self.upgrade_panel.tower.entity_id != game_state.selected_entity_id
+            ):
+                self._open_upgrade_panel(str(game_state.selected_entity_id))
+
+        # If the player has cleared their selection, close any open panels.
+        elif not game_state.selected_entity_id and (
+            self.upgrade_panel or self.info_panel
+        ):
+            self._close_panel()
 
         return False
 
