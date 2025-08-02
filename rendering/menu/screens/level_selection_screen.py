@@ -1,4 +1,4 @@
-# rendering/menu/level_selection_screen.py
+# rendering/menu/screens/level_selection_screen.py
 import pygame
 import logging
 from typing import List, Dict, Any, Callable, Set
