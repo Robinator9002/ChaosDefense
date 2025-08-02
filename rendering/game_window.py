@@ -90,10 +90,13 @@ class Game:
         """
         logger.info(f"--- Starting New Game on level: {level_id} ---")
 
+        # --- MODIFIED: Removed obsolete call to apply_global_upgrades ---
+        # The GameManager's __init__ method now handles the application of
+        # global modifiers internally. This call was causing the crash and
+        # is no longer necessary with the new architecture.
         self.game_manager = GameManager(
             self.all_configs, self.progression_manager, level_id
         )
-        self.progression_manager.apply_global_upgrades(self.game_manager)
 
         self.ui_manager = UIManager(
             screen_rect=self.screen.get_rect(),
@@ -294,7 +297,6 @@ class Game:
         panel_rect = pygame.Rect(5, 5, panel_width, panel_height)
 
         panel_surf = pygame.Surface(panel_rect.size, pygame.SRCALPHA)
-        # --- FIX: Convert the list from the theme to a tuple before concatenation ---
         bg_color_list = colors.get("panel_primary", [0, 0, 0])
         panel_surf.fill(tuple(bg_color_list) + (200,))
         self.screen.blit(panel_surf, panel_rect.topleft)
