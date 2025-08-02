@@ -9,8 +9,6 @@ from game_logic.game_manager import GameManager
 from rendering.sprite_renderer import SpriteRenderer
 from rendering.hud.ui_manager import UIManager
 from rendering.menu.menu_manager import MenuManager
-
-# --- NEW: Import the refactored components ---
 from rendering.game.camera import Camera
 from rendering.game.input_handler import InputHandler
 
@@ -23,17 +21,13 @@ logger = logging.getLogger(__name__)
 class GameState(Enum):
     MAIN_MENU = auto()
     IN_GAME = auto()
-    GAME_OVER = auto()
+    # GAME_OVER state is now handled by a transition back to the menu
 
 
 class Game:
     """
-    The main window and application class for the game.
-
-    REFACTORED: This class is now a high-level state machine and orchestrator.
-    It delegates all complex in-game tasks like camera control and input
-    processing to specialized manager classes, keeping its own logic clean
-    and focused on the main application loop.
+    The main window and application class for the game. It acts as a high-level
+    state machine, orchestrating all of its specialized manager classes.
     """
 
     def __init__(
@@ -69,34 +63,39 @@ class Game:
         # --- High-Level Managers ---
         self.menu_manager = MenuManager(
             screen_rect=self.screen.get_rect(),
-            new_game_callback=self._start_new_game,
+            progression_manager=self.progression_manager,
+            all_configs=self.all_configs,
+            start_level_callback=self._start_new_game,
             quit_callback=self._quit_game,
         )
         # In-game managers are initialized lazily.
         self.game_manager: Optional[GameManager] = None
         self.ui_manager: Optional[UIManager] = None
         self.sprite_renderer: Optional[SpriteRenderer] = None
-        # --- NEW: In-game sub-managers ---
         self.camera: Optional[Camera] = None
         self.input_handler: Optional[InputHandler] = None
 
         self.background_color = (15, 20, 25)
         self.gui_font = pygame.font.SysFont("segoeui", 22, bold=True)
 
-    def _start_new_game(self):
+    def _start_new_game(self, level_id: str):
         """
-        Initializes all components for a new game session and switches state.
+        Initializes all components for a new game session on a specific level.
         """
-        logger.info("--- Starting New Game ---")
+        logger.info(f"--- Starting New Game on level: {level_id} ---")
 
-        # --- Initialize Core Logic and UI ---
-        self.game_manager = GameManager(self.all_configs)
+        self.game_manager = GameManager(
+            self.all_configs, self.progression_manager, level_id
+        )
         self.progression_manager.apply_global_upgrades(self.game_manager)
+
         self.ui_manager = UIManager(
-            self.screen.get_rect(), self.game_manager, self.assets_path
+            screen_rect=self.screen.get_rect(),
+            game_manager=self.game_manager,
+            progression_manager=self.progression_manager,
+            assets_path=self.assets_path,
         )
 
-        # --- NEW: Initialize Game Sub-Systems ---
         self.camera = Camera(self.screen_width, self.screen_height)
         self.input_handler = InputHandler(
             game_manager=self.game_manager,
@@ -104,11 +103,29 @@ class Game:
             camera=self.camera,
         )
 
-        # --- Initialize Rendering (depends on game logic) ---
         self._setup_rendering()
-
-        # --- Final State Change ---
         self.game_state = GameState.IN_GAME
+
+    def _return_to_main_menu(self):
+        """
+        Handles the transition from an ended game back to the main menu,
+        cleaning up all in-game objects.
+        """
+        logger.info("Returning to main menu.")
+        # Unload all game-specific objects to free memory and ensure a clean state
+        self.game_manager = None
+        self.ui_manager = None
+        self.sprite_renderer = None
+        self.camera = None
+        self.input_handler = None
+
+        # Reset background color for the menu
+        self.background_color = (15, 20, 25)
+
+        # Rebuild the menu to reflect any new unlocks
+        self.menu_manager._build_main_menu()
+
+        self.game_state = GameState.MAIN_MENU
 
     def _quit_game(self):
         """Sets the running flag to false to exit the main game loop."""
@@ -127,14 +144,9 @@ class Game:
             self.running = False
             return
 
-        style_config = {}
-        for style in self.game_manager.level_manager.level_styles.values():
-            if isinstance(style, dict):
-                gen_params = style.get("generation_params", {})
-                if gen_params.get("grid_width") == grid.width:
-                    style_config = style
-                    break
-
+        style_config = self.game_manager.level_manager.level_styles.get(
+            self.game_manager.current_level_id, {}
+        )
         self.background_color = style_config.get("background_color", (10, 10, 10))
         tile_definitions = style_config.get("tile_definitions", {})
 
@@ -145,7 +157,6 @@ class Game:
             assets_path=self.assets_path,
         )
 
-        # --- NEW: Connect camera to the map ---
         self.camera.set_map_renderer(self.sprite_renderer)
         logger.info("--- Rendering Setup Complete ---")
 
@@ -180,7 +191,6 @@ class Game:
                 ):
                     continue
 
-                # Event Priority: 1. UI, 2. Camera, 3. Game World
                 ui_handled = self.ui_manager.handle_event(
                     event, self.game_manager.game_state
                 )
@@ -197,6 +207,10 @@ class Game:
             self.ui_manager.screen_rect = self.screen.get_rect()
         if self.camera:
             self.camera.on_resize(event.w, event.h)
+        if self.menu_manager:
+            self.menu_manager.screen_rect = self.screen.get_rect()
+            # Rebuild layouts that depend on screen size
+            self.menu_manager._build_main_menu()
 
     def _update(self, dt: float):
         """Updates all systems based on the current game state."""
@@ -207,6 +221,12 @@ class Game:
             if self.game_manager and self.ui_manager:
                 self.game_manager.update(dt)
                 self.ui_manager.update(dt, self.game_manager.game_state)
+
+                # --- NEW: End-of-Game Detection ---
+                gs = self.game_manager.game_state
+                if gs.victory or gs.game_over:
+                    self.game_manager.end_game_session(victory=gs.victory)
+                    self._return_to_main_menu()
 
     def _draw(self):
         """Draws the entire game state to the screen."""
@@ -222,7 +242,6 @@ class Game:
                 and self.ui_manager
                 and self.camera
             ):
-                # Use camera's offset and zoom for all rendering
                 cam_offset = self.camera.offset
                 cam_zoom = self.camera.zoom
 

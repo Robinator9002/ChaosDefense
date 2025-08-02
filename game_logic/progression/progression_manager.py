@@ -68,6 +68,12 @@ class ProgressionManager:
         player_data = self.get_player_data()
 
         for tower_id, config in self.all_tower_configs.items():
+            # --- BUG FIX: Ensure the config value is a dictionary ---
+            # This gracefully skips any top-level keys in the JSON that are not
+            # tower definitions, such as comments (e.g., "//": "comment text").
+            if not isinstance(config, dict):
+                continue
+
             # Towers are considered unlockable if they have a 'unlock_cost' defined.
             if "unlock_cost" in config:
                 unlockable.append(
