@@ -10,7 +10,10 @@ from rendering.sprite_renderer import SpriteRenderer
 from rendering.hud.ui_manager import UIManager
 from rendering.menu.menu_manager import MenuManager
 
-# --- NEW: Import ProgressionManager for type hinting ---
+# --- NEW: Import the refactored components ---
+from rendering.game.camera import Camera
+from rendering.game.input_handler import InputHandler
+
 if TYPE_CHECKING:
     from game_logic.progression.progression_manager import ProgressionManager
 
@@ -23,19 +26,14 @@ class GameState(Enum):
     GAME_OVER = auto()
 
 
-MAX_ZOOM = 3.0
-MIN_ZOOM_CLAMP = 0.1
-ZOOM_INCREMENT = 0.07
-
-
 class Game:
     """
-    The main window and rendering engine for the game. This class is the
-    bridge between player input (mouse, keyboard), the game's logical state
-    (GameManager), and what is drawn to the screen.
+    The main window and application class for the game.
 
-    REFACTORED: This class now acts as a state machine, managing the flow
-    between the main menu and the game itself.
+    REFACTORED: This class is now a high-level state machine and orchestrator.
+    It delegates all complex in-game tasks like camera control and input
+    processing to specialized manager classes, keeping its own logic clean
+    and focused on the main application loop.
     """
 
     def __init__(
@@ -53,7 +51,6 @@ class Game:
         self.all_configs = all_configs
         self.game_settings = all_configs["game_settings"]
         self.assets_path = assets_path
-        # --- NEW: Store the progression manager ---
         self.progression_manager = progression_manager
 
         self.screen_width = self.game_settings.get("screen_width", 1280)
@@ -69,40 +66,48 @@ class Game:
 
         self.game_state = GameState.MAIN_MENU
 
+        # --- High-Level Managers ---
         self.menu_manager = MenuManager(
             screen_rect=self.screen.get_rect(),
             new_game_callback=self._start_new_game,
             quit_callback=self._quit_game,
         )
+        # In-game managers are initialized lazily.
         self.game_manager: Optional[GameManager] = None
         self.ui_manager: Optional[UIManager] = None
         self.sprite_renderer: Optional[SpriteRenderer] = None
+        # --- NEW: In-game sub-managers ---
+        self.camera: Optional[Camera] = None
+        self.input_handler: Optional[InputHandler] = None
 
         self.background_color = (15, 20, 25)
         self.gui_font = pygame.font.SysFont("segoeui", 22, bold=True)
-        self.tile_size = self.game_settings.get("tile_size", 32)
-        self.zoom = 1.0
-        self.min_zoom = MIN_ZOOM_CLAMP
-        self.camera_offset = pygame.Vector2(0, 0)
-        self.is_panning = False
-        self.pan_start_mouse_pos = pygame.Vector2(0, 0)
-        self.pan_start_camera_offset = pygame.Vector2(0, 0)
 
     def _start_new_game(self):
         """
-        Initializes all necessary components for a new game session and
-        switches the game state to IN_GAME.
+        Initializes all components for a new game session and switches state.
         """
         logger.info("--- Starting New Game ---")
+
+        # --- Initialize Core Logic and UI ---
         self.game_manager = GameManager(self.all_configs)
-
-        # --- NEW: Apply global upgrades before UI is built ---
         self.progression_manager.apply_global_upgrades(self.game_manager)
-
         self.ui_manager = UIManager(
             self.screen.get_rect(), self.game_manager, self.assets_path
         )
+
+        # --- NEW: Initialize Game Sub-Systems ---
+        self.camera = Camera(self.screen_width, self.screen_height)
+        self.input_handler = InputHandler(
+            game_manager=self.game_manager,
+            ui_manager=self.ui_manager,
+            camera=self.camera,
+        )
+
+        # --- Initialize Rendering (depends on game logic) ---
         self._setup_rendering()
+
+        # --- Final State Change ---
         self.game_state = GameState.IN_GAME
 
     def _quit_game(self):
@@ -110,10 +115,9 @@ class Game:
         self.running = False
 
     def _setup_rendering(self):
-        """Initializes rendering components based on the game logic's state."""
-        logger.info("--- Initializing Rendering Components ---")
-        if not self.game_manager:
-            logger.critical("Cannot setup rendering without a GameManager.")
+        """Initializes rendering components."""
+        if not self.game_manager or not self.camera:
+            logger.critical("Cannot setup rendering without GameManager and Camera.")
             self.running = False
             return
 
@@ -136,18 +140,17 @@ class Game:
 
         self.sprite_renderer = SpriteRenderer(
             grid=grid,
-            tile_size=self.tile_size,
+            tile_size=self.game_manager.tile_size,
             style_definitions=tile_definitions,
             assets_path=self.assets_path,
         )
 
-        self._calculate_min_zoom()
-        self.zoom = self.min_zoom
-        self._center_camera()
+        # --- NEW: Connect camera to the map ---
+        self.camera.set_map_renderer(self.sprite_renderer)
         logger.info("--- Rendering Setup Complete ---")
 
     def run(self):
-        """The main game loop, which now delegates to state-specific methods."""
+        """The main application loop."""
         while self.running:
             dt = self.clock.tick(60) / 1000.0
             self._handle_events()
@@ -162,33 +165,41 @@ class Game:
                 self.running = False
                 return
 
+            if event.type == pygame.VIDEORESIZE:
+                self._on_resize(event)
+
             if self.game_state == GameState.MAIN_MENU:
                 self.menu_manager.handle_event(event)
 
             elif self.game_state == GameState.IN_GAME:
-                if not self.ui_manager or not self.game_manager:
+                if (
+                    not self.ui_manager
+                    or not self.game_manager
+                    or not self.camera
+                    or not self.input_handler
+                ):
                     continue
 
-                ui_handled_event = self.ui_manager.handle_event(
+                # Event Priority: 1. UI, 2. Camera, 3. Game World
+                ui_handled = self.ui_manager.handle_event(
                     event, self.game_manager.game_state
                 )
+                if not ui_handled:
+                    camera_handled = self.camera.handle_event(event)
+                    if not camera_handled:
+                        self.input_handler.handle_event(event)
 
-                if not ui_handled_event:
-                    if event.type == pygame.VIDEORESIZE:
-                        self._on_resize(event)
-                    elif event.type == pygame.MOUSEBUTTONDOWN:
-                        self._handle_mouse_down(event)
-                    elif event.type == pygame.MOUSEBUTTONUP:
-                        if event.button == 2:
-                            self.is_panning = False
-                    elif event.type == pygame.MOUSEMOTION:
-                        if self.is_panning:
-                            self._handle_pan(event)
-                    elif event.type == pygame.KEYDOWN:
-                        self._handle_keyboard_input(event)
+    def _on_resize(self, event):
+        """Handles the window being resized."""
+        self.screen_width, self.screen_height = event.w, event.h
+        self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+        if self.ui_manager:
+            self.ui_manager.screen_rect = self.screen.get_rect()
+        if self.camera:
+            self.camera.on_resize(event.w, event.h)
 
     def _update(self, dt: float):
-        """Updates all game systems based on the current game state."""
+        """Updates all systems based on the current game state."""
         if self.game_state == GameState.MAIN_MENU:
             self.menu_manager.update(dt)
 
@@ -198,15 +209,24 @@ class Game:
                 self.ui_manager.update(dt, self.game_manager.game_state)
 
     def _draw(self):
-        """Draws the entire game state to the screen based on the current state."""
+        """Draws the entire game state to the screen."""
         self.screen.fill(self.background_color)
 
         if self.game_state == GameState.MAIN_MENU:
             self.menu_manager.draw(self.screen)
 
         elif self.game_state == GameState.IN_GAME:
-            if self.sprite_renderer and self.game_manager and self.ui_manager:
-                self.sprite_renderer.draw(self.screen, self.camera_offset, self.zoom)
+            if (
+                self.sprite_renderer
+                and self.game_manager
+                and self.ui_manager
+                and self.camera
+            ):
+                # Use camera's offset and zoom for all rendering
+                cam_offset = self.camera.offset
+                cam_zoom = self.camera.zoom
+
+                self.sprite_renderer.draw(self.screen, cam_offset, cam_zoom)
 
                 all_entities = (
                     list(self.game_manager.enemies.values())
@@ -214,139 +234,12 @@ class Game:
                     + list(self.game_manager.projectiles.values())
                 )
                 for entity in all_entities:
-                    entity.draw(self.screen, self.camera_offset, self.zoom)
+                    entity.draw(self.screen, cam_offset, cam_zoom)
 
                 self._draw_top_gui()
                 self.ui_manager.draw(self.screen, self.game_manager.game_state)
 
         pygame.display.flip()
-
-    def _handle_mouse_down(self, event):
-        """Handles all mouse down events, routing them based on the button."""
-        if not self.game_manager:
-            return
-
-        if event.button == 1:
-            self._handle_map_click(event)
-        elif event.button == 2:
-            self.is_panning = True
-            self.pan_start_mouse_pos = pygame.Vector2(event.pos)
-            self.pan_start_camera_offset = self.camera_offset.copy()
-        elif event.button == 3:
-            game_state = self.game_manager.game_state
-            if game_state.selected_tower_to_build or game_state.selected_entity_id:
-                game_state.clear_selection()
-        elif event.button == 4:
-            self.zoom = min(self.zoom + ZOOM_INCREMENT, MAX_ZOOM)
-            self._clamp_camera_offset()
-        elif event.button == 5:
-            self.zoom = max(self.zoom - ZOOM_INCREMENT, self.min_zoom)
-            self._clamp_camera_offset()
-
-    def _handle_keyboard_input(self, event: pygame.event.Event):
-        """Handles all keyboard presses, routing them to the appropriate system."""
-        if not self.ui_manager or not self.game_manager:
-            return
-
-        mods = pygame.key.get_mods()
-        is_ctrl_pressed = mods & pygame.KMOD_CTRL
-
-        if event.key == pygame.K_TAB and is_ctrl_pressed:
-            self.ui_manager.cycle_category()
-            return
-
-        if event.key == pygame.K_TAB and not is_ctrl_pressed:
-            self.ui_manager.cycle_tower_selection(self.game_manager.game_state)
-            return
-
-        f_key_map = {
-            pygame.K_F1: 0,
-            pygame.K_F2: 1,
-            pygame.K_F3: 2,
-            pygame.K_F4: 3,
-            pygame.K_F5: 4,
-            pygame.K_F6: 5,
-            pygame.K_F7: 6,
-            pygame.K_F8: 7,
-            pygame.K_F9: 8,
-            pygame.K_F10: 9,
-        }
-        if event.key in f_key_map:
-            self.ui_manager.set_active_category_by_index(f_key_map[event.key])
-            return
-
-        num_key_map = {
-            pygame.K_1: 0,
-            pygame.K_2: 1,
-            pygame.K_3: 2,
-            pygame.K_4: 3,
-            pygame.K_5: 4,
-            pygame.K_6: 5,
-            pygame.K_7: 6,
-            pygame.K_8: 7,
-            pygame.K_9: 8,
-            pygame.K_0: 9,
-        }
-        if is_ctrl_pressed and event.key in num_key_map:
-            self.ui_manager.set_active_category_by_index(num_key_map[event.key])
-            return
-
-        if not is_ctrl_pressed and event.key in num_key_map:
-            hotkey_index = num_key_map[event.key]
-            if 0 <= hotkey_index < len(self.ui_manager.hotkey_map):
-                tower_id = self.ui_manager.hotkey_map[hotkey_index]
-                game_state = self.game_manager.game_state
-                if game_state.selected_tower_to_build == tower_id:
-                    game_state.clear_selection()
-                else:
-                    game_state.selected_tower_to_build = tower_id
-                    logger.info(
-                        f"Player selected '{tower_id}' via hotkey {hotkey_index + 1}."
-                    )
-
-    def _handle_map_click(self, event):
-        """Handles left-clicks that occur on the game map (not the UI)."""
-        if not self.game_manager:
-            return
-
-        game_state = self.game_manager.game_state
-        if game_state.selected_tower_to_build:
-            world_pos = self._screen_to_world(pygame.Vector2(event.pos))
-            tile_x = int(world_pos.x // self.tile_size)
-            tile_y = int(world_pos.y // self.tile_size)
-            self.game_manager.place_tower(
-                game_state.selected_tower_to_build, tile_x, tile_y
-            )
-            return
-
-        world_pos = self._screen_to_world(pygame.Vector2(event.pos))
-        clicked_on_tower = False
-        for tower in self.game_manager.towers.values():
-            if tower.rect.collidepoint(world_pos):
-                if game_state.selected_entity_id == tower.entity_id:
-                    game_state.clear_selection()
-                else:
-                    game_state.selected_entity_id = tower.entity_id
-                clicked_on_tower = True
-                break
-
-        if not clicked_on_tower:
-            game_state.clear_selection()
-
-    def _handle_pan(self, event):
-        """Handles camera movement when panning."""
-        mouse_delta = pygame.Vector2(event.pos) - self.pan_start_mouse_pos
-        self.camera_offset = self.pan_start_camera_offset + mouse_delta
-        self._clamp_camera_offset()
-
-    def _on_resize(self, event):
-        """Handles the window being resized."""
-        self.screen_width, self.screen_height = event.w, event.h
-        self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
-        if self.ui_manager:
-            self.ui_manager.screen_rect = self.screen.get_rect()
-        self._calculate_min_zoom()
-        self._clamp_camera_offset()
 
     def _draw_top_gui(self):
         """Draws the static user interface elements like gold, hp, and wave count."""
@@ -378,50 +271,3 @@ class Game:
         for surf in surfaces:
             self.screen.blit(surf, (current_x, y_pos))
             current_x += surf.get_width() + padding
-
-    def _screen_to_world(self, screen_pos: pygame.Vector2) -> pygame.Vector2:
-        """Converts screen coordinates to world (map) coordinates."""
-        return (screen_pos - self.camera_offset) / self.zoom
-
-    def _calculate_min_zoom(self):
-        """Calculates the minimum zoom level to fit the whole map on screen."""
-        if not self.sprite_renderer:
-            return
-        map_w = self.sprite_renderer.map_surface.get_width()
-        map_h = self.sprite_renderer.map_surface.get_height()
-        if map_w > 0 and map_h > 0:
-            self.min_zoom = max(
-                MIN_ZOOM_CLAMP,
-                min(self.screen_width / map_w, self.screen_height / map_h),
-            )
-
-    def _center_camera(self):
-        """Centers the camera on the map."""
-        if not self.sprite_renderer:
-            return
-        map_w = self.sprite_renderer.map_surface.get_width() * self.zoom
-        map_h = self.sprite_renderer.map_surface.get_height() * self.zoom
-        self.camera_offset.x = (self.screen_width - map_w) / 2
-        self.camera_offset.y = (self.screen_height - map_h) / 2
-        self._clamp_camera_offset()
-
-    def _clamp_camera_offset(self):
-        """Prevents the camera from panning off the edge of the map."""
-        if not self.sprite_renderer:
-            return
-        map_w, map_h = (
-            self.sprite_renderer.map_surface.get_width() * self.zoom,
-            self.sprite_renderer.map_surface.get_height() * self.zoom,
-        )
-        max_x, min_x = 0, self.screen_width - map_w
-        max_y, min_y = 0, self.screen_height - map_h
-        self.camera_offset.x = (
-            max(min_x, min(self.camera_offset.x, max_x))
-            if map_w > self.screen_width
-            else (self.screen_width - map_w) / 2
-        )
-        self.camera_offset.y = (
-            max(min_y, min(self.camera_offset.y, max_y))
-            if map_h > self.screen_height
-            else (self.screen_height - map_h) / 2
-        )
