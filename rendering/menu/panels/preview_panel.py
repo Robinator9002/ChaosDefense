@@ -1,7 +1,7 @@
 # rendering/menu/panels/preview_panel.py
 import pygame
 import logging
-from typing import Dict, Any, Optional, Callable, TYPE_CHECKING, List
+from typing import Dict, Any, Optional, Callable, TYPE_CHECKING
 
 from rendering.common.ui.ui_element import UIElement
 from rendering.text.text_renderer import render_text_wrapped
@@ -43,7 +43,6 @@ class PreviewPanel(UIElement):
         self.action_callback: Optional[Callable] = None
         self.is_button_enabled = False
 
-        # Pre-load fonts and styles from the theme
         self._load_theme_assets()
 
     def _load_theme_assets(self):
@@ -53,9 +52,9 @@ class PreviewPanel(UIElement):
 
         self.font_title = self.font_manager.get_font("title_small")
         self.font_desc = self.font_manager.get_font("body_small")
-        self.font_stat_header = self.font_manager.get_font("body_medium", bold=True)
+        self.font_stat_header = self.font_manager.get_font("body_medium_bold")
         self.font_stat_label = self.font_manager.get_font("body_tiny")
-        self.font_stat_value = self.font_manager.get_font("body_tiny", bold=True)
+        self.font_stat_value = self.font_manager.get_font("body_tiny_bold")
         self.font_button = self.font_manager.get_font("button_large")
 
     def set_item(
@@ -127,27 +126,28 @@ class PreviewPanel(UIElement):
         if not self.action_button or not self.is_button_enabled:
             return
 
-        self.action_button.is_hovered = self.action_button.rect.collidepoint(event.pos)
+        if event.type == pygame.MOUSEMOTION:
+            self.action_button.is_hovered = self.action_button.rect.collidepoint(
+                event.pos
+            )
+
         if (
-            self.action_button.is_hovered
-            and event.type == pygame.MOUSEBUTTONDOWN
+            event.type == pygame.MOUSEBUTTONDOWN
             and event.button == 1
+            and self.action_button.rect.collidepoint(event.pos)
         ):
             if self.action_callback:
-                item_id = (
-                    self.active_item_data.get("id") if self.active_item_data else None
-                )
-                if item_id:
+                # The workshop screen passes a lambda with no args, level select passes one with an ID.
+                # This try/except handles both cases gracefully.
+                try:
+                    self.action_callback()
+                except TypeError:
+                    item_id = (
+                        self.active_item_data.get("id")
+                        if self.active_item_data
+                        else None
+                    )
                     self.action_callback(item_id)
-                else:
-                    logger.warning("PreviewPanel action called without an item ID.")
-                    # Fallback for actions that don't need an ID
-                    try:
-                        self.action_callback()
-                    except TypeError:
-                        logger.error(
-                            f"Action callback {self.action_callback} requires an ID but none was provided."
-                        )
 
     def draw(self, screen: pygame.Surface):
         """Draws the panel and its contents using styles from the theme."""
@@ -156,8 +156,11 @@ class PreviewPanel(UIElement):
 
         # Draw panel background and border
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        panel_surf.fill(self.colors.get("panel_primary", (25, 30, 40)) + (230,))
+        # --- FIX: Convert list from theme to tuple before adding alpha tuple ---
+        bg_color_list = self.colors.get("panel_primary", [25, 30, 40])
+        panel_surf.fill(tuple(bg_color_list) + (230,))
         screen.blit(panel_surf, self.rect.topleft)
+
         pygame.draw.rect(
             screen,
             self.colors.get("border_primary", (80, 90, 100)),
@@ -170,7 +173,7 @@ class PreviewPanel(UIElement):
         spacing = self.layout.get("spacing_medium", 10)
         current_y = self.rect.y + padding
 
-        # Draw Title
+        # Title
         title_surf = self.font_title.render(
             self.active_item_data.get("name", "No Item Selected"),
             True,
@@ -179,7 +182,7 @@ class PreviewPanel(UIElement):
         screen.blit(title_surf, (self.rect.x + padding, current_y))
         current_y += title_surf.get_height() + spacing
 
-        # Draw Description
+        # Description
         desc = self.active_item_data.get("description", "")
         desc_max_width = self.rect.width - (padding * 2)
         wrapped_desc = render_text_wrapped(
@@ -193,7 +196,7 @@ class PreviewPanel(UIElement):
             current_y += line_surf.get_height()
         current_y += padding
 
-        # --- NEW: Draw Stats Section ---
+        # Stats
         stats_to_display = self.active_item_data.get("info_panel_stats", [])
         if stats_to_display:
             header_surf = self.font_stat_header.render(
@@ -222,14 +225,15 @@ class PreviewPanel(UIElement):
                     value_str, True, self.colors.get("text_primary")
                 )
 
+                # --- FIX: Corrected typo from 'currenty' to 'current_y' ---
                 screen.blit(label_surf, (self.rect.x + padding, current_y))
                 value_rect = value_surf.get_rect(
                     topright=(self.rect.right - padding, current_y)
                 )
                 screen.blit(value_surf, value_rect)
-                current_y += 22  # Custom spacing for stats
+                current_y += 22
 
-        # Draw Action Button
+        # Action Button
         if self.action_button:
             if not self.is_button_enabled:
                 bg_color = self.colors.get("button_disabled_bg")

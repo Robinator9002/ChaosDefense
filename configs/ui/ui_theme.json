@@ -40,6 +40,11 @@
       "body_small": { "size": 16, "style": [] },
       "body_tiny": { "size": 14, "style": [] },
 
+      "//": "--- NEW: Added explicit bold variants for use in panels ---",
+      "body_medium_bold": { "size": 18, "style": ["bold"] },
+      "body_small_bold": { "size": 16, "style": ["bold"] },
+      "body_tiny_bold": { "size": 14, "style": ["bold"] },
+
       "button_large": { "size": 24, "style": ["bold"] },
       "button_medium": { "size": 18, "style": ["bold"] }
     }
@@ -60,6 +65,7 @@
     "border_width_standard": 2,
     "border_width_selected": 3,
 
-    "scrollbar_width": 10
+    "scrollbar_width": 10,
+    "hud_panel_height": 80
   }
 }

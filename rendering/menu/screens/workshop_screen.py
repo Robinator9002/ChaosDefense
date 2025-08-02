@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 class WorkshopButton(UIElement):
     """
     A generic button for the Workshop screen, used for category filters.
-    REFACTORED: Now fully theme-driven.
     """
 
     def __init__(
@@ -39,6 +38,8 @@ class WorkshopButton(UIElement):
         self.font = font_manager.get_font("button_medium")
 
     def handle_event(self, event: pygame.event.Event):
+        if event.type == pygame.MOUSEMOTION:
+            self.is_hovered = self.rect.collidepoint(event.pos)
         if (
             self.is_hovered
             and event.type == pygame.MOUSEBUTTONDOWN
@@ -51,7 +52,7 @@ class WorkshopButton(UIElement):
         if self.is_active:
             bg_color = self.colors.get("panel_interactive_hover")
             text_color = self.colors.get("text_primary")
-            border_color = self.colors.get("border_interactive_selected")
+            border_color = self.colors.get("border_accent")
         else:
             bg_color = (
                 self.colors.get("panel_interactive_hover")
@@ -73,7 +74,6 @@ class WorkshopButton(UIElement):
 class TowerUnlockButton(UIElement):
     """
     A UI element for unlocking a new tower in The Workshop.
-    REFACTORED: Redesigned with theme-driven styles for better visual clarity.
     """
 
     def __init__(
@@ -91,10 +91,10 @@ class TowerUnlockButton(UIElement):
 
         self.colors = ui_theme.get("colors", {})
         self.layout = ui_theme.get("layout", {})
-        self.font_name = font_manager.get_font("body_medium", bold=True)
-        self.font_cost = font_manager.get_font("body_medium", bold=True)
+        self.font_name = font_manager.get_font("body_medium_bold")
+        self.font_cost = font_manager.get_font("body_medium_bold")
         self.font_stat_label = font_manager.get_font("body_tiny")
-        self.font_stat_value = font_manager.get_font("body_tiny", bold=True)
+        self.font_stat_value = font_manager.get_font("body_tiny_bold")
 
         self._prepare_stat_surfaces()
 
@@ -181,7 +181,6 @@ class TowerUnlockButton(UIElement):
 class WorkshopScreen:
     """
     Manages The Workshop UI.
-    REFACTORED: Now fully theme-driven and correctly initializes child components.
     """
 
     def __init__(
@@ -318,13 +317,13 @@ class WorkshopScreen:
             self.set_filter(self.active_filter)
 
     def handle_event(self, event: pygame.event.Event):
+        # --- FIX: Restructured event handling for clarity and correctness ---
         mouse_pos = pygame.mouse.get_pos()
-        self.grid.handle_scroll_event(event)
-        self.preview_panel.handle_event(event)
 
+        # 1. Always update hover states for all elements based on current mouse position
         for btn in self.filter_buttons:
             btn.is_hovered = btn.rect.collidepoint(mouse_pos)
-            btn.handle_event(event)
+        self.back_button.is_hovered = self.back_button.rect.collidepoint(mouse_pos)
 
         hovered_button = None
         for i, button in enumerate(self.tower_buttons):
@@ -338,30 +337,38 @@ class WorkshopScreen:
             else:
                 button.is_hovered = False
 
-        if hovered_button and hovered_button != self.selected_tower:
-            self.selected_tower = hovered_button
-            for btn in self.tower_buttons:
-                btn.is_selected = btn == self.selected_tower
-            can_afford = (
-                self.progression_manager.get_player_data().meta_currency
-                >= self.selected_tower.tower_info["cost"]
-            )
-            self.preview_panel.set_item(
-                item_data=self.selected_tower.tower_info,
-                button_text=f"Unlock ({self.selected_tower.tower_info['cost']} CS)",
-                button_action=lambda: self._purchase_tower(
-                    self.selected_tower.tower_info["id"]
-                ),
-                is_button_enabled=not self.selected_tower.is_unlocked and can_afford,
-            )
+        # 2. Delegate events to child components that need to manage their own state
+        self.grid.handle_scroll_event(event)
+        self.preview_panel.handle_event(event)
 
-        self.back_button.is_hovered = self.back_button.rect.collidepoint(mouse_pos)
-        if (
-            self.back_button.is_hovered
-            and event.type == pygame.MOUSEBUTTONDOWN
-            and event.button == 1
-        ):
-            self.back_callback()
+        for btn in self.filter_buttons:
+            btn.handle_event(event)
+
+        # 3. Handle primary actions (clicks) for this screen
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.back_button.is_hovered:
+                self.back_callback()
+                return  # Event handled
+
+            # --- FIX: Added click detection for tower buttons to set the selection ---
+            if hovered_button:
+                self.selected_tower = hovered_button
+                for btn in self.tower_buttons:
+                    btn.is_selected = btn == self.selected_tower
+
+                can_afford = (
+                    self.progression_manager.get_player_data().meta_currency
+                    >= self.selected_tower.tower_info["cost"]
+                )
+                self.preview_panel.set_item(
+                    item_data=self.selected_tower.tower_info,
+                    button_text=f"Unlock ({self.selected_tower.tower_info['cost']} CS)",
+                    button_action=lambda: self._purchase_tower(
+                        self.selected_tower.tower_info["id"]
+                    ),
+                    is_button_enabled=not self.selected_tower.is_unlocked
+                    and can_afford,
+                )
 
     def draw(self, screen: pygame.Surface):
         title_surf = self.font_title.render(
