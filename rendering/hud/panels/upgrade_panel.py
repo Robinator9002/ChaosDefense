@@ -1,12 +1,14 @@
 # rendering/hud/panels/upgrade_panel.py
 import pygame
 import logging
-from typing import Optional, List, TYPE_CHECKING, Dict, Any
+from typing import Optional, List, TYPE_CHECKING, Dict, Any, Tuple
 
 from rendering.common.ui.ui_element import UIElement
 from ..buttons.upgrade_button import UpgradeButton
 from rendering.common.ui.ui_action import UIAction, ActionType
-from rendering.common.panels.panel_utils import get_nested_value, format_stat_value
+
+# --- MODIFIED: Removed unused 'get_nested_value' import ---
+from rendering.common.panels.panel_utils import format_stat_value
 
 if TYPE_CHECKING:
     from game_logic.entities.tower import Tower
@@ -95,35 +97,28 @@ class UpgradePanel(UIElement):
         spacing = self.layout.get("spacing_medium", 10)
         current_y = self.rect.y + padding
 
-        # Close button
         self.close_button_rect = pygame.Rect(
             self.rect.right - 28, self.rect.y + 8, 20, 20
         )
-
-        # Title and Stats
         current_y += self.font_title.get_height() + spacing
-        stats_to_display = self._get_stats_to_display()
+        stats_to_display = self.tower.get_displayable_stats()
         current_y += self.font_header.get_height() + (spacing / 2)
         current_y += len(stats_to_display) * 22
         current_y += spacing
-
-        # Persona Section
         current_y += self.font_header.get_height() + (spacing / 2)
-        current_y += 26  # Space for "Current: ..." text
+        current_y += 26
         button_width = self.rect.width - (padding * 2)
         self.persona_change_button_rect = pygame.Rect(
             self.rect.x + padding, current_y, button_width, 30
         )
         current_y += self.persona_change_button_rect.height + spacing
 
-        # Upgrade Buttons
         if self.upgrade_buttons:
             current_y += spacing
             for button in self.upgrade_buttons:
                 button.rect.topleft = (self.rect.x + padding, current_y)
                 current_y += button.rect.height + spacing
 
-        # Salvage Button Area
         current_y += 55
         self.rect.height = current_y - self.rect.y
         self.salvage_button_rect = pygame.Rect(
@@ -175,7 +170,6 @@ class UpgradePanel(UIElement):
 
     def draw(self, screen: pygame.Surface):
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        # --- FIX (Step 1.2): Convert the list-based color from theme to a tuple ---
         panel_color = self.colors.get("panel_primary", [25, 30, 40])
         panel_surf.fill(tuple(panel_color) + (230,))
         screen.blit(panel_surf, self.rect.topleft)
@@ -198,8 +192,7 @@ class UpgradePanel(UIElement):
         padding = self.layout.get("padding_medium", 15)
         spacing = self.layout.get("spacing_medium", 10)
 
-        # Calculate Y position based on the layout of the stats section
-        stats_to_display = self._get_stats_to_display()
+        stats_to_display = self.tower.get_displayable_stats()
         header_y = (
             self.rect.y
             + padding
@@ -288,24 +281,6 @@ class UpgradePanel(UIElement):
         text_rect = text_surf.get_rect(center=self.salvage_button_rect.center)
         screen.blit(text_surf, text_rect)
 
-    def _get_stats_to_display(self) -> List[tuple[str, Any, Any]]:
-        stats = []
-        stat_definitions = self.tower_base_data.get("info_panel_stats", [])
-        for stat_info in stat_definitions:
-            label, value_path = stat_info.get("label"), stat_info.get("value_path")
-            live_value = (
-                get_nested_value(self.tower, value_path) if value_path else None
-            )
-            if live_value is not None:
-                stats.append((label, live_value, stat_info.get("format")))
-        if self.tower.pierce_count > 0 and not any(s[0] == "Pierce" for s in stats):
-            stats.append(("Pierce", self.tower.pierce_count, None))
-        if self.tower.projectiles_per_shot > 1 and not any(
-            s[0] == "Projectiles" for s in stats
-        ):
-            stats.append(("Projectiles", self.tower.projectiles_per_shot, None))
-        return stats
-
     def _draw_static_text(self, screen: pygame.Surface):
         padding = self.layout.get("padding_medium", 15)
         spacing = self.layout.get("spacing_medium", 10)
@@ -320,7 +295,11 @@ class UpgradePanel(UIElement):
         )
         screen.blit(stats_header_surf, (self.rect.x + padding, current_y))
         current_y += stats_header_surf.get_height() + (spacing / 2)
-        for label, value, value_format in self._get_stats_to_display():
+
+        # --- MODIFIED: Use the new centralized stats method ---
+        # The panel no longer has its own logic for gathering stats. It simply
+        # asks the tower for its displayable stats and renders them.
+        for label, value, value_format in self.tower.get_displayable_stats():
             value_str = format_stat_value(value, value_format)
             label_surf = self.font_stat.render(
                 f"{label}:", True, self.colors.get("text_secondary")
