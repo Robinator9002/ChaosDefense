@@ -89,7 +89,14 @@ class SpriteRenderer:
 
         # Use SRCALPHA to support transparent parts of sprites (if any).
         map_surface = pygame.Surface((map_width_px, map_height_px), pygame.SRCALPHA)
+        # --- FIX: Fill the map surface with a solid color before drawing tiles.
+        # This prevents the "empty green map" bug by ensuring a non-transparent
+        # surface is always returned, even if no tiles can be rendered.
+        map_surface.fill((0, 255, 0))  # Using a bright color to make the issue obvious.
 
+        # --- FIX (Step 2.2): Add a counter to diagnose the 'Empty Green Map' bug ---
+        # This counter will track how many tiles were successfully drawn.
+        drawn_tiles_count = 0
         for y in range(self.grid.height):
             for x in range(self.grid.width):
                 tile = self.grid.get_tile(x, y)
@@ -110,7 +117,19 @@ class SpriteRenderer:
                 px_position = (x * self.tile_size, y * self.tile_size)
                 map_surface.blit(tile_surface, px_position)
 
-        logger.info("Map surface created successfully.")
+                # Increment the counter
+                drawn_tiles_count += 1
+
+        if drawn_tiles_count == 0:
+            logger.critical(
+                "CRITICAL: Map surface is empty! No tile definitions found or all were skipped. "
+                "The screen will display a solid color. Please check level_styles.json."
+            )
+        else:
+            logger.info(
+                f"Map surface created successfully with {drawn_tiles_count} tiles."
+            )
+
         return map_surface
 
     def draw(self, screen: pygame.Surface, camera_offset: pygame.Vector2, zoom: float):

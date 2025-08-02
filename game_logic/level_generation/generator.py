@@ -48,12 +48,34 @@ class LevelGenerator:
 
         start_points = LevelGenerator._define_start_points(grid, total_paths_requested)
 
+        # --- FIX: Introduce a fallback in case path generation fails entirely.
+        # The crash was caused by `_request_paths` returning an empty list, which
+        # then broke the wave manager. This block ensures we have at least one
+        # path, even if it's a simple one, to prevent a critical crash.
         paths = LevelGenerator._request_paths(
             grid, start_points, target_points, paths_config
         )
         if not paths:
-            logger.error("Pathfinder failed to generate the required paths. Aborting.")
-            return grid, []
+            logger.critical(
+                "CRITICAL: Pathfinder failed to generate the required paths. Attempting to create a single, simple fallback path."
+            )
+            # Create a simple wandering path as a last resort to prevent a crash
+            # The start and end points here are hardcoded for robustness.
+            fallback_start = (1, grid.height // 2)
+            fallback_end = (grid.width - 5, grid.height // 2)
+            paths = [
+                Pathfinder.create_wandering_path(
+                    grid, fallback_start, fallback_end, set()
+                )
+            ]
+
+            if not paths[0]:
+                logger.critical(
+                    "FATAL: Fallback path generation also failed. The game cannot proceed with this level."
+                )
+                return grid, []
+
+            logger.warning("Successfully generated a fallback path to prevent a crash.")
 
         # Carve the final, successful paths onto the grid.
         for path in paths:
