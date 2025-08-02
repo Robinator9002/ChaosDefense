@@ -255,7 +255,9 @@ class UIManager:
                 elif action.type == ActionType.CHANGE_TARGETING_PERSONA:
                     self._change_persona(action.entity_id)
                 return True
-            return self.persona_panel.rect.collidepoint(pygame.mouse.get_pos())
+            if hasattr(event, "pos"):
+                return self.persona_panel.rect.collidepoint(event.pos)
+            return False
 
         if self.upgrade_panel:
             action = self.upgrade_panel.handle_event(event, game_state)
@@ -273,12 +275,15 @@ class UIManager:
                 elif action.type == ActionType.OPEN_PERSONA_PANEL:
                     self._open_persona_panel()
                 return True
-            return self.upgrade_panel.rect.collidepoint(pygame.mouse.get_pos())
+            if hasattr(event, "pos"):
+                return self.upgrade_panel.rect.collidepoint(event.pos)
+            return False
 
         if self.info_panel:
-            if self.info_panel.rect.collidepoint(pygame.mouse.get_pos()):
+            if hasattr(event, "pos") and self.info_panel.rect.collidepoint(event.pos):
                 return True
-            self.info_panel = None
+            # This logic might be too aggressive, let's refine it.
+            # self.info_panel = None
 
         for button in self.tab_buttons:
             if (
