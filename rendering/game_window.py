@@ -3,12 +3,27 @@ import pygame
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
+from enum import Enum, auto
 
 from game_logic.game_manager import GameManager
 from rendering.sprite_renderer import SpriteRenderer
 from rendering.hud.ui_manager import UIManager
 
+# --- NEW: Import the MenuManager ---
+from rendering.menu.menu_manager import MenuManager
+
 logger = logging.getLogger(__name__)
+
+
+# --- NEW: Game State Enum ---
+# This Enum will manage the overall state of the application, determining
+# whether we are in the menu, playing the game, or on another screen.
+class GameState(Enum):
+    MAIN_MENU = auto()
+    IN_GAME = auto()
+    GAME_OVER = auto()
+    # Add future states like GLOBAL_UPGRADES here
+
 
 # --- Control Constants ---
 MAX_ZOOM = 3.0
@@ -21,15 +36,19 @@ class Game:
     The main window and rendering engine for the game. This class is the
     bridge between player input (mouse, keyboard), the game's logical state
     (GameManager), and what is drawn to the screen.
+
+    REFACTORED: This class now acts as a state machine, managing the flow
+    between the main menu and the game itself.
     """
 
     def __init__(self, all_configs: Dict[str, Any], assets_path: Path):
         """
-        Initializes Pygame, the window, and all core systems.
+        Initializes Pygame, the window, and all high-level systems.
         """
         pygame.init()
         pygame.font.init()
 
+        self.all_configs = all_configs
         self.game_settings = all_configs["game_settings"]
         self.assets_path = assets_path
 
@@ -44,16 +63,25 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
 
-        self.game_manager = GameManager(all_configs)
-        self.ui_manager = UIManager(
-            self.screen.get_rect(), self.game_manager, assets_path
-        )
+        # --- State Machine Initialization ---
+        self.game_state = GameState.MAIN_MENU
 
+        # --- Manager Initialization ---
+        # Menu manager is created immediately.
+        self.menu_manager = MenuManager(
+            screen_rect=self.screen.get_rect(),
+            new_game_callback=self._start_new_game,
+            quit_callback=self._quit_game,
+        )
+        # In-game managers are initialized lazily (set to None initially).
+        self.game_manager: Optional[GameManager] = None
+        self.ui_manager: Optional[UIManager] = None
         self.sprite_renderer: Optional[SpriteRenderer] = None
-        self.background_color = (0, 0, 0)
+
+        # --- Rendering & Camera State ---
+        self.background_color = (15, 20, 25)  # Default menu background
         self.gui_font = pygame.font.SysFont("segoeui", 22, bold=True)
         self.tile_size = self.game_settings.get("tile_size", 32)
-
         self.zoom = 1.0
         self.min_zoom = MIN_ZOOM_CLAMP
         self.camera_offset = pygame.Vector2(0, 0)
@@ -61,11 +89,32 @@ class Game:
         self.pan_start_mouse_pos = pygame.Vector2(0, 0)
         self.pan_start_camera_offset = pygame.Vector2(0, 0)
 
+    def _start_new_game(self):
+        """
+        Initializes all necessary components for a new game session and
+        switches the game state to IN_GAME.
+        """
+        logger.info("--- Starting New Game ---")
+        # --- Initialize all in-game managers ---
+        self.game_manager = GameManager(self.all_configs)
+        self.ui_manager = UIManager(
+            self.screen.get_rect(), self.game_manager, self.assets_path
+        )
         self._setup_rendering()
+        self.game_state = GameState.IN_GAME
+
+    def _quit_game(self):
+        """Sets the running flag to false to exit the main game loop."""
+        self.running = False
 
     def _setup_rendering(self):
         """Initializes rendering components based on the game logic's state."""
         logger.info("--- Initializing Rendering Components ---")
+        if not self.game_manager:
+            logger.critical("Cannot setup rendering without a GameManager.")
+            self.running = False
+            return
+
         grid = self.game_manager.grid
         if not grid:
             logger.critical("GameManager failed to provide a grid.")
@@ -73,6 +122,7 @@ class Game:
             return
 
         style_config = {}
+        # This logic correctly finds the style config for the generated level
         for style in self.game_manager.level_manager.level_styles.values():
             if isinstance(style, dict):
                 gen_params = style.get("generation_params", {})
@@ -96,7 +146,7 @@ class Game:
         logger.info("--- Rendering Setup Complete ---")
 
     def run(self):
-        """The main game loop."""
+        """The main game loop, which now delegates to state-specific methods."""
         while self.running:
             dt = self.clock.tick(60) / 1000.0
             self._handle_events()
@@ -105,32 +155,79 @@ class Game:
         pygame.quit()
 
     def _handle_events(self):
-        """Processes events, delegating first to the UI, then the game world."""
+        """Processes all Pygame events based on the current game state."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
                 return
 
-            ui_handled_event = self.ui_manager.handle_event(
-                event, self.game_manager.game_state
-            )
+            if self.game_state == GameState.MAIN_MENU:
+                self.menu_manager.handle_event(event)
 
-            if not ui_handled_event:
-                if event.type == pygame.VIDEORESIZE:
-                    self._on_resize(event)
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    self._handle_mouse_down(event)
-                elif event.type == pygame.MOUSEBUTTONUP:
-                    if event.button == 2:
-                        self.is_panning = False
-                elif event.type == pygame.MOUSEMOTION:
-                    if self.is_panning:
-                        self._handle_pan(event)
-                elif event.type == pygame.KEYDOWN:
-                    self._handle_keyboard_input(event)
+            elif self.game_state == GameState.IN_GAME:
+                # Ensure in-game managers exist before handling events
+                if not self.ui_manager or not self.game_manager:
+                    continue
+
+                ui_handled_event = self.ui_manager.handle_event(
+                    event, self.game_manager.game_state
+                )
+
+                if not ui_handled_event:
+                    if event.type == pygame.VIDEORESIZE:
+                        self._on_resize(event)
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        self._handle_mouse_down(event)
+                    elif event.type == pygame.MOUSEBUTTONUP:
+                        if event.button == 2:
+                            self.is_panning = False
+                    elif event.type == pygame.MOUSEMOTION:
+                        if self.is_panning:
+                            self._handle_pan(event)
+                    elif event.type == pygame.KEYDOWN:
+                        self._handle_keyboard_input(event)
+
+    def _update(self, dt: float):
+        """Updates all game systems based on the current game state."""
+        if self.game_state == GameState.MAIN_MENU:
+            self.menu_manager.update(dt)
+
+        elif self.game_state == GameState.IN_GAME:
+            if self.game_manager and self.ui_manager:
+                self.game_manager.update(dt)
+                self.ui_manager.update(dt, self.game_manager.game_state)
+
+    def _draw(self):
+        """Draws the entire game state to the screen based on the current state."""
+        self.screen.fill(self.background_color)
+
+        if self.game_state == GameState.MAIN_MENU:
+            self.menu_manager.draw(self.screen)
+
+        elif self.game_state == GameState.IN_GAME:
+            if self.sprite_renderer and self.game_manager and self.ui_manager:
+                self.sprite_renderer.draw(self.screen, self.camera_offset, self.zoom)
+
+                all_entities = (
+                    list(self.game_manager.enemies.values())
+                    + list(self.game_manager.towers.values())
+                    + list(self.game_manager.projectiles.values())
+                )
+                for entity in all_entities:
+                    entity.draw(self.screen, self.camera_offset, self.zoom)
+
+                self._draw_top_gui()
+                self.ui_manager.draw(self.screen, self.game_manager.game_state)
+
+        pygame.display.flip()
+
+    # --- All methods below this point are IN_GAME specific ---
 
     def _handle_mouse_down(self, event):
         """Handles all mouse down events, routing them based on the button."""
+        if not self.game_manager:
+            return
+
         if event.button == 1:
             self._handle_map_click(event)
         elif event.button == 2:
@@ -149,9 +246,10 @@ class Game:
             self._clamp_camera_offset()
 
     def _handle_keyboard_input(self, event: pygame.event.Event):
-        """
-        Handles all keyboard presses, routing them to the appropriate system.
-        """
+        """Handles all keyboard presses, routing them to the appropriate system."""
+        if not self.ui_manager or not self.game_manager:
+            return
+
         mods = pygame.key.get_mods()
         is_ctrl_pressed = mods & pygame.KMOD_CTRL
 
@@ -210,6 +308,9 @@ class Game:
 
     def _handle_map_click(self, event):
         """Handles left-clicks that occur on the game map (not the UI)."""
+        if not self.game_manager:
+            return
+
         game_state = self.game_manager.game_state
         if game_state.selected_tower_to_build:
             world_pos = self._screen_to_world(pygame.Vector2(event.pos))
@@ -222,7 +323,6 @@ class Game:
 
         world_pos = self._screen_to_world(pygame.Vector2(event.pos))
         clicked_on_tower = False
-        # We iterate through the dictionary's values here for collision checks.
         for tower in self.game_manager.towers.values():
             if tower.rect.collidepoint(world_pos):
                 if game_state.selected_entity_id == tower.entity_id:
@@ -245,42 +345,16 @@ class Game:
         """Handles the window being resized."""
         self.screen_width, self.screen_height = event.w, event.h
         self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
-        self.ui_manager.screen_rect = self.screen.get_rect()
+        if self.ui_manager:
+            self.ui_manager.screen_rect = self.screen.get_rect()
         self._calculate_min_zoom()
         self._clamp_camera_offset()
 
-    def _update(self, dt: float):
-        """Updates all game systems."""
-        self.game_manager.update(dt)
-        self.ui_manager.update(dt, self.game_manager.game_state)
-
-    def _draw(self):
-        """Draws the entire game state to the screen."""
-        self.screen.fill(self.background_color)
-
-        if self.sprite_renderer:
-            self.sprite_renderer.draw(self.screen, self.camera_offset, self.zoom)
-
-        # --- BUG FIX: Correctly handle dictionary data structures for rendering ---
-        # The performance refactor changed entity storage from lists to dictionaries.
-        # We can no longer use the '+' operator to concatenate them. Instead, we
-        # get the .values() from each dictionary, convert them to lists, and then
-        # concatenate those lists to create a single iterable for drawing.
-        all_entities = (
-            list(self.game_manager.enemies.values())
-            + list(self.game_manager.towers.values())
-            + list(self.game_manager.projectiles.values())
-        )
-        for entity in all_entities:
-            entity.draw(self.screen, self.camera_offset, self.zoom)
-
-        self._draw_top_gui()
-        self.ui_manager.draw(self.screen, self.game_manager.game_state)
-
-        pygame.display.flip()
-
     def _draw_top_gui(self):
         """Draws the static user interface elements like gold, hp, and wave count."""
+        if not self.game_manager:
+            return
+
         state = self.game_manager.game_state
         wave_mgr = self.game_manager.wave_manager
         if not state or not wave_mgr:
