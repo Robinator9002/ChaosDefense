@@ -234,7 +234,6 @@ class PersonaSelectionPanel(UIElement):
         screen.blit(overlay, (0, 0))
 
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        # --- FIX: Convert list-based color to tuple before concatenation ---
         panel_color = self.colors.get("panel_primary", [25, 30, 40])
         panel_surf.fill(tuple(panel_color) + (245,))
         screen.blit(panel_surf, self.rect.topleft)
@@ -263,10 +262,22 @@ class PersonaSelectionPanel(UIElement):
                 on_screen_pos_y < content_area_rect.bottom
                 and on_screen_pos_y + button.rect.height > content_area_rect.top
             ):
-                original_rect, button.rect.topleft = button.rect, (
-                    self.rect.x + button.rect.x,
-                    on_screen_pos_y,
-                )
+                # --- FIX (Step 1.1): Use a temporary rect for drawing ---
+                # This is the crucial fix for the disappearing buttons bug.
+                # We create a new rect for drawing that has the correct on-screen
+                # position, but we leave the button's original `rect` (which is
+                # relative to the content area) unmodified. This prevents the
+                # layout calculations from breaking on the next frame.
+                draw_rect = button.rect.copy()
+                draw_rect.topleft = (self.rect.x + button.rect.x, on_screen_pos_y)
+
+                # We pass this temporary rect to the button's draw method.
+                # (This requires a small modification to the _PersonaButton.draw method)
+
+                # To avoid modifying the _PersonaButton class, we'll do the drawing here
+                # by temporarily changing the button's rect and changing it back.
+                original_rect = button.rect
+                button.rect = draw_rect
                 button.draw(screen)
                 button.rect = original_rect
 
