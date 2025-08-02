@@ -1,4 +1,4 @@
-# rendering/ui/buttons/tower_button.py
+# rendering/hud/buttons/tower_button.py
 import pygame
 import logging
 from pathlib import Path

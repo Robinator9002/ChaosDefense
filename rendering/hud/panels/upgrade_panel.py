@@ -1,4 +1,4 @@
-# rendering/ui/panels/upgrade_panel.py
+# rendering/hud/panels/upgrade_panel.py
 import pygame
 import logging
 from typing import Optional, List, TYPE_CHECKING, Dict, Any

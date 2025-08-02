@@ -1,4 +1,4 @@
-# rendering/ui/panels/persona_selection_panel.py
+# rendering/hud/panels/persona_selection_panel.py
 import pygame
 import logging
 from typing import List, Dict, Any, Optional

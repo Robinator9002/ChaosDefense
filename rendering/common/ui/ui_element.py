@@ -1,4 +1,4 @@
-# rendering/ui/ui_element.py
+# rendering/hud/ui_element.py
 import pygame
 from typing import Optional, Any
 

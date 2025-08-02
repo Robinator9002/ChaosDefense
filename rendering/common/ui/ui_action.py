@@ -1,4 +1,4 @@
-# rendering/ui/ui_action.py
+# rendering/hud/ui_action.py
 import logging
 from enum import Enum, auto
 from dataclasses import dataclass

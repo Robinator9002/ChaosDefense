@@ -1,4 +1,4 @@
-# rendering/ui/buttons/upgrade_button.py
+# rendering/hud/buttons/upgrade_button.py
 import pygame
 import logging
 from typing import Optional, TYPE_CHECKING

@@ -1,4 +1,4 @@
-# rendering/ui/text_renderer.py
+# rendering/hud/text_renderer.py
 import pygame
 from typing import List, Tuple
 

@@ -1,4 +1,4 @@
-# rendering/ui/buttons/tab_button.py
+# rendering/hud/buttons/tab_button.py
 import pygame
 import logging
 from typing import Optional

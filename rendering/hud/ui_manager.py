@@ -1,4 +1,4 @@
-# rendering/ui/ui_manager.py
+# rendering/hud/ui_manager.py
 import pygame
 import logging
 from pathlib import Path

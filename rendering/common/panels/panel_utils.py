@@ -1,4 +1,4 @@
-# rendering/ui/panel_utils.py
+# rendering/hud/panel_utils.py
 from typing import Dict, Any
 
 

@@ -1,4 +1,4 @@
-# rendering/ui/panels/tower_info_panel.py
+# rendering/hud/panels/tower_info_panel.py
 import pygame
 import logging
 from typing import Dict, Any, TYPE_CHECKING
