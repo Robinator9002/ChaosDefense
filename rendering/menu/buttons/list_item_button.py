@@ -26,18 +26,20 @@ class ListItemButton(UIElement):
         font_manager: "FontManager",
     ):
         super().__init__(rect)
+        # --- FIX: Store the original item_data dictionary ---
+        # The parent screen needs access to this raw data to function correctly.
+        self.item_data = item_data
+
         self.ui_theme = ui_theme
         self.font_manager = font_manager
         self.is_selected = False
 
         # --- Data Parsing ---
-        self.title: str = item_data.get("title", "N/A")
-        self.is_locked: bool = item_data.get("is_locked", False)
-        self.can_afford: bool = item_data.get("can_afford", True)
-        # Top-right corner text (e.g., cost or "UNLOCKED")
-        self.status_text: Optional[str] = item_data.get("status_text")
-        # List of (label, value) tuples for stats
-        self.stats: List[Tuple[str, str]] = item_data.get("stats", [])
+        self.title: str = self.item_data.get("title", "N/A")
+        self.is_locked: bool = self.item_data.get("is_locked", False)
+        self.can_afford: bool = self.item_data.get("can_afford", True)
+        self.status_text: Optional[str] = self.item_data.get("status_text")
+        self.stats: List[Tuple[str, str]] = self.item_data.get("stats", [])
 
         self._load_theme_assets()
 
@@ -52,28 +54,42 @@ class ListItemButton(UIElement):
         self.font_locked = self.font_manager.get_font("title_small")
 
     def draw(self, screen: pygame.Surface):
-        """Draws the button with complex styling based on its state."""
+        """
+        Draws the button with complex styling based on its state.
+
+        This method now includes clearer visual feedback for hover and selection states,
+        using different colors, borders, and border widths.
+        """
         border_radius = self.layout.get("border_radius_large", 8)
         border_width = self.layout.get("border_width_standard", 2)
         padding = self.layout.get("padding_medium", 15)
 
         # 1. Determine Colors and Styles based on State
+        bg_color = self.colors.get("panel_primary")
+        border_color = self.colors.get("border_primary")
+        title_color = self.colors.get("text_primary")
+        text_color_secondary = self.colors.get("text_secondary")
+
         if self.is_locked:
+            # Locked state is visually distinct, with muted colors
             bg_color = self.colors.get("panel_primary")
             border_color = self.colors.get("border_primary")
             title_color = self.colors.get("text_disabled")
+            text_color_secondary = self.colors.get("text_disabled")
+        elif self.is_selected:
+            # Selected state has a prominent accent color border
+            bg_color = self.colors.get("panel_secondary")
+            border_color = self.colors.get("border_accent")
+            border_width = self.layout.get("border_width_selected", 3)
+        elif self.is_hovered:
+            # Hover state for interactive feedback
+            bg_color = self.colors.get("panel_interactive_hover")
+            border_color = self.colors.get("border_interactive_selected")
         else:
-            title_color = self.colors.get("text_primary")
-            if self.is_selected:
-                bg_color = self.colors.get("panel_secondary")
-                border_color = self.colors.get("border_accent")
-                border_width = self.layout.get("border_width_selected", 3)
-            elif self.is_hovered:
-                bg_color = self.colors.get("panel_interactive_hover")
-                border_color = self.colors.get("border_interactive_selected")
-            else:
-                bg_color = self.colors.get("panel_primary")
-                border_color = self.colors.get("border_primary")
+            # Default state
+            bg_color = self.colors.get("panel_primary")
+            border_color = self.colors.get("border_primary")
+            border_width = self.layout.get("border_width_standard", 2)
 
         # 2. Draw Background and Border
         pygame.draw.rect(screen, bg_color, self.rect, border_radius=border_radius)
@@ -96,6 +112,9 @@ class ListItemButton(UIElement):
             if "UNLOCKED" in self.status_text:
                 status_color = self.colors.get("text_success")
 
+            if self.is_locked:
+                status_color = self.colors.get("text_disabled")
+
             status_surf = self.font_status.render(self.status_text, True, status_color)
             status_rect = status_surf.get_rect(
                 topright=(self.rect.right - padding, self.rect.y + 12)
@@ -116,16 +135,14 @@ class ListItemButton(UIElement):
         current_y = self.rect.y + 40
         for label, value in self.stats:
             label_surf = self.font_stat_label.render(
-                f"{label}:", True, self.colors.get("text_secondary")
+                f"{label}:", True, text_color_secondary
             )
-            value_surf = self.font_stat_value.render(
-                value, True, self.colors.get("text_primary")
-            )
+            value_surf = self.font_stat_value.render(value, True, title_color)
 
-            # --- FIX: Label on the left, value right-aligned ---
-            screen.blit(label_surf, (self.rect.x + padding, current_y))
-            value_rect = value_surf.get_rect(
+            # --- FIX: Value on the left, label right-aligned as requested ---
+            screen.blit(value_surf, (self.rect.x + padding, current_y))
+            label_rect = label_surf.get_rect(
                 topright=(self.rect.right - padding, current_y)
             )
-            screen.blit(value_surf, value_rect)
+            screen.blit(label_surf, label_rect)
             current_y += 18

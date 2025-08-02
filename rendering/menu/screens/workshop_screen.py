@@ -265,7 +265,9 @@ class WorkshopScreen:
         for i, button in enumerate(self.tower_buttons):
             layout_rect = self.grid.get_item_rect(i)
             on_screen_rect = layout_rect.move(0, -self.grid.scroll_y)
-            button.rect.topleft = on_screen_rect.topleft
+            # --- FIX: Update the button's internal rect before checking for hover ---
+            button.rect = on_screen_rect
+
             if self.grid.area.contains(on_screen_rect):
                 button.is_hovered = on_screen_rect.collidepoint(mouse_pos)
                 if button.is_hovered:
@@ -351,8 +353,11 @@ class WorkshopScreen:
 
         # Draw scrollable content
         screen.set_clip(self.grid.area)
-        for button in self.tower_buttons:
+        for i, button in enumerate(self.tower_buttons):
             # The button's rect is updated in handle_event, so we can just draw it
+            layout_rect = self.grid.get_item_rect(i)
+            # --- FIX: Update the button's internal rect for drawing ---
+            button.rect.topleft = (layout_rect.x, layout_rect.y - self.grid.scroll_y)
             button.draw(screen)
         screen.set_clip(None)
 

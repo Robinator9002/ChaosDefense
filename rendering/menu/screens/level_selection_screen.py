@@ -6,16 +6,12 @@ from typing import List, Dict, Any, Callable, Set, Optional, TYPE_CHECKING
 from rendering.common.ui.ui_element import UIElement
 from ..components.scrollable_grid import ScrollableGrid
 from ..panels.preview_panel import PreviewPanel
-
-# --- NEW: Import the consolidated ListItemButton ---
 from ..buttons.list_item_button import ListItemButton
 
 if TYPE_CHECKING:
     from rendering.text.font_manager import FontManager
 
 logger = logging.getLogger(__name__)
-
-# --- REMOVED: The old LevelButton class is now obsolete ---
 
 
 class LevelSelectionScreen:
@@ -45,7 +41,6 @@ class LevelSelectionScreen:
         self.start_level_callback = start_level_callback
         self.back_callback = back_callback
 
-        # --- MODIFIED: The list now holds the new, generic button type ---
         self.buttons: List[ListItemButton] = []
         self.selected_button: Optional[ListItemButton] = None
 
@@ -96,7 +91,6 @@ class LevelSelectionScreen:
         for level_id, level_data in self.level_configs.items():
             is_locked = level_id not in self.unlocked_levels
 
-            # --- NEW: Prepare data specifically for the ListItemButton ---
             button_data = {
                 "id": level_id,
                 "title": level_id.replace("_", " ").title(),
@@ -104,7 +98,7 @@ class LevelSelectionScreen:
                     "description", "No description available."
                 ),
                 "is_locked": is_locked,
-                # Levels don't have status text or stats, so we omit them
+                "item_data": level_data,  # Store original data
             }
 
             button = ListItemButton(
@@ -118,42 +112,56 @@ class LevelSelectionScreen:
         self.grid.update_item_count(len(self.buttons))
 
     def handle_event(self, event: pygame.event.Event):
-        """Handles user input for the level selection screen."""
-        mouse_pos = pygame.mouse.get_pos()
-
-        # Update hover states
-        self.back_button.is_hovered = self.back_button.rect.collidepoint(mouse_pos)
-
-        hovered_button: Optional[ListItemButton] = None
-        for i, button in enumerate(self.buttons):
-            layout_rect = self.grid.get_item_rect(i)
-            on_screen_rect = layout_rect.move(0, -self.grid.scroll_y)
-            button.rect.topleft = on_screen_rect.topleft
-            if self.grid.area.contains(on_screen_rect):
-                button.is_hovered = button.rect.collidepoint(mouse_pos)
-                if button.is_hovered:
-                    hovered_button = button
-            else:
-                button.is_hovered = False
-
-        # Delegate events to children
+        """
+        Handles user input for the level selection screen with a clean,
+        event-type-based structure.
+        """
+        # 1. Delegate events to child components that manage their own state
         self.grid.handle_scroll_event(event)
         self.preview_panel.handle_event(event)
 
-        # Handle primary actions (clicks)
+        # 2. Handle MOUSEMOTION for hover effects
+        if event.type == pygame.MOUSEMOTION:
+            mouse_pos = event.pos
+            self.back_button.is_hovered = self.back_button.rect.collidepoint(mouse_pos)
+
+            for i, button in enumerate(self.buttons):
+                layout_rect = self.grid.get_item_rect(i)
+                on_screen_rect = layout_rect.move(0, -self.grid.scroll_y)
+                # --- FIX: Update the button's internal rect before checking for hover ---
+                button.rect = on_screen_rect
+
+                if self.grid.area.contains(on_screen_rect):
+                    button.is_hovered = on_screen_rect.collidepoint(mouse_pos)
+                else:
+                    button.is_hovered = False
+
+        # 3. Handle MOUSEBUTTONDOWN for clicks and selections
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.back_button.is_hovered:
+            mouse_pos = event.pos
+            if self.back_button.rect.collidepoint(mouse_pos):
                 self.back_callback()
                 return
 
-            if hovered_button:
-                self.selected_button = hovered_button
+            clicked_button = None
+            for i, button in enumerate(self.buttons):
+                layout_rect = self.grid.get_item_rect(i)
+                on_screen_rect = layout_rect.move(0, -self.grid.scroll_y)
+                # --- FIX: Update the button's internal rect before checking for clicks ---
+                button.rect = on_screen_rect
+
+                if self.grid.area.contains(
+                    on_screen_rect
+                ) and on_screen_rect.collidepoint(mouse_pos):
+                    clicked_button = button
+                    break
+
+            if clicked_button:
+                self.selected_button = clicked_button
                 for btn in self.buttons:
                     btn.is_selected = btn == self.selected_button
 
-                # Get the full data for the preview panel
                 level_id = self.selected_button.item_data["id"]
-                level_data = self.level_configs.get(level_id, {})
 
                 self.preview_panel.set_item(
                     item_data={
@@ -200,7 +208,11 @@ class LevelSelectionScreen:
 
         # Scrollable Content
         screen.set_clip(self.grid.area)
-        for button in self.buttons:
+        for i, button in enumerate(self.buttons):
+            # Calculate final position here, just for drawing
+            layout_rect = self.grid.get_item_rect(i)
+            # --- FIX: Update the button's internal rect for drawing ---
+            button.rect.topleft = (layout_rect.x, layout_rect.y - self.grid.scroll_y)
             button.draw(screen)
         screen.set_clip(None)
 
