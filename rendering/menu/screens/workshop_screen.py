@@ -1,72 +1,152 @@
 # rendering/menu/screens/workshop_screen.py
 import pygame
 import logging
-from typing import List, Dict, Any, Callable, Set
+from typing import List, Dict, Any, Callable, Set, Optional
 
 from rendering.common.ui.ui_element import UIElement
 from rendering.common.text.text_renderer import render_text_wrapped
 from game_logic.progression.progression_manager import ProgressionManager
+from ..components.scrollable_grid import ScrollableGrid
+from ..panels.preview_panel import PreviewPanel
+from rendering.common.panels.panel_utils import get_nested_value, format_stat_value
 
 logger = logging.getLogger(__name__)
 
 
-class TowerUnlockButton(UIElement):
-    """
-    A UI element for unlocking a new tower in The Workshop.
-    """
+class WorkshopButton(UIElement):
+    """A generic button for the Workshop screen, used for category filters."""
 
     def __init__(
-        self, rect: pygame.Rect, tower_info: Dict[str, Any], purchase_callback: Callable
+        self, rect: pygame.Rect, text: str, action: Callable, is_active: bool = False
     ):
         super().__init__(rect)
-        self.tower_id = tower_info["id"]
-        self.name = tower_info["name"]
-        self.description = tower_info["description"]
-        self.cost = tower_info["cost"]
-        self.is_unlocked = tower_info["unlocked"]
-        self.purchase_callback = purchase_callback
-
-        self.font_name = pygame.font.SysFont("segoeui", 22, bold=True)
-        self.font_desc = pygame.font.SysFont("segoeui", 14)
-        self.font_cost = pygame.font.SysFont("segoeui", 20, bold=True)
+        self.text = text
+        self.action = action
+        self.is_active = is_active
+        self.font = pygame.font.SysFont("segoeui", 18, bold=True)
         self.colors = {
             "bg_default": (40, 50, 60),
             "bg_hover": (60, 75, 90),
+            "bg_active": (80, 110, 140),
+            "text_default": (180, 180, 190),
+            "text_active": (240, 240, 250),
+            "border_active": (150, 180, 200),
+            "border_default": (80, 90, 100),
+        }
+
+    def handle_event(self, event: pygame.event.Event):
+        if (
+            self.is_hovered
+            and event.type == pygame.MOUSEBUTTONDOWN
+            and event.button == 1
+        ):
+            self.action()
+
+    def draw(self, screen: pygame.Surface):
+        bg_color = (
+            self.colors["bg_active"]
+            if self.is_active
+            else (
+                self.colors["bg_hover"]
+                if self.is_hovered
+                else self.colors["bg_default"]
+            )
+        )
+        text_color = (
+            self.colors["text_active"]
+            if self.is_active
+            else self.colors["text_default"]
+        )
+        border_color = (
+            self.colors["border_active"]
+            if self.is_active
+            else self.colors["border_default"]
+        )
+
+        pygame.draw.rect(screen, bg_color, self.rect, border_radius=5)
+        pygame.draw.rect(screen, border_color, self.rect, 2, border_radius=5)
+        text_surf = self.font.render(self.text, True, text_color)
+        text_rect = text_surf.get_rect(center=self.rect.center)
+        screen.blit(text_surf, text_rect)
+
+
+class TowerUnlockButton(UIElement):
+    """A UI element for unlocking a new tower in The Workshop, now with stats."""
+
+    def __init__(self, rect: pygame.Rect, tower_info: Dict[str, Any]):
+        super().__init__(rect)
+        self.tower_info = tower_info
+        self.name = tower_info["name"]
+        self.is_unlocked = tower_info["unlocked"]
+
+        self._setup_fonts_and_colors()
+        self._prepare_stat_surfaces()
+
+    def _setup_fonts_and_colors(self):
+        self.font_name = pygame.font.SysFont("segoeui", 20, bold=True)
+        self.font_cost = pygame.font.SysFont("segoeui", 18, bold=True)
+        self.font_stat_label = pygame.font.SysFont("segoeui", 14)
+        self.font_stat_value = pygame.font.SysFont("segoeui", 14, bold=True)
+        self.colors = {
+            "bg_default": (40, 50, 60),
+            "bg_hover": (60, 75, 90),
+            "bg_selected": (75, 95, 115),
             "bg_unlocked": (35, 60, 45),
             "border_default": (80, 90, 100),
             "border_hover": (150, 180, 200),
             "border_unlocked": (70, 110, 85),
             "text_name": (210, 210, 220),
-            "text_desc": (160, 160, 170),
             "text_unlocked": (180, 230, 190),
             "cost_can_afford": (255, 215, 0),
             "cost_cant_afford": (180, 40, 40),
+            "stat_label": (160, 160, 170),
+            "stat_value": (220, 220, 230),
         }
+        self.is_selected = False
 
-    def handle_event(self, event: pygame.event.Event, can_afford: bool) -> bool:
-        """Handles clicks. If affordable and not unlocked, triggers purchase callback."""
-        # The parent screen now calculates the hover state based on scroll position.
-        if not self.is_unlocked and can_afford and self.is_hovered:
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                self.purchase_callback(self.tower_id)
-                return True
-        return False
+    def _prepare_stat_surfaces(self):
+        """Pre-renders the stat text for drawing."""
+        self.stat_surfaces = []
+        stats_to_display = self.tower_info.get("info_panel_stats", [])
+
+        for stat_info in stats_to_display[:3]:  # Show up to 3 key stats
+            label = stat_info.get("label", "N/A")
+            value_path = stat_info.get("value_path")
+            value = (
+                get_nested_value(self.tower_info, value_path) if value_path else "N/A"
+            )
+
+            if value is None:
+                continue
+
+            value_str = format_stat_value(value, stat_info.get("format"))
+
+            label_surf = self.font_stat_label.render(
+                f"{label}:", True, self.colors["stat_label"]
+            )
+            value_surf = self.font_stat_value.render(
+                value_str, True, self.colors["stat_value"]
+            )
+            self.stat_surfaces.append((label_surf, value_surf))
 
     def draw(self, screen: pygame.Surface, can_afford: bool):
-        """Draws the button, showing its state (locked, unlocked, affordable)."""
         if self.is_unlocked:
             bg_color = self.colors["bg_unlocked"]
             border_color = self.colors["border_unlocked"]
             name_color = self.colors["text_unlocked"]
         else:
             bg_color = (
-                self.colors["bg_hover"]
-                if self.is_hovered and can_afford
-                else self.colors["bg_default"]
+                self.colors["bg_selected"]
+                if self.is_selected
+                else (
+                    self.colors["bg_hover"]
+                    if self.is_hovered
+                    else self.colors["bg_default"]
+                )
             )
             border_color = (
                 self.colors["border_hover"]
-                if self.is_hovered and can_afford
+                if self.is_hovered or self.is_selected
                 else self.colors["border_default"]
             )
             name_color = self.colors["text_name"]
@@ -74,6 +154,7 @@ class TowerUnlockButton(UIElement):
         pygame.draw.rect(screen, bg_color, self.rect, border_radius=8)
         pygame.draw.rect(screen, border_color, self.rect, 2, border_radius=8)
 
+        # Draw Name and Cost/Status
         name_surf = self.font_name.render(self.name, True, name_color)
         screen.blit(name_surf, (self.rect.x + 15, self.rect.y + 10))
 
@@ -81,42 +162,31 @@ class TowerUnlockButton(UIElement):
             status_surf = self.font_cost.render(
                 "UNLOCKED", True, self.colors["text_unlocked"]
             )
-            status_rect = status_surf.get_rect(
-                topright=(self.rect.right - 15, self.rect.y + 12)
-            )
-            screen.blit(status_surf, status_rect)
         else:
             cost_color = (
                 self.colors["cost_can_afford"]
                 if can_afford
                 else self.colors["cost_cant_afford"]
             )
-            cost_surf = self.font_cost.render(f"{self.cost} CS", True, cost_color)
-            cost_rect = cost_surf.get_rect(
-                topright=(self.rect.right - 15, self.rect.y + 12)
-            )
-            screen.blit(cost_surf, cost_rect)
+            cost_text = f"{self.tower_info['cost']} CS"
+            status_surf = self.font_cost.render(cost_text, True, cost_color)
 
-        desc_surfaces = render_text_wrapped(
-            self.description,
-            self.font_desc,
-            self.colors["text_desc"],
-            self.rect.width - 30,
+        status_rect = status_surf.get_rect(
+            topright=(self.rect.right - 15, self.rect.y + 12)
         )
-        current_y = self.rect.y + 45
-        for line in desc_surfaces:
-            screen.blit(line, (self.rect.x + 15, current_y))
-            current_y += line.get_height()
+        screen.blit(status_surf, status_rect)
+
+        # Draw Stats
+        current_y = self.rect.y + 40
+        for label_surf, value_surf in self.stat_surfaces:
+            screen.blit(label_surf, (self.rect.x + 15, current_y))
+            value_rect = value_surf.get_rect(topright=(self.rect.right - 15, current_y))
+            screen.blit(value_surf, value_rect)
+            current_y += 18
 
 
 class WorkshopScreen:
-    """
-    Manages and renders The Workshop UI, where players can permanently
-    unlock towers and purchase global upgrades.
-
-    REFACTORED: Now features a scrollable grid layout to accommodate a large
-    number of unlockable items.
-    """
+    """Manages The Workshop UI with a scrollable grid, filters, and a preview panel."""
 
     def __init__(
         self,
@@ -128,110 +198,143 @@ class WorkshopScreen:
         self.progression_manager = progression_manager
         self.back_callback = back_callback
 
+        self.all_unlockable_towers = self.progression_manager.get_unlockable_towers()
+        self.filtered_towers: List[Dict[str, Any]] = []
         self.tower_buttons: List[TowerUnlockButton] = []
-        self.back_button: UIElement = None
+        self.selected_tower: Optional[TowerUnlockButton] = None
 
-        # --- Scrolling State ---
-        self.scroll_y = 0
-        self.content_height = 0
-        self.visible_height = 0
-        self.max_scroll = 0
-        self.is_scrollable = False
+        self.active_filter = "All"
+        self.filter_buttons: List[WorkshopButton] = []
+
+        self._setup_components()
+        self._build_layout()
+
+    def _setup_components(self):
+        grid_area = pygame.Rect(
+            50, 160, self.screen_rect.width * 0.5, self.screen_rect.height - 240
+        )
+        preview_area = pygame.Rect(
+            grid_area.right + 50,
+            160,
+            self.screen_rect.width * 0.35,
+            self.screen_rect.height * 0.7,
+        )
+
+        self.grid = ScrollableGrid(
+            area=grid_area,
+            item_size=(int(grid_area.width * 0.45), 110),
+            item_spacing=(20, 20),
+            columns=2,
+        )
+        self.preview_panel = PreviewPanel(preview_area)
+
+        back_button_rect = pygame.Rect(30, self.screen_rect.bottom - 80, 150, 50)
+        self.back_button = UIElement(back_button_rect)
 
         self._setup_fonts_and_colors()
-        self._build_layout()
 
     def _setup_fonts_and_colors(self):
         self.title_font = pygame.font.SysFont("segoeui", 52, bold=True)
         self.currency_font = pygame.font.SysFont("segoeui", 28, bold=True)
         self.back_font = pygame.font.SysFont("segoeui", 24, bold=True)
-        self.section_font = pygame.font.SysFont("segoeui", 28, bold=True)
-        self.colors = {
-            "title": (220, 220, 230),
-            "currency": (255, 215, 0),
-            "section_header": (180, 180, 190),
-            "back_button_text": (210, 210, 220),
-            "back_bg_default": (40, 50, 60),
-            "back_bg_hover": (60, 75, 90),
-            "scrollbar_track": (30, 35, 45),
-            "scrollbar_handle": (80, 90, 100),
-        }
 
     def _build_layout(self):
-        """Creates and positions all UI elements for the screen."""
+        """Filters towers and rebuilds the grid and filter buttons."""
+        self.all_unlockable_towers = self.progression_manager.get_unlockable_towers()
+
+        if self.active_filter == "All":
+            self.filtered_towers = self.all_unlockable_towers
+        else:
+            # We need the full tower config for category filtering
+            all_tower_configs = self.progression_manager.all_tower_configs
+            self.filtered_towers = [
+                t
+                for t in self.all_unlockable_towers
+                if all_tower_configs.get(t["id"], {}).get("category")
+                == self.active_filter
+            ]
+
         self.tower_buttons.clear()
+        for tower_info in self.filtered_towers:
+            button = TowerUnlockButton(pygame.Rect(0, 0, 0, 0), tower_info)
+            self.tower_buttons.append(button)
+        self.grid.update_item_count(len(self.tower_buttons))
 
-        # --- Define Layout Constants ---
-        padding = 50
-        header_height = self.screen_rect.height * 0.15
-        footer_height = 100
-        self.visible_height = self.screen_rect.height - header_height - footer_height
-
-        # --- Tower Unlocks Section ---
-        tower_unlocks = self.progression_manager.get_unlockable_towers()
-        button_width, button_height, spacing = 400, 90, 20
-        columns = 2
-
-        current_y = spacing
-        current_y += self.section_font.get_height() + spacing
-
-        # Grid layout for buttons
-        for i, tower_info in enumerate(tower_unlocks):
-            col = i % columns
-            row = i // columns
-            x_pos = (
-                self.screen_rect.centerx
-                + ((col - 0.5) * (button_width + spacing))
-                - (button_width / 2)
+        self.filter_buttons.clear()
+        all_categories = sorted(
+            list(
+                set(
+                    self.progression_manager.all_tower_configs.get(t["id"], {}).get(
+                        "category", "N/A"
+                    )
+                    for t in self.all_unlockable_towers
+                )
             )
-            y_pos = current_y + (row * (button_height + spacing))
-
-            button_rect = pygame.Rect(x_pos, y_pos, button_width, button_height)
-            self.tower_buttons.append(
-                TowerUnlockButton(button_rect, tower_info, self._purchase_tower)
-            )
-
-        num_rows = (len(self.tower_buttons) + columns - 1) // columns
-        self.content_height = (
-            (num_rows * (button_height + spacing))
-            + self.section_font.get_height()
-            + spacing
         )
+        categories = ["All"] + all_categories
 
-        self.is_scrollable = self.content_height > self.visible_height
-        self.max_scroll = max(0, self.content_height - self.visible_height)
-        self.scroll_y = min(self.scroll_y, self.max_scroll)
+        btn_width, btn_height, btn_spacing = 120, 35, 10
+        start_x = self.grid.area.left
+        for i, category in enumerate(categories):
+            rect = pygame.Rect(
+                start_x + i * (btn_width + btn_spacing),
+                self.grid.area.top - btn_height - 10,
+                btn_width,
+                btn_height,
+            )
+            btn = WorkshopButton(
+                rect,
+                category.title(),
+                lambda c=category.lower(): self.set_filter(c),
+                is_active=(self.active_filter == category.lower()),
+            )
+            self.filter_buttons.append(btn)
 
-        # --- Back Button ---
-        back_button_rect = pygame.Rect(30, self.screen_rect.bottom - 80, 150, 50)
-        self.back_button = UIElement(back_button_rect)
+    def set_filter(self, category: str):
+        self.active_filter = category
+        self.selected_tower = None
+        self.preview_panel.set_item(None, "", lambda: None)
+        self._build_layout()
 
     def _purchase_tower(self, tower_id: str):
-        """Callback for when a purchase is attempted."""
         if self.progression_manager.purchase_tower(tower_id):
-            self._build_layout()
+            self.set_filter(self.active_filter)
 
     def handle_event(self, event: pygame.event.Event):
-        """Delegates events to all interactive elements."""
-        # --- BUG FIX: Only check event.pos for mouse events ---
         mouse_pos = pygame.mouse.get_pos()
+        self.grid.handle_scroll_event(event)
+        self.preview_panel.handle_event(event)
 
-        if self.is_scrollable and event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 4:  # Scroll up
-                self.scroll_y = max(0, self.scroll_y - 35)
-            elif event.button == 5:  # Scroll down
-                self.scroll_y = min(self.max_scroll, self.scroll_y + 35)
+        for btn in self.filter_buttons:
+            btn.is_hovered = btn.rect.collidepoint(mouse_pos)
+            btn.handle_event(event)
 
-        current_currency = self.progression_manager.get_player_data().meta_currency
+        hovered_button = None
+        for i, button in enumerate(self.tower_buttons):
+            layout_rect = self.grid.get_item_rect(i)
+            on_screen_rect = layout_rect.move(0, -self.grid.scroll_y)
+            if self.grid.area.contains(on_screen_rect):
+                button.is_hovered = on_screen_rect.collidepoint(mouse_pos)
+                if button.is_hovered:
+                    hovered_button = button
+            else:
+                button.is_hovered = False
 
-        header_height = self.screen_rect.height * 0.15
-        for button in self.tower_buttons:
-            on_screen_rect = button.rect.move(0, header_height - self.scroll_y)
-            button.is_hovered = on_screen_rect.collidepoint(mouse_pos)
+        if hovered_button and hovered_button != self.selected_tower:
+            self.selected_tower = hovered_button
+            for btn in self.tower_buttons:
+                btn.is_selected = btn == self.selected_tower
 
-            can_afford = current_currency >= button.cost
-            if button.handle_event(event, can_afford):
-                return
+            can_afford = (
+                self.progression_manager.get_player_data().meta_currency
+                >= self.selected_tower.tower_info["cost"]
+            )
+            self.preview_panel.set_item(
+                item_data=self.selected_tower.tower_info,
+                button_text=f"Unlock ({self.selected_tower.tower_info['cost']} CS)",
+                button_action=self._purchase_tower,
+                is_button_enabled=not self.selected_tower.is_unlocked and can_afford,
+            )
 
         self.back_button.is_hovered = self.back_button.rect.collidepoint(mouse_pos)
         if (
@@ -242,90 +345,36 @@ class WorkshopScreen:
             self.back_callback()
 
     def draw(self, screen: pygame.Surface):
-        """Draws the entire Workshop screen with scrolling and clipping."""
-        # --- Draw Static Header ---
-        title_surf = self.title_font.render("The Workshop", True, self.colors["title"])
+        title_surf = self.title_font.render("The Workshop", True, (220, 220, 230))
         title_rect = title_surf.get_rect(
             centerx=self.screen_rect.centerx, y=self.screen_rect.height * 0.05
         )
         screen.blit(title_surf, title_rect)
 
         currency = self.progression_manager.get_player_data().meta_currency
-        currency_text = f"Chaos Shards: {currency}"
         currency_surf = self.currency_font.render(
-            currency_text, True, self.colors["currency"]
+            f"Chaos Shards: {currency}", True, (255, 215, 0)
         )
         currency_rect = currency_surf.get_rect(
             topright=(self.screen_rect.right - 30, 30)
         )
         screen.blit(currency_surf, currency_rect)
 
-        # --- Draw Scrollable Content ---
-        header_height = self.screen_rect.height * 0.15
-        content_area_rect = pygame.Rect(
-            0, header_height, self.screen_rect.width, self.visible_height
-        )
+        back_bg = (60, 75, 90) if self.back_button.is_hovered else (40, 50, 60)
+        pygame.draw.rect(screen, back_bg, self.back_button.rect, border_radius=8)
+        back_surf = self.back_font.render("Back", True, (210, 210, 220))
+        screen.blit(back_surf, back_surf.get_rect(center=self.back_button.rect.center))
 
-        section_surf = self.section_font.render(
-            "Tower Blueprints", True, self.colors["section_header"]
-        )
-        # Draw the header relative to the content area, but affected by scroll
-        screen.blit(section_surf, (50, header_height + 20 - self.scroll_y))
+        self.preview_panel.draw(screen)
+        for btn in self.filter_buttons:
+            btn.draw(screen)
 
-        screen.set_clip(content_area_rect)
-
-        current_currency = self.progression_manager.get_player_data().meta_currency
-        for button in self.tower_buttons:
-            original_rect = button.rect.copy()
-            # Position the button within the scrollable content area
-            button.rect.topleft = (
-                original_rect.x,
-                original_rect.y + header_height - self.scroll_y,
-            )
-
-            can_afford = current_currency >= button.cost
-            button.draw(screen, can_afford)
-
-            button.rect = original_rect
-
+        screen.set_clip(self.grid.area)
+        can_afford = self.progression_manager.get_player_data().meta_currency
+        for i, button in enumerate(self.tower_buttons):
+            layout_rect = self.grid.get_item_rect(i)
+            button.rect.topleft = (layout_rect.x, layout_rect.y - self.grid.scroll_y)
+            button.draw(screen, can_afford >= button.tower_info["cost"])
         screen.set_clip(None)
 
-        if self.is_scrollable:
-            self._draw_scrollbar(screen, content_area_rect)
-
-        # --- Draw Static Footer ---
-        back_bg_color = (
-            self.colors["back_bg_hover"]
-            if self.back_button.is_hovered
-            else self.colors["back_bg_default"]
-        )
-        pygame.draw.rect(screen, back_bg_color, self.back_button.rect, border_radius=8)
-        back_text_surf = self.back_font.render(
-            "Back", True, self.colors["back_button_text"]
-        )
-        back_text_rect = back_text_surf.get_rect(center=self.back_button.rect.center)
-        screen.blit(back_text_surf, back_text_rect)
-
-    def _draw_scrollbar(self, screen: pygame.Surface, area: pygame.Rect):
-        """Draws a custom scrollbar for the content area."""
-        track_width = 10
-        track_rect = pygame.Rect(
-            area.right - track_width - 15, area.top + 5, track_width, area.height - 10
-        )
-        pygame.draw.rect(
-            screen, self.colors["scrollbar_track"], track_rect, border_radius=5
-        )
-
-        if self.content_height > self.visible_height:
-            handle_height = self.visible_height * (
-                self.visible_height / self.content_height
-            )
-            handle_height = max(20, handle_height)
-            scroll_ratio = self.scroll_y / self.max_scroll if self.max_scroll > 0 else 0
-            handle_y = track_rect.y + (track_rect.height - handle_height) * scroll_ratio
-            handle_rect = pygame.Rect(
-                track_rect.x, handle_y, track_rect.width, handle_height
-            )
-            pygame.draw.rect(
-                screen, self.colors["scrollbar_handle"], handle_rect, border_radius=5
-            )
+        self.grid.draw_scrollbar(screen)
