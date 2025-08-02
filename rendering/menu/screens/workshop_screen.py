@@ -242,10 +242,9 @@ class WorkshopScreen:
         """Filters towers and rebuilds the grid and filter buttons."""
         self.all_unlockable_towers = self.progression_manager.get_unlockable_towers()
 
-        if self.active_filter == "All":
+        if self.active_filter.lower() == "all":
             self.filtered_towers = self.all_unlockable_towers
         else:
-            # We need the full tower config for category filtering
             all_tower_configs = self.progression_manager.all_tower_configs
             self.filtered_towers = [
                 t
@@ -256,7 +255,12 @@ class WorkshopScreen:
 
         self.tower_buttons.clear()
         for tower_info in self.filtered_towers:
-            button = TowerUnlockButton(pygame.Rect(0, 0, 0, 0), tower_info)
+            # Add the full config data to the info dict for the button
+            full_config = self.progression_manager.all_tower_configs.get(
+                tower_info["id"], {}
+            )
+            tower_info_full = {**full_config, **tower_info}
+            button = TowerUnlockButton(pygame.Rect(0, 0, 0, 0), tower_info_full)
             self.tower_buttons.append(button)
         self.grid.update_item_count(len(self.tower_buttons))
 
@@ -271,7 +275,7 @@ class WorkshopScreen:
                 )
             )
         )
-        categories = ["All"] + all_categories
+        categories = ["All"] + [cat for cat in all_categories if cat != "N/A"]
 
         btn_width, btn_height, btn_spacing = 120, 35, 10
         start_x = self.grid.area.left
@@ -370,11 +374,11 @@ class WorkshopScreen:
             btn.draw(screen)
 
         screen.set_clip(self.grid.area)
-        can_afford = self.progression_manager.get_player_data().meta_currency
+        player_currency = self.progression_manager.get_player_data().meta_currency
         for i, button in enumerate(self.tower_buttons):
             layout_rect = self.grid.get_item_rect(i)
             button.rect.topleft = (layout_rect.x, layout_rect.y - self.grid.scroll_y)
-            button.draw(screen, can_afford >= button.tower_info["cost"])
+            button.draw(screen, player_currency >= button.tower_info["cost"])
         screen.set_clip(None)
 
         self.grid.draw_scrollbar(screen)
