@@ -119,10 +119,14 @@ class GameManager:
 
     def get_buildable_towers(self) -> List[str]:
         """
-        Retrieves a list of all buildable tower IDs from the game configuration.
-        This method is needed by the UIManager to populate tower buttons.
+        Retrieves a list of tower IDs that the player has unlocked and can build.
+        This method now correctly consults the ProgressionManager to respect
+        the player's save data, fixing the "instant unlock" bug.
         """
-        return list(self.configs.get("tower_types", {}).keys())
+        # --- FIX (Step 1.2): Get unlocked towers from player save data ---
+        player_data = self.progression_manager.get_player_data()
+        # We sort the list to ensure the UI tower buttons appear in a consistent order.
+        return sorted(list(player_data.unlocked_towers))
 
     def end_game_session(self, victory: bool):
         """
