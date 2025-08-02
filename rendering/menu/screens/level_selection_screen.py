@@ -3,8 +3,8 @@ import pygame
 import logging
 from typing import List, Dict, Any, Callable, Set
 
-from ..common.ui.ui_element import UIElement
-from ..common.text.text_renderer import render_text_wrapped
+from rendering.common.ui.ui_element import UIElement
+from rendering.common.text.text_renderer import render_text_wrapped
 
 logger = logging.getLogger(__name__)
 
