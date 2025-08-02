@@ -234,7 +234,9 @@ class PersonaSelectionPanel(UIElement):
         screen.blit(overlay, (0, 0))
 
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        panel_surf.fill(self.colors.get("panel_primary") + (245,))
+        # --- FIX: Convert list-based color to tuple before concatenation ---
+        panel_color = self.colors.get("panel_primary", [25, 30, 40])
+        panel_surf.fill(tuple(panel_color) + (245,))
         screen.blit(panel_surf, self.rect.topleft)
         pygame.draw.rect(
             screen,

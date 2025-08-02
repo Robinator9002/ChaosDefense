@@ -147,5 +147,7 @@ class UpgradeButton(UIElement):
 
         if not self.can_afford:
             overlay_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-            overlay_surf.fill(self.colors.get("background_primary", (0, 0, 0)) + (100,))
+            # --- FIX: Convert the list-based color to a tuple before concatenation ---
+            overlay_color = self.colors.get("background_primary", [0, 0, 0])
+            overlay_surf.fill(tuple(overlay_color) + (100,))
             screen.blit(overlay_surf, self.rect.topleft)
