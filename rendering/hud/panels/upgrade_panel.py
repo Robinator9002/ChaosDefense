@@ -13,15 +13,28 @@ if TYPE_CHECKING:
     from game_logic.upgrades.upgrade_manager import UpgradeManager
     from game_logic.game_state import GameState
     from rendering.text.font_manager import FontManager
+    from rendering.common.tooltips import TooltipManager
 
 logger = logging.getLogger(__name__)
+
+
+class _StatLine(UIElement):
+    """A helper UIElement to manage a single line of text in the stats display."""
+
+    def __init__(
+        self, rect: pygame.Rect, label: str, value_str: str, tooltip_text: Optional[str]
+    ):
+        super().__init__(rect)
+        self.label = label
+        self.value_str = value_str
+        self.tooltip_text = tooltip_text
 
 
 class UpgradePanel(UIElement):
     """
     A UI panel that displays stats and upgrade options for a selected tower.
-    MODIFIED: Layout has been improved with better spacing and visual separators
-    for increased readability.
+    MODIFIED: Now integrated with the TooltipManager to display descriptions
+    for complex stats.
     """
 
     def __init__(
@@ -35,6 +48,7 @@ class UpgradePanel(UIElement):
         targeting_ai_config: Dict[str, Any],
         ui_theme: Dict[str, Any],
         font_manager: "FontManager",
+        tooltip_manager: "TooltipManager",
     ):
         super().__init__(rect)
         self.tower = tower
@@ -45,17 +59,17 @@ class UpgradePanel(UIElement):
         self.targeting_ai_config = targeting_ai_config
         self.ui_theme = ui_theme
         self.font_manager = font_manager
+        self.tooltip_manager = tooltip_manager
 
         self.upgrade_buttons: List[UpgradeButton] = []
+        self.stat_lines: List[_StatLine] = []
         self.persona_change_button_rect = pygame.Rect(0, 0, 0, 0)
         self.is_persona_button_hovered = False
         self.close_button_rect = pygame.Rect(0, 0, 0, 0)
         self.is_close_hovered = False
         self.salvage_button_rect = pygame.Rect(0, 0, 0, 0)
         self.is_salvage_hovered = False
-
         self.separator_y_positions: List[int] = []
-        # --- NEW: Store layout positions to prevent re-calculation bugs ---
         self.stats_header_y = 0
         self.targeting_header_y = 0
         self.current_persona_y = 0
@@ -65,7 +79,6 @@ class UpgradePanel(UIElement):
         self.rebuild_layout()
 
     def _load_theme_assets(self):
-        """Loads all necessary fonts and style values from the theme config."""
         self.colors = self.ui_theme.get("colors", {})
         self.layout = self.ui_theme.get("layout", {})
         self.font_title = self.font_manager.get_font("body_large")
@@ -76,18 +89,15 @@ class UpgradePanel(UIElement):
         self.font_persona = self.font_manager.get_font("body_tiny", bold=True)
 
     def on_resize(self, new_screen_rect: pygame.Rect):
-        """Updates position based on new screen dimensions."""
         self.rect.right = new_screen_rect.right - self.layout.get("padding_medium", 15)
         self.rebuild_layout()
 
     def rebuild_layout(self):
-        """Forces the panel to re-create its buttons and recalculate layout."""
         self._create_button_objects()
         self._perform_layout_and_positioning()
         self.update_hover_states()
 
     def update_hover_states(self):
-        """Checks mouse position and updates hover state for all elements."""
         mouse_pos = pygame.mouse.get_pos()
         self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
         self.is_salvage_hovered = self.salvage_button_rect.collidepoint(mouse_pos)
@@ -96,10 +106,12 @@ class UpgradePanel(UIElement):
         )
         for button in self.upgrade_buttons:
             button.is_hovered = button.rect.collidepoint(mouse_pos)
+        for stat_line in self.stat_lines:
+            stat_line.is_hovered = stat_line.rect.collidepoint(mouse_pos)
 
     def _perform_layout_and_positioning(self):
-        """Calculates required height and sets positions for all elements."""
         self.separator_y_positions.clear()
+        self.stat_lines.clear()
         padding = self.layout.get("padding_medium", 15)
         spacing = self.layout.get("spacing_medium", 10)
         section_spacing = self.layout.get("padding_large", 20)
@@ -108,22 +120,33 @@ class UpgradePanel(UIElement):
         self.close_button_rect = pygame.Rect(
             self.rect.right - 28, self.rect.y + 8, 20, 20
         )
-
-        # Title and Stats Section
         current_y += self.font_title.get_height() + spacing
         self.stats_header_y = current_y
-        stats_to_display = self.tower.get_displayable_stats()
-        current_y += self.font_header.get_height() + (spacing / 2)
-        current_y += len(stats_to_display) * 22
+
+        # Create stat line objects
+        stats_data = self.tower.get_displayable_stats()
+        stat_line_y = (
+            self.stats_header_y + self.font_header.get_height() + (spacing / 2)
+        )
+        for label, value, value_format, description in stats_data:
+            line_rect = pygame.Rect(
+                self.rect.x + padding, stat_line_y, self.rect.width - padding * 2, 22
+            )
+            value_str = format_stat_value(value, value_format)
+            self.stat_lines.append(
+                _StatLine(line_rect, f"{label}:", value_str, description)
+            )
+            stat_line_y += 22
+
+        current_y = stat_line_y
         current_y += section_spacing / 2
         self.separator_y_positions.append(current_y)
         current_y += section_spacing / 2
 
-        # Persona Section
         self.targeting_header_y = current_y
         current_y += self.font_header.get_height() + (spacing / 2)
         self.current_persona_y = current_y
-        current_y += 20  # Space for the "Current: ..." text line
+        current_y += 20
         button_width = self.rect.width - (padding * 2)
         self.persona_change_button_rect = pygame.Rect(
             self.rect.x + padding, current_y, button_width, 30
@@ -133,7 +156,6 @@ class UpgradePanel(UIElement):
         self.separator_y_positions.append(current_y)
         current_y += section_spacing / 2
 
-        # Upgrade Buttons Section
         if self.upgrade_buttons:
             self.upgrades_header_y = current_y
             current_y += self.font_header.get_height() + spacing
@@ -141,7 +163,6 @@ class UpgradePanel(UIElement):
                 button.rect.topleft = (self.rect.x + padding, current_y)
                 current_y += button.rect.height + spacing
 
-        # Salvage Button Area (always at the bottom)
         self.rect.height = current_y + 55
         self.salvage_button_rect = pygame.Rect(
             self.rect.x + padding,
@@ -154,7 +175,6 @@ class UpgradePanel(UIElement):
         self.upgrade_buttons.clear()
         padding = self.layout.get("padding_medium", 15)
         width = self.rect.width - (padding * 2)
-
         for path in ["path_a", "path_b"]:
             next_upgrade = self.upgrade_manager.get_next_upgrade(self.tower, path)
             if next_upgrade:
@@ -189,6 +209,23 @@ class UpgradePanel(UIElement):
                 if action:
                     return action
         return None
+
+    # --- NEW: Update method to handle tooltip requests ---
+    def update(self, dt: float, game_state: "GameState"):
+        """Updates the panel, including checking for and requesting tooltips."""
+        self.update_hover_states()
+
+        hovered_item = False
+        for stat_line in self.stat_lines:
+            if stat_line.is_hovered and stat_line.tooltip_text:
+                self.tooltip_manager.request_tooltip(
+                    stat_line.tooltip_text, stat_line.rect
+                )
+                hovered_item = True
+                break
+
+        if not hovered_item:
+            self.tooltip_manager.cancel_tooltip()
 
     def draw(self, screen: pygame.Surface):
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
@@ -231,10 +268,10 @@ class UpgradePanel(UIElement):
             active_persona_name, True, self.colors.get("text_primary")
         )
 
-        # --- FIX: Use the Y position calculated during the layout phase ---
-        info_y = self.current_persona_y
-        screen.blit(label_surf, (self.rect.x + padding, info_y))
-        value_rect = value_surf.get_rect(topright=(self.rect.right - padding, info_y))
+        screen.blit(label_surf, (self.rect.x + padding, self.current_persona_y))
+        value_rect = value_surf.get_rect(
+            topright=(self.rect.right - padding, self.current_persona_y)
+        )
         screen.blit(value_surf, value_rect)
 
         bg_color = (
@@ -263,12 +300,10 @@ class UpgradePanel(UIElement):
         screen.blit(text_surf, text_rect)
 
     def _draw_upgrades_header(self, screen: pygame.Surface):
-        """Draws the 'Upgrades' header text."""
         padding = self.layout.get("padding_medium", 15)
         header_surf = self.font_header.render(
             "Upgrades", True, self.colors.get("text_primary")
         )
-        # --- FIX: Use the Y position calculated during the layout phase ---
         screen.blit(header_surf, (self.rect.x + padding, self.upgrades_header_y))
 
     def _draw_close_button(self, screen: pygame.Surface):
@@ -305,14 +340,12 @@ class UpgradePanel(UIElement):
 
     def _draw_static_text(self, screen: pygame.Surface):
         padding = self.layout.get("padding_medium", 15)
-        spacing = self.layout.get("spacing_medium", 10)
         current_y = self.rect.y + padding
         title_surf = self.font_title.render(
             self.tower.name, True, self.colors.get("text_primary")
         )
         screen.blit(title_surf, (self.rect.x + padding, current_y))
 
-        # --- FIX: Use the Y positions calculated during the layout phase ---
         stats_header_surf = self.font_header.render(
             "Statistics", True, self.colors.get("text_primary")
         )
@@ -325,19 +358,17 @@ class UpgradePanel(UIElement):
             targeting_header_surf, (self.rect.x + padding, self.targeting_header_y)
         )
 
-        # --- FIX: Start drawing stats from the correct Y position ---
-        current_y = self.stats_header_y + stats_header_surf.get_height() + (spacing / 2)
-        for label, value, value_format in self.tower.get_displayable_stats():
-            value_str = format_stat_value(value, value_format)
-            label_surf = self.font_stat.render(
-                f"{label}:", True, self.colors.get("text_secondary")
-            )
-            value_surf = self.font_stat.render(
-                value_str, True, self.colors.get("text_primary")
-            )
-            screen.blit(label_surf, (self.rect.x + padding, current_y))
-            value_rect = value_surf.get_rect(
-                topright=(self.rect.right - padding, current_y)
-            )
+        # --- MODIFIED: Draw using the new _StatLine objects ---
+        for stat_line in self.stat_lines:
+            label_color = self.colors.get("text_secondary")
+            value_color = self.colors.get("text_primary")
+            if stat_line.is_hovered and stat_line.tooltip_text:
+                label_color = self.colors.get("text_accent")
+                value_color = self.colors.get("text_accent")
+
+            label_surf = self.font_stat.render(stat_line.label, True, label_color)
+            value_surf = self.font_stat.render(stat_line.value_str, True, value_color)
+
+            screen.blit(label_surf, stat_line.rect.topleft)
+            value_rect = value_surf.get_rect(topright=stat_line.rect.topright)
             screen.blit(value_surf, value_rect)
-            current_y += 22

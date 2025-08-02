@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from game_logic.game_manager import GameManager
     from game_logic.progression.progression_manager import ProgressionManager
     from rendering.text.font_manager import FontManager
+    from rendering.common.tooltips import TooltipManager
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ class UIManager:
         screen_rect: pygame.Rect,
         game_manager: "GameManager",
         progression_manager: "ProgressionManager",
+        tooltip_manager: "TooltipManager",  # <-- NEW: Accept TooltipManager
         assets_path: Path,
         ui_theme: Dict[str, Any],
         font_manager: "FontManager",
@@ -40,6 +42,7 @@ class UIManager:
         self.screen_rect = screen_rect
         self.game_manager = game_manager
         self.progression_manager = progression_manager
+        self.tooltip_manager = tooltip_manager  # <-- NEW: Store TooltipManager
         self.assets_path = assets_path
         self.ui_theme = ui_theme
         self.font_manager = font_manager
@@ -56,7 +59,6 @@ class UIManager:
         self.info_panel: Optional[TowerInfoPanel] = None
         self.upgrade_panel: Optional[UpgradePanel] = None
         self.persona_panel: Optional[PersonaSelectionPanel] = None
-
         self.hovered_tower_button: Optional[TowerButton] = None
 
         self._build_static_ui()
@@ -81,9 +83,6 @@ class UIManager:
         buildable_tower_ids = self.game_manager.get_buildable_towers()
         all_tower_configs = self.game_manager.configs.get("tower_types", {})
 
-        # --- MODIFIED: Implement custom category sorting ---
-        # 1. Determine the canonical order of all categories from tower_types.json.
-        # This preserves the intended progression order from the config file.
         canonical_category_order = []
         for tower_id, config in all_tower_configs.items():
             if isinstance(config, dict):
@@ -91,14 +90,11 @@ class UIManager:
                 if category and category not in canonical_category_order:
                     canonical_category_order.append(category)
 
-        # 2. Get the unique set of categories that are actually buildable by the player.
         available_categories_set = set()
         for t_id in buildable_tower_ids:
             if isinstance(tower_data := all_tower_configs.get(t_id), dict):
                 available_categories_set.add(tower_data.get("category", "basic"))
 
-        # 3. Sort the available categories based on the canonical order.
-        # This replaces the simple alphabetical sort with a more logical one.
         sorted_available_categories = sorted(
             list(available_categories_set),
             key=lambda cat: (
@@ -107,10 +103,7 @@ class UIManager:
                 else float("inf")
             ),
         )
-
-        # 4. Finalize the list for the tabs, ensuring "all" is always first.
         categories = ["all"] + sorted_available_categories
-        # --- END OF SORTING LOGIC ---
 
         tab_button_width = 80
         tab_button_height = 30
@@ -209,16 +202,22 @@ class UIManager:
                 panel_width,
                 self.screen_rect.height * 0.9,
             )
+            # --- MODIFIED: Pass the tooltip_manager to the UpgradePanel ---
             self.upgrade_panel = UpgradePanel(
-                panel_rect,
-                tower,
-                self.game_manager.configs["tower_types"].get(tower.tower_type_id),
-                self.game_manager.upgrade_manager,
-                self.game_manager.game_state,
-                self.game_manager.game_settings.get("salvage_refund_percentage", 0.5),
-                self.game_manager.configs.get("targeting_ai", {}),
-                self.ui_theme,
-                self.font_manager,
+                rect=panel_rect,
+                tower=tower,
+                tower_base_data=self.game_manager.configs["tower_types"].get(
+                    tower.tower_type_id
+                ),
+                upgrade_manager=self.game_manager.upgrade_manager,
+                game_state=self.game_manager.game_state,
+                salvage_refund_percentage=self.game_manager.game_settings.get(
+                    "salvage_refund_percentage", 0.5
+                ),
+                targeting_ai_config=self.game_manager.configs.get("targeting_ai", {}),
+                ui_theme=self.ui_theme,
+                font_manager=self.font_manager,
+                tooltip_manager=self.tooltip_manager,
             )
 
     def _close_panel(self):
@@ -233,13 +232,15 @@ class UIManager:
             all_personas = self.game_manager.configs.get("targeting_ai", {})
             eligible_personas = tower.get_eligible_personas(all_personas)
             active_persona = tower.current_persona
+            # --- MODIFIED: Pass the tooltip_manager to the PersonaSelectionPanel ---
             self.persona_panel = PersonaSelectionPanel(
-                self.screen_rect,
-                all_personas,
-                eligible_personas,
-                active_persona,
-                self.ui_theme,
-                self.font_manager,
+                screen_rect=self.screen_rect,
+                all_personas=all_personas,
+                eligible_personas=eligible_personas,
+                active_persona=active_persona,
+                ui_theme=self.ui_theme,
+                font_manager=self.font_manager,
+                tooltip_manager=self.tooltip_manager,
             )
 
     def _close_persona_panel(self):
@@ -333,12 +334,16 @@ class UIManager:
                         panel_width,
                         self.screen_rect.height * 0.9,
                     )
+                    # --- MODIFIED: Pass the tooltip_manager to the TowerInfoPanel ---
                     self.info_panel = TowerInfoPanel(
-                        panel_rect,
-                        tower_data,
-                        self.game_manager.configs.get("targeting_ai", {}),
-                        self.ui_theme,
-                        self.font_manager,
+                        rect=panel_rect,
+                        tower_data=tower_data,
+                        targeting_ai_config=self.game_manager.configs.get(
+                            "targeting_ai", {}
+                        ),
+                        ui_theme=self.ui_theme,
+                        font_manager=self.font_manager,
+                        tooltip_manager=self.tooltip_manager,
                     )
                 return True
         return False
