@@ -8,10 +8,18 @@ from typing import Dict
 from rendering.game_window import Game
 from game_logic.upgrades.upgrade_loader import load_all_upgrades
 
+# --- NEW: Import progression system managers ---
+from game_logic.progression.player_data_manager import PlayerDataManager
+from game_logic.progression.progression_manager import ProgressionManager
+
+
 # --- Constants ---
 PROJECT_ROOT = Path(__file__).parent
 CONFIG_PATH = PROJECT_ROOT / "configs"
 ASSETS_PATH = PROJECT_ROOT / "assets"
+# --- NEW: Define path for save data ---
+SAVES_PATH = PROJECT_ROOT / "saves"
+
 
 # --- Basic Logging Setup ---
 logging.basicConfig(
@@ -54,7 +62,6 @@ def main():
             ),
             "tower_types": load_config(CONFIG_PATH / "entities/tower_types.json"),
             "targeting_ai": load_config(CONFIG_PATH / "targeting/targeting_ai.json"),
-            # --- NEW: Load the AI formations playbook ---
             "formations": load_config(CONFIG_PATH / "ai/formations.json"),
             "upgrade_definitions": all_upgrade_defs,
             "difficulty_scaling": load_config(
@@ -70,11 +77,21 @@ def main():
         )
         return
 
+    # --- NEW: Initialize Progression Systems ---
+    logger.info("--- Initializing Progression Systems ---")
+    player_data_manager = PlayerDataManager(SAVES_PATH / "player_data.json")
+    progression_manager = ProgressionManager(
+        player_data_manager=player_data_manager,
+        all_tower_configs=all_configs["tower_types"],
+    )
+
     logger.info("--- Initializing Game ---")
     try:
         game = Game(
             all_configs=all_configs,
             assets_path=ASSETS_PATH,
+            # --- NEW: Pass the progression manager to the Game class ---
+            progression_manager=progression_manager,
         )
         game.run()
     except Exception as e:
