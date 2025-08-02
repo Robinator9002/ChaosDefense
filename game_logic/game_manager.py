@@ -2,7 +2,7 @@
 import logging
 import uuid
 import pygame
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Tuple, Optional, TYPE_CHECKING
 
 from .game_state import GameState
 from .levels.level_manager import LevelManager
@@ -18,9 +18,11 @@ from .entities.projectiles.persistent_attached_aura import PersistentAttachedAur
 from .upgrades.upgrade_manager import UpgradeManager
 from .effects.status_effect import StatusEffect
 from .game_ai.targeting.targeting_manager import TargetingManager
-
-# --- NEW: Import the DirectorAI class ---
 from .game_ai.director_ai import DirectorAI
+
+if TYPE_CHECKING:
+    from .progression.progression_manager import ProgressionManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +30,22 @@ logger = logging.getLogger(__name__)
 class GameManager:
     """
     The central "headless" engine for the game.
+
+    REFACTORED: Now integrates with the ProgressionManager to handle the end-of-game
+    reward loop.
     """
 
-    def __init__(self, all_configs: Dict[str, Any]):
+    def __init__(
+        self, all_configs: Dict[str, Any], progression_manager: "ProgressionManager"
+    ):
         """
         Initializes the game engine and all its core systems.
         """
         logger.info("--- Initializing Game Manager ---")
         self.configs = all_configs
+        # --- NEW: Store the progression manager ---
+        self.progression_manager = progression_manager
+
         self.tile_size = self.configs["game_settings"].get("tile_size", 32)
         self.game_state: GameState = GameState()
         self.level_manager: LevelManager = LevelManager(self.configs["level_styles"])
@@ -46,7 +56,6 @@ class GameManager:
         self.targeting_manager: TargetingManager = TargetingManager(
             cell_size=120, targeting_ai_config=targeting_ai_config
         )
-        # --- NEW: Instantiate the Director AI ---
         player_difficulty = self.configs["game_settings"].get("difficulty", 1)
         self.director_ai: DirectorAI = DirectorAI(
             difficulty_settings=self.configs["difficulty_scaling"].get(
@@ -68,7 +77,7 @@ class GameManager:
         """Sets up all necessary objects for a new game session."""
         logger.info("--- Setting up new game via Game Manager ---")
         try:
-            preset_to_load = "Forest"
+            preset_to_load = "Forest"  # TODO: Make this selectable
             self.grid, self.paths, style_config = (
                 self.level_manager.build_level_from_preset(preset_to_load)
             )
@@ -95,14 +104,46 @@ class GameManager:
             player_difficulty=player_difficulty,
             initial_level_difficulty=level_difficulty,
             num_paths=len(self.paths),
-            # --- FIX: Pass the DirectorAI instance to the WaveManager ---
             director_ai=self.director_ai,
         )
         logger.info("--- Game Manager setup complete ---")
 
+    def end_game_session(self, victory: bool):
+        """
+        Calculates and awards meta-currency at the end of a game, then saves
+        the player's progress.
+
+        Args:
+            victory (bool): Whether the player won the game.
+        """
+        logger.info(f"Game session ended. Victory: {victory}")
+        waves_cleared = self.game_state.current_wave_number
+
+        # --- Reward Calculation ---
+        # A simple formula: 5 shards per wave cleared, plus a big bonus for winning.
+        shards_per_wave = 5
+        victory_bonus = 100 if victory else 0
+
+        total_shards_earned = (waves_cleared * shards_per_wave) + victory_bonus
+
+        if total_shards_earned > 0:
+            logger.info(f"Awarding {total_shards_earned} Chaos Shards to the player.")
+            player_data = self.progression_manager.get_player_data()
+            player_data.meta_currency += total_shards_earned
+
+            # Update highest wave for stats
+            if waves_cleared > player_data.highest_wave_reached:
+                player_data.highest_wave_reached = waves_cleared
+
+            # TODO: Add level unlocking logic here
+
+            self.progression_manager.player_data_manager.save_data(player_data)
+        else:
+            logger.info("No Chaos Shards earned this session.")
+
     def update(self, dt: float):
         """The main update loop for the entire game simulation."""
-        if self.game_state.game_over:
+        if self.game_state.game_over or self.game_state.victory:
             return
 
         if self.wave_manager:
@@ -112,6 +153,8 @@ class GameManager:
             self.game_state.current_wave_number = (
                 self.wave_manager.wave_state.current_wave_number
             )
+            if self.wave_manager.wave_state.victory:
+                self.game_state.victory = True
 
         newly_created_entities: List[Any] = []
         for tower in self.towers.values():
@@ -122,7 +165,6 @@ class GameManager:
         for enemy in list(self.enemies.values()):
             leaked_enemy = enemy.update(dt, self.game_state, self.targeting_manager)
             if leaked_enemy:
-                # The GameManager is now responsible for reporting the leak
                 self.director_ai.record_enemy_leak(leaked_enemy)
 
             if enemy.is_alive:
@@ -150,9 +192,7 @@ class GameManager:
             dead_enemy = self.enemies[enemy_id]
             self.game_state.add_gold(dead_enemy.bounty)
             self._handle_on_death_effects(dead_enemy)
-
             self.director_ai.record_enemy_death(dead_enemy)
-
             self.targeting_manager.remove_entity(dead_enemy)
             del self.enemies[enemy_id]
 
@@ -204,10 +244,7 @@ class GameManager:
                     enemy.apply_status_effect(effect_instance)
 
     def _spawn_enemy(self, spawn_job: Dict[str, Any]):
-        """
-        Creates an Enemy or BossEnemy instance based on a spawn job, adds it
-        to the game, and registers it with the targeting manager.
-        """
+        """Creates an Enemy or BossEnemy instance based on a spawn job."""
         entity_id = spawn_job["type"]
         path_index = spawn_job["path_index"]
         if not (0 <= path_index < len(self.paths)) or not self.wave_manager:
@@ -218,7 +255,6 @@ class GameManager:
         status_effects_cfg = self.configs.get("status_effects", {})
         new_enemy = None
 
-        # --- NEW: Add the enemy type ID to the data for the AI ---
         config = {}
         if entity_id in self.configs["boss_types"]:
             config = self.configs["boss_types"][entity_id]
@@ -263,7 +299,7 @@ class GameManager:
     def place_tower(self, tower_type_id: str, tile_x: int, tile_y: int) -> bool:
         """Handles the logic for a player attempting to place a new tower."""
         tower_data = self.configs.get("tower_types", {}).get(tower_type_id)
-        if not tower_data:
+        if not tower_data or not self.grid:
             return False
 
         tile = self.grid.get_tile(tile_x, tile_y)
@@ -283,7 +319,6 @@ class GameManager:
 
         self.towers[new_tower.entity_id] = new_tower
         self.targeting_manager.add_entity(new_tower)
-
         self.grid.set_tile_type(tile_x, tile_y, "TOWER_OCCUPIED")
         return True
 
@@ -311,7 +346,7 @@ class GameManager:
     def salvage_tower(self, tower_id: uuid.UUID):
         """Handles all logic for salvaging a tower."""
         target_tower = self.towers.get(tower_id)
-        if not target_tower:
+        if not target_tower or not self.grid:
             return
 
         refund_amount = int(target_tower.total_investment * self.get_salvage_rate())
@@ -330,7 +365,6 @@ class GameManager:
         if not target_tower:
             logger.error(f"Could not find tower with ID {tower_id} to change persona.")
             return
-
         target_tower.set_persona(new_persona_id)
 
     def get_salvage_rate(self) -> float:
