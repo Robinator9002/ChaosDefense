@@ -7,8 +7,8 @@ from enum import Enum, auto
 from ..common.ui.ui_element import UIElement
 
 # --- NEW: Import the new screen classes ---
-from .level_selection_screen import LevelSelectionScreen
-from .workshop_screen import WorkshopScreen
+from .screens.level_selection_screen import LevelSelectionScreen
+from .screens.workshop_screen import WorkshopScreen
 
 if TYPE_CHECKING:
     from game_logic.progression.progression_manager import ProgressionManager
