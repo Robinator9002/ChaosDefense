@@ -52,7 +52,15 @@ class UIManager:
 
         self.tower_buttons: List[TowerButton] = []
         self.tab_buttons: List[TabButton] = []
-        self.active_tab: str = "basic"
+
+        # --- FIX (Step 1.3): Set "all" as the default active tab ---
+        # This ensures that tower buttons are visible from the start of the game.
+        self.active_tab: str = "all"
+
+        # --- FIX (Step 1.3): Initialize the hotkey_map attribute ---
+        # This list will hold the tower_type_ids for the currently visible buttons,
+        # allowing the InputHandler to select them via number keys.
+        self.hotkey_map: List[str] = []
 
         self.info_panel: Optional[TowerInfoPanel] = None
         self.upgrade_panel: Optional[UpgradePanel] = None
@@ -78,6 +86,9 @@ class UIManager:
         """
         self.tower_buttons.clear()
         self.tab_buttons.clear()
+
+        # --- FIX (Step 1.3): Clear the hotkey map before rebuilding ---
+        self.hotkey_map.clear()
 
         buildable_tower_ids = self.game_manager.get_buildable_towers()
         all_tower_configs = self.game_manager.configs.get("tower_types", {})
@@ -123,6 +134,11 @@ class UIManager:
                     or tower_data.get("category") == self.active_tab
                 ):
                     filtered_tower_ids.append(t_id)
+
+        # --- FIX (Step 1.3): Populate the hotkey map ---
+        # The hotkey_map is now a simple list of the tower IDs in the order they
+        # will be displayed. The InputHandler can use an index to get the ID.
+        self.hotkey_map = filtered_tower_ids
 
         button_size = 64
         button_spacing = 15
@@ -273,7 +289,8 @@ class UIManager:
                 self.active_tab = button.category_name.lower()
                 self._rebuild_tower_buttons()
                 return True
-            button.is_hovered = button.rect.collidepoint(pygame.mouse.get_pos())
+            if hasattr(event, "pos"):
+                button.is_hovered = button.rect.collidepoint(event.pos)
 
         for button in self.tower_buttons:
             action = button.handle_event(event, game_state)
