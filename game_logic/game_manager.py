@@ -31,19 +31,23 @@ class GameManager:
     """
     The central "headless" engine for the game.
 
-    REFACTORED: Now integrates with the ProgressionManager to handle the end-of-game
-    reward loop and level unlocking.
+    REFACTORED: Now accepts a level_id upon creation to dynamically build
+    the selected level.
     """
 
     def __init__(
-        self, all_configs: Dict[str, Any], progression_manager: "ProgressionManager"
+        self,
+        all_configs: Dict[str, Any],
+        progression_manager: "ProgressionManager",
+        level_id: str,
     ):
         """
-        Initializes the game engine and all its core systems.
+        Initializes the game engine and all its core systems for a specific level.
         """
         logger.info("--- Initializing Game Manager ---")
         self.configs = all_configs
         self.progression_manager = progression_manager
+        self.current_level_id = level_id
 
         self.tile_size = self.configs["game_settings"].get("tile_size", 32)
         self.game_state: GameState = GameState()
@@ -65,7 +69,6 @@ class GameManager:
         self.wave_manager: Optional[WaveManager] = None
         self.grid: Optional[Grid] = None
         self.paths: List[List[Tuple[int, int]]] = []
-        self.current_level_id: Optional[str] = None
 
         self.enemies: Dict[uuid.UUID, Enemy] = {}
         self.towers: Dict[uuid.UUID, Tower] = {}
@@ -75,9 +78,8 @@ class GameManager:
 
     def _setup_new_game(self):
         """Sets up all necessary objects for a new game session."""
-        logger.info("--- Setting up new game via Game Manager ---")
+        logger.info(f"--- Setting up new game for level: {self.current_level_id} ---")
         try:
-            self.current_level_id = "Forest"  # TODO: Make this selectable
             self.grid, self.paths, style_config = (
                 self.level_manager.build_level_from_preset(self.current_level_id)
             )
@@ -112,16 +114,12 @@ class GameManager:
         """
         Calculates and awards meta-currency and unlocks the next level upon
         victory, then saves the player's progress.
-
-        Args:
-            victory (bool): Whether the player won the game.
         """
         logger.info(f"Game session ended. Victory: {victory}")
         waves_cleared = self.game_state.current_wave_number
 
         player_data = self.progression_manager.get_player_data()
 
-        # --- Reward Calculation ---
         shards_per_wave = 5
         victory_bonus = 100 if victory else 0
         total_shards_earned = (waves_cleared * shards_per_wave) + victory_bonus
@@ -130,11 +128,9 @@ class GameManager:
             logger.info(f"Awarding {total_shards_earned} Chaos Shards to the player.")
             player_data.meta_currency += total_shards_earned
 
-        # Update highest wave for stats
         if waves_cleared > player_data.highest_wave_reached:
             player_data.highest_wave_reached = waves_cleared
 
-        # --- Level Unlocking Logic ---
         if victory and self.current_level_id:
             all_levels = self.level_manager.get_level_presets()
             try:
@@ -146,7 +142,7 @@ class GameManager:
                         logger.warning(f"NEW LEVEL UNLOCKED: {next_level_id}")
             except ValueError:
                 logger.error(
-                    f"Could not find current level '{self.current_level_id}' in level list for unlocking."
+                    f"Could not find current level '{self.current_level_id}' in level list."
                 )
 
         self.progression_manager.player_data_manager.save_data(player_data)
@@ -176,7 +172,6 @@ class GameManager:
             leaked_enemy = enemy.update(dt, self.game_state, self.targeting_manager)
             if leaked_enemy:
                 self.director_ai.record_enemy_leak(leaked_enemy)
-
             if enemy.is_alive:
                 self.targeting_manager.update_entity_position(enemy)
 
@@ -196,7 +191,7 @@ class GameManager:
         self._cleanup_dead_entities()
 
     def _cleanup_dead_entities(self):
-        """Removes all dead entities from the game dictionaries and targeting manager."""
+        """Removes all dead entities from the game."""
         dead_enemy_ids = [eid for eid, e in self.enemies.items() if not e.is_alive]
         for enemy_id in dead_enemy_ids:
             dead_enemy = self.enemies[enemy_id]
