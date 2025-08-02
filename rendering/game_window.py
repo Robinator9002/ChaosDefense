@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 
 from game_logic.game_manager import GameManager
 from rendering.sprite_renderer import SpriteRenderer
-from rendering.ui.ui_manager import UIManager
+from rendering.hud.ui_manager import UIManager
 
 logger = logging.getLogger(__name__)
 
