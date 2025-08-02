@@ -42,9 +42,6 @@ class Game:
         """
         Initializes the window and all high-level systems.
         """
-        # --- FIX: Pygame initialization is now done in main.py ---
-        # This class now assumes Pygame has already been initialized.
-
         self.all_configs = all_configs
         self.game_settings = all_configs["game_settings"]
         self.assets_path = assets_path
@@ -90,10 +87,6 @@ class Game:
         """
         logger.info(f"--- Starting New Game on level: {level_id} ---")
 
-        # --- MODIFIED: Removed obsolete call to apply_global_upgrades ---
-        # The GameManager's __init__ method now handles the application of
-        # global modifiers internally. This call was causing the crash and
-        # is no longer necessary with the new architecture.
         self.game_manager = GameManager(
             self.all_configs, self.progression_manager, level_id
         )
@@ -264,44 +257,105 @@ class Game:
 
         pygame.display.flip()
 
+    # --- MODIFIED: Complete overhaul of the top HUD (Your Plan / Step 2.3) ---
+    # This method has been rewritten to create a more visually appealing and
+    # theme-aligned panel with icons and a better layout, replacing the
+    # previous simple text implementation.
     def _draw_top_gui(self):
         """Draws the static user interface elements like gold, hp, and wave count."""
-        if not self.game_manager:
+        if not self.game_manager or not self.game_manager.game_state:
             return
 
         state = self.game_manager.game_state
         wave_mgr = self.game_manager.wave_manager
-        if not state or not wave_mgr:
-            return
-
         colors = self.ui_theme.get("colors", {})
         layout = self.ui_theme.get("layout", {})
-        font = self.font_manager.get_font("body_medium")
-
-        color_gold = colors.get("text_accent", (255, 215, 0))
-        color_hp = colors.get("text_error", (220, 20, 60))
-        color_wave = colors.get("text_primary", (0, 191, 255))
         padding = layout.get("padding_medium", 15)
-        y_pos = 15
+        spacing = layout.get("spacing_medium", 10)
+        font = self.font_manager.get_font("body_large")
 
-        wave_text = f"Wave: {state.current_wave_number} / {wave_mgr.max_waves}"
-        surfaces = [
-            font.render(f"Gold: {state.gold}", True, color_gold),
-            font.render(f"Base HP: {state.base_hp}", True, color_hp),
-            font.render(wave_text, True, color_wave),
+        # Define content for each stat pod (icon_drawer, text, color_key)
+        # The wave text is now more compact, showing only the current wave.
+        wave_text = f"{state.current_wave_number}"
+        if wave_mgr:
+            wave_text += f" / {wave_mgr.max_waves}"
+
+        stat_pods_data = [
+            (self._draw_heart_icon, f"{state.base_hp}", "text_error"),
+            (self._draw_coin_icon, f"{state.gold}", "text_accent"),
+            (self._draw_wave_icon, wave_text, "text_primary"),
         ]
-        panel_width = sum(s.get_width() for s in surfaces) + (
-            padding * (len(surfaces) + 1)
-        )
-        panel_height = max(s.get_height() for s in surfaces) + (padding / 2)
-        panel_rect = pygame.Rect(5, 5, panel_width, panel_height)
 
+        # Calculate total width required for all pods
+        total_width = padding
+        for _, text, _ in stat_pods_data:
+            text_width = font.size(text)[0]
+            # Width of pod = icon_size + spacing + text_width + padding
+            total_width += 30 + spacing + text_width + padding * 2
+
+        panel_height = 50
+        panel_rect = pygame.Rect(10, 10, total_width, panel_height)
         panel_surf = pygame.Surface(panel_rect.size, pygame.SRCALPHA)
-        bg_color_list = colors.get("panel_primary", [0, 0, 0])
-        panel_surf.fill(tuple(bg_color_list) + (200,))
+        bg_color = tuple(colors.get("panel_primary", [0, 0, 0])) + (220,)
+        panel_surf.fill(bg_color)
+
+        # Draw border for the main panel
+        pygame.draw.rect(
+            panel_surf,
+            colors.get("border_primary"),
+            panel_surf.get_rect(),
+            width=layout.get("border_width_standard", 2),
+            border_radius=layout.get("border_radius_small", 5),
+        )
         self.screen.blit(panel_surf, panel_rect.topleft)
 
+        # Draw each stat pod inside the main panel
         current_x = panel_rect.left + padding
-        for surf in surfaces:
-            self.screen.blit(surf, (current_x, y_pos))
-            current_x += surf.get_width() + padding
+        for icon_drawer, text, color_key in stat_pods_data:
+            icon_rect = pygame.Rect(current_x, panel_rect.centery - 15, 30, 30)
+            icon_drawer(self.screen, icon_rect, colors.get(color_key))
+
+            text_surf = font.render(text, True, colors.get(color_key))
+            text_rect = text_surf.get_rect(
+                centery=panel_rect.centery, x=icon_rect.right + spacing
+            )
+            self.screen.blit(text_surf, text_rect)
+
+            current_x = text_rect.right + padding
+
+    # --- NEW: Helper methods to draw procedural icons for the HUD ---
+    def _draw_heart_icon(self, surface, rect, color):
+        """Draws a simple heart shape inside the given rect."""
+        x, y, w, h = rect
+        p = [
+            (x + w / 2, y + h),
+            (x, y + h / 3),
+            (x + w / 4, y),
+            (x + w / 2, y + h / 4),
+            (x + 3 * w / 4, y),
+            (x + w, y + h / 3),
+        ]
+        pygame.draw.polygon(surface, color, p)
+
+    def _draw_coin_icon(self, surface, rect, color):
+        """Draws a simple coin shape inside the given rect."""
+        pygame.draw.circle(surface, color, rect.center, rect.width / 2)
+        pygame.draw.circle(
+            surface,
+            self.ui_theme.get("colors", {}).get("panel_primary"),
+            rect.center,
+            rect.width / 3,
+        )
+
+    def _draw_wave_icon(self, surface, rect, color):
+        """Draws a simple wave-like symbol inside the given rect."""
+        start_y = rect.centery
+        points = []
+        for i in range(rect.width):
+            angle = (i / rect.width) * 2 * 3.14159 * 2  # Two full cycles
+            y_offset = (rect.height / 4) * pygame.math.Vector2(0, 1).rotate(
+                -angle * 180 / 3.14159
+            )[1]
+            points.append((rect.x + i, start_y + y_offset))
+        if len(points) > 1:
+            pygame.draw.lines(surface, color, False, points, 3)
