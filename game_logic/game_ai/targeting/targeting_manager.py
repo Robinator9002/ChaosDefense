@@ -1,4 +1,4 @@
-# game_ai/targeting/targeting_manager.py
+# game_logic/game_ai/targeting/targeting_manager.py
 import logging
 import math
 from collections import defaultdict
