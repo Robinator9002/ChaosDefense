@@ -8,8 +8,6 @@ from typing import List, Set
 logger = logging.getLogger(__name__)
 
 
-# Define the structure of the player's save data using a dataclass.
-# This provides a clear, type-safe "schema" for the save file.
 @dataclass
 class PlayerData:
     """
@@ -18,9 +16,10 @@ class PlayerData:
 
     meta_currency: int = 0
     unlocked_towers: Set[str] = field(default_factory=lambda: {"turret", "freezer"})
+    # --- NEW: Track unlocked levels ---
+    unlocked_levels: Set[str] = field(default_factory=lambda: {"Forest"})
     purchased_upgrades: Set[str] = field(default_factory=set)
     highest_wave_reached: int = 0
-    # Add any other stats to track here, e.g., total_enemies_defeated, etc.
 
 
 class PlayerDataManager:
@@ -54,6 +53,10 @@ class PlayerDataManager:
                     # Convert lists from JSON back to sets for efficient lookups
                     data["unlocked_towers"] = set(data.get("unlocked_towers", []))
                     data["purchased_upgrades"] = set(data.get("purchased_upgrades", []))
+                    # --- NEW: Load unlocked levels ---
+                    data["unlocked_levels"] = set(
+                        data.get("unlocked_levels", ["Forest"])
+                    )
 
                     logger.info(
                         f"Player data loaded successfully from {self.save_path}"
@@ -64,9 +67,7 @@ class PlayerDataManager:
                     f"Failed to load or parse player data from {self.save_path}: {e}. "
                     "Creating a new default save file."
                 )
-                # If loading fails, fall through to create a new file
 
-        # If we reach here, either the file didn't exist or it was corrupt.
         return self._create_default_data()
 
     def _create_default_data(self) -> PlayerData:
@@ -92,12 +93,11 @@ class PlayerDataManager:
         """
         self.save_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Create a serializable version of the data
         save_dict = {
             "meta_currency": player_data.meta_currency,
-            "unlocked_towers": list(
-                player_data.unlocked_towers
-            ),  # Convert sets to lists for JSON
+            "unlocked_towers": list(player_data.unlocked_towers),
+            # --- NEW: Save unlocked levels ---
+            "unlocked_levels": list(player_data.unlocked_levels),
             "purchased_upgrades": list(player_data.purchased_upgrades),
             "highest_wave_reached": player_data.highest_wave_reached,
         }
