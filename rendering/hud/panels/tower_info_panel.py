@@ -5,12 +5,11 @@ from typing import Dict, Any, TYPE_CHECKING
 
 from rendering.common.ui.ui_element import UIElement
 from rendering.text.text_renderer import render_text_wrapped
-
-# --- NEW: Import shared utility functions ---
 from rendering.common.panels.panel_utils import get_nested_value, format_stat_value
 
 if TYPE_CHECKING:
     from game_logic.game_state import GameState
+    from rendering.text.font_manager import FontManager
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +18,7 @@ class TowerInfoPanel(UIElement):
     """
     A UI panel that displays detailed information about a tower type
     selected from the build menu, before it is placed.
+    REFACTORED: Now fully theme-driven for consistent styling.
     """
 
     def __init__(
@@ -26,6 +26,8 @@ class TowerInfoPanel(UIElement):
         rect: pygame.Rect,
         tower_data: Dict[str, Any],
         targeting_ai_config: Dict[str, Any],
+        ui_theme: Dict[str, Any],
+        font_manager: "FontManager",
     ):
         """
         Initializes the TowerInfoPanel.
@@ -33,116 +35,130 @@ class TowerInfoPanel(UIElement):
         super().__init__(rect)
         self.tower_data = tower_data
         self.targeting_ai_config = targeting_ai_config
-        self._setup_fonts_and_colors()
+        self.ui_theme = ui_theme
+        self.font_manager = font_manager
+
+        self._load_theme_assets()
         self._calculate_and_set_dynamic_height()
 
-    def _setup_fonts_and_colors(self):
-        """Initializes font and color constants for drawing."""
-        self.font_title = pygame.font.SysFont("segoeui", 22, bold=True)
-        self.font_header = pygame.font.SysFont("segoeui", 18, bold=True)
-        self.font_stat = pygame.font.SysFont("segoeui", 16)
-        self.font_desc = pygame.font.SysFont("segoeui", 15)
-        self.colors = {
-            "bg": (25, 30, 40, 230),
-            "bg_hover": (25, 30, 40, 60),
-            "border": (80, 90, 100),
-            "title": (240, 240, 240),
-            "header": (200, 200, 210),
-            "stat_label": (160, 160, 170),
-            "stat_value": (220, 220, 230),
-            "desc": (180, 180, 190),
-        }
+    def _load_theme_assets(self):
+        """Loads all necessary fonts and style values from the theme config."""
+        self.colors = self.ui_theme.get("colors", {})
+        self.layout = self.ui_theme.get("layout", {})
+        self.font_title = self.font_manager.get_font("body_large")
+        self.font_header = self.font_manager.get_font("body_medium", bold=True)
+        self.font_stat = self.font_manager.get_font("body_small")
+        self.font_desc = self.font_manager.get_font("body_tiny")
 
     def _calculate_and_set_dynamic_height(self):
         """Calculates the total required height for all content and resizes the panel."""
-        padding = 15
+        padding = self.layout.get("padding_medium", 15)
+        spacing = self.layout.get("spacing_medium", 10)
+
         total_height = padding
-        total_height += self.font_title.get_height() + 10
+        total_height += self.font_title.get_height() + spacing
 
         description = self.tower_data.get("description", "No description available.")
         desc_max_width = self.rect.width - (padding * 2)
         wrapped_desc = render_text_wrapped(
-            description, self.font_desc, self.colors["desc"], desc_max_width
+            description,
+            self.font_desc,
+            self.colors.get("text_secondary"),
+            desc_max_width,
         )
-        total_height += sum(s.get_height() for s in wrapped_desc) + 15
+        total_height += sum(s.get_height() for s in wrapped_desc) + spacing
 
         stats_to_display = self.tower_data.get("info_panel_stats", [])
         if stats_to_display:
-            total_height += self.font_header.get_height() + 5
-            total_height += len(stats_to_display) * 24
-            total_height += 15
+            total_height += self.font_header.get_height() + (spacing / 2)
+            total_height += len(stats_to_display) * 22  # Approx height per stat line
+            total_height += spacing
 
+        # This logic for available personas is now deprecated in favor of dynamic eligibility
+        # but we'll leave the space calculation for now in case it's reused.
         personas = self.tower_data.get("ai_config", {}).get("available_personas", [])
         if personas:
-            total_height += self.font_header.get_height() + 5
+            total_height += self.font_header.get_height() + (spacing / 2)
             total_height += len(personas) * self.font_desc.get_height()
 
         total_height += padding
         self.rect.height = total_height
 
     def draw(self, screen: pygame.Surface):
-        """Draws the panel and all its components."""
-        bg_color = self.colors["bg_hover"] if self.is_hovered else self.colors["bg"]
+        """Draws the panel and all its components using theme styles."""
+        bg_color = self.colors.get("panel_primary", (25, 30, 40))
+        border_color = self.colors.get("border_primary", (80, 90, 100))
+        border_radius = self.layout.get("border_radius_small", 5)
+        border_width = self.layout.get("border_width_standard", 2)
+
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        panel_surf.fill(bg_color)
+        panel_surf.fill(bg_color + (230,))
         screen.blit(panel_surf, self.rect.topleft)
-        pygame.draw.rect(screen, self.colors["border"], self.rect, 2, border_radius=5)
+        pygame.draw.rect(
+            screen, border_color, self.rect, border_width, border_radius=border_radius
+        )
+
         self._draw_text_content(screen)
 
     def _draw_text_content(self, screen: pygame.Surface):
-        """Renders and positions all text within the panel."""
-        padding = 15
+        """Renders and positions all text within the panel using theme styles."""
+        padding = self.layout.get("padding_medium", 15)
+        spacing = self.layout.get("spacing_medium", 10)
         current_y = self.rect.y + padding
 
+        # Title and Cost
         title_surf = self.font_title.render(
-            self.tower_data.get("name", "N/A"), True, self.colors["title"]
+            self.tower_data.get("name", "N/A"), True, self.colors.get("text_primary")
         )
         screen.blit(title_surf, (self.rect.x + padding, current_y))
         cost_text = f"{self.tower_data.get('cost', 0)}G"
-        cost_surf = self.font_title.render(cost_text, True, (255, 215, 0))
+        cost_surf = self.font_title.render(
+            cost_text, True, self.colors.get("text_accent")
+        )
         cost_rect = cost_surf.get_rect(topright=(self.rect.right - padding, current_y))
         screen.blit(cost_surf, cost_rect)
-        current_y += title_surf.get_height() + 10
+        current_y += title_surf.get_height() + spacing
 
-        description = self.tower_data.get("description", "No description available.")
+        # Description
+        description = self.tower_data.get("description", "")
         desc_max_width = self.rect.width - (padding * 2)
         wrapped_desc = render_text_wrapped(
-            description, self.font_desc, self.colors["desc"], desc_max_width
+            description,
+            self.font_desc,
+            self.colors.get("text_secondary"),
+            desc_max_width,
         )
         for line_surf in wrapped_desc:
             screen.blit(line_surf, (self.rect.x + padding, current_y))
             current_y += line_surf.get_height()
-        current_y += 15
+        current_y += spacing
 
+        # Statistics
         stats_to_display = self.tower_data.get("info_panel_stats", [])
         if stats_to_display:
             header_surf = self.font_header.render(
-                "Statistics", True, self.colors["header"]
+                "Statistics", True, self.colors.get("text_primary")
             )
             screen.blit(header_surf, (self.rect.x + padding, current_y))
-            current_y += header_surf.get_height() + 5
+            current_y += header_surf.get_height() + (spacing / 2)
 
             for stat_info in stats_to_display:
                 label = stat_info.get("label", "N/A")
                 value_path = stat_info.get("value_path")
-                # --- REFACTORED: Use shared utility function ---
                 value = (
                     get_nested_value(self.tower_data, value_path)
                     if value_path
                     else "N/A"
                 )
-
                 if value is None:
                     continue
-
-                # --- REFACTORED: Use shared utility function ---
                 value_str = format_stat_value(value, stat_info.get("format"))
 
                 label_surf = self.font_stat.render(
-                    f"{label}:", True, self.colors["stat_label"]
+                    f"{label}:", True, self.colors.get("text_secondary")
                 )
                 value_surf = self.font_stat.render(
-                    value_str, True, self.colors["stat_value"]
+                    value_str, True, self.colors.get("text_primary")
                 )
 
                 screen.blit(label_surf, (self.rect.x + padding, current_y))
@@ -150,22 +166,4 @@ class TowerInfoPanel(UIElement):
                     topright=(self.rect.right - padding, current_y)
                 )
                 screen.blit(value_surf, value_rect)
-                current_y += 24
-            current_y += 15
-
-        personas = self.tower_data.get("ai_config", {}).get("available_personas", [])
-        if personas:
-            header_surf = self.font_header.render(
-                "Targeting Modes", True, self.colors["header"]
-            )
-            screen.blit(header_surf, (self.rect.x + padding, current_y))
-            current_y += header_surf.get_height() + 5
-
-            for persona_id in personas:
-                persona_name = self.targeting_ai_config.get(persona_id, {}).get(
-                    "name", persona_id
-                )
-                line_text = f"• {persona_name}"
-                line_surf = self.font_desc.render(line_text, True, self.colors["desc"])
-                screen.blit(line_surf, (self.rect.x + padding, current_y))
-                current_y += self.font_desc.get_height()
+                current_y += 22

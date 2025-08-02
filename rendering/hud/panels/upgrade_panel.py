@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from game_logic.entities.tower import Tower
     from game_logic.upgrades.upgrade_manager import UpgradeManager
     from game_logic.game_state import GameState
+    from rendering.text.font_manager import FontManager
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +20,7 @@ logger = logging.getLogger(__name__)
 class UpgradePanel(UIElement):
     """
     A UI panel that displays stats and upgrade options for a selected tower.
-
-    REFACTORED: The persona selection is now handled by a single button that
-    opens a dedicated modal panel, creating a cleaner and more scalable UI.
+    REFACTORED: Now fully theme-driven and dynamically sized.
     """
 
     def __init__(
@@ -33,6 +32,8 @@ class UpgradePanel(UIElement):
         game_state: "GameState",
         salvage_refund_percentage: float,
         targeting_ai_config: Dict[str, Any],
+        ui_theme: Dict[str, Any],
+        font_manager: "FontManager",
     ):
         super().__init__(rect)
         self.tower = tower
@@ -41,35 +42,44 @@ class UpgradePanel(UIElement):
         self.game_state = game_state
         self.salvage_refund_percentage = salvage_refund_percentage
         self.targeting_ai_config = targeting_ai_config
+        self.ui_theme = ui_theme
+        self.font_manager = font_manager
 
         self.upgrade_buttons: List[UpgradeButton] = []
         self.persona_change_button_rect = pygame.Rect(0, 0, 0, 0)
         self.is_persona_button_hovered = False
-
-        self._setup_fonts_and_colors()
-
-        self.close_button_rect = pygame.Rect(
-            self.rect.right - 28, self.rect.y + 8, 20, 20
-        )
+        self.close_button_rect = pygame.Rect(0, 0, 0, 0)
         self.is_close_hovered = False
         self.salvage_button_rect = pygame.Rect(0, 0, 0, 0)
         self.is_salvage_hovered = False
 
+        self._load_theme_assets()
+        self.rebuild_layout()
+
+    def _load_theme_assets(self):
+        """Loads all necessary fonts and style values from the theme config."""
+        self.colors = self.ui_theme.get("colors", {})
+        self.layout = self.ui_theme.get("layout", {})
+        self.font_title = self.font_manager.get_font("body_large")
+        self.font_header = self.font_manager.get_font("body_medium", bold=True)
+        self.font_stat = self.font_manager.get_font("body_small")
+        self.font_close = self.font_manager.get_font("body_large")
+        self.font_salvage = self.font_manager.get_font("body_medium", bold=True)
+        self.font_persona = self.font_manager.get_font("body_tiny", bold=True)
+
+    def on_resize(self, new_screen_rect: pygame.Rect):
+        """Updates position based on new screen dimensions."""
+        self.rect.right = new_screen_rect.right - self.layout.get("padding_medium", 15)
         self.rebuild_layout()
 
     def rebuild_layout(self):
-        """
-        Forces the panel to re-create its buttons, calculate all element positions,
-        and resize the panel.
-        """
+        """Forces the panel to re-create its buttons and recalculate layout."""
         self._create_button_objects()
         self._perform_layout_and_positioning()
+        self.update_hover_states()
 
     def update_hover_states(self):
-        """
-        Checks the current mouse position and updates the hover state for all
-        interactive elements on this panel.
-        """
+        """Checks mouse position and updates hover state for all elements."""
         mouse_pos = pygame.mouse.get_pos()
         self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
         self.is_salvage_hovered = self.salvage_button_rect.collidepoint(mouse_pos)
@@ -80,100 +90,76 @@ class UpgradePanel(UIElement):
             button.is_hovered = button.rect.collidepoint(mouse_pos)
 
     def _perform_layout_and_positioning(self):
-        """
-        Calculates the required height and sets the final position for all elements.
-        """
-        padding = 15
+        """Calculates required height and sets positions for all elements."""
+        padding = self.layout.get("padding_medium", 15)
+        spacing = self.layout.get("spacing_medium", 10)
         current_y = self.rect.y + padding
 
-        # Section 1: Title and Stats
-        current_y += self.font_title.get_height() + 10
-        stats_to_display = self._get_stats_to_display()
-        current_y += self.font_header.get_height() + 5
-        current_y += len(stats_to_display) * 24
-        current_y += 15
+        # Close button
+        self.close_button_rect = pygame.Rect(
+            self.rect.right - 28, self.rect.y + 8, 20, 20
+        )
 
-        # --- UI IMPROVEMENT: Layout for persona info and change button ---
-        current_y += self.font_header.get_height() + 8  # Header (was 5)
-        current_y += 28  # Space for the "Current: ..." text (was 24)
+        # Title and Stats
+        current_y += self.font_title.get_height() + spacing
+        stats_to_display = self._get_stats_to_display()
+        current_y += self.font_header.get_height() + (spacing / 2)
+        current_y += len(stats_to_display) * 22
+        current_y += spacing
+
+        # Persona Section
+        current_y += self.font_header.get_height() + (spacing / 2)
+        current_y += 26  # Space for "Current: ..." text
         button_width = self.rect.width - (padding * 2)
         self.persona_change_button_rect = pygame.Rect(
             self.rect.x + padding, current_y, button_width, 30
         )
-        current_y += self.persona_change_button_rect.height + 15
+        current_y += self.persona_change_button_rect.height + spacing
 
-        # Section 3: Upgrade Buttons
+        # Upgrade Buttons
         if self.upgrade_buttons:
-            current_y += 10  # Extra padding before upgrade buttons
+            current_y += spacing
             for button in self.upgrade_buttons:
                 button.rect.topleft = (self.rect.x + padding, current_y)
-                current_y += button.rect.height + 10
+                current_y += button.rect.height + spacing
 
-        # Section 4: Salvage Button Area
+        # Salvage Button Area
         current_y += 55
-
-        # Final Sizing and Salvage Button Positioning
         self.rect.height = current_y - self.rect.y
         self.salvage_button_rect = pygame.Rect(
-            self.rect.x + 15, self.rect.bottom - 55, self.rect.width - 30, 40
+            self.rect.x + padding,
+            self.rect.bottom - 55,
+            self.rect.width - (padding * 2),
+            40,
         )
-
-    def _setup_fonts_and_colors(self):
-        self.font_title = pygame.font.SysFont("segoeui", 22, bold=True)
-        self.font_header = pygame.font.SysFont("segoeui", 18, bold=True)
-        self.font_stat = pygame.font.SysFont("segoeui", 16)
-        self.font_close = pygame.font.SysFont("segoeui", 20, bold=True)
-        self.font_salvage = pygame.font.SysFont("segoeui", 16, bold=True)
-        self.font_persona = pygame.font.SysFont("segoeui", 14, bold=True)
-        self.colors = {
-            "bg": (25, 30, 40, 230),
-            "border": (80, 90, 100),
-            "title": (240, 240, 240),
-            "header": (200, 200, 210),
-            "stat_label": (160, 160, 170),
-            "stat_value": (220, 220, 230),
-            "close_default": (150, 150, 160),
-            "close_hover": (255, 80, 80),
-            "salvage_bg_default": (80, 40, 40),
-            "salvage_bg_hover": (110, 50, 50),
-            "salvage_border": (150, 80, 80),
-            "salvage_text": (230, 210, 210),
-            "persona_bg_default": (40, 50, 60),
-            "persona_bg_hover": (60, 75, 90),
-            "persona_border_default": (80, 90, 100),
-            "persona_text": (210, 210, 220),
-        }
 
     def _create_button_objects(self):
         self.upgrade_buttons.clear()
-        padding = 15
+        padding = self.layout.get("padding_medium", 15)
         width = self.rect.width - (padding * 2)
 
-        next_upgrade_a = self.upgrade_manager.get_next_upgrade(self.tower, "path_a")
-        if next_upgrade_a:
-            can_afford = self.game_state.gold >= next_upgrade_a.cost
-            button_rect = pygame.Rect(0, 0, width, 0)
-            self.upgrade_buttons.append(
-                UpgradeButton(button_rect, next_upgrade_a, can_afford)
-            )
-
-        next_upgrade_b = self.upgrade_manager.get_next_upgrade(self.tower, "path_b")
-        if next_upgrade_b:
-            can_afford = self.game_state.gold >= next_upgrade_b.cost
-            button_rect = pygame.Rect(0, 0, width, 0)
-            self.upgrade_buttons.append(
-                UpgradeButton(button_rect, next_upgrade_b, can_afford)
-            )
+        for path in ["path_a", "path_b"]:
+            next_upgrade = self.upgrade_manager.get_next_upgrade(self.tower, path)
+            if next_upgrade:
+                can_afford = self.game_state.gold >= next_upgrade.cost
+                button_rect = pygame.Rect(0, 0, width, 0)
+                self.upgrade_buttons.append(
+                    UpgradeButton(
+                        button_rect,
+                        next_upgrade,
+                        can_afford,
+                        self.ui_theme,
+                        self.font_manager,
+                    )
+                )
 
     def handle_event(
         self, event: pygame.event.Event, game_state: "GameState"
     ) -> Optional[UIAction]:
         if event.type == pygame.MOUSEMOTION:
             self.update_hover_states()
-
         if not self.rect.collidepoint(pygame.mouse.get_pos()):
             return None
-
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_close_hovered:
                 return UIAction(type=ActionType.CLOSE_PANEL)
@@ -181,18 +167,23 @@ class UpgradePanel(UIElement):
                 return UIAction(type=ActionType.SALVAGE_TOWER)
             if self.is_persona_button_hovered:
                 return UIAction(type=ActionType.OPEN_PERSONA_PANEL)
-
-        for button in self.upgrade_buttons:
-            action = button.handle_event(event, game_state)
-            if action:
-                return action
+            for button in self.upgrade_buttons:
+                action = button.handle_event(event, game_state)
+                if action:
+                    return action
         return None
 
     def draw(self, screen: pygame.Surface):
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        panel_surf.fill(self.colors["bg"])
+        panel_surf.fill(self.colors.get("panel_primary", (25, 30, 40)) + (230,))
         screen.blit(panel_surf, self.rect.topleft)
-        pygame.draw.rect(screen, self.colors["border"], self.rect, 2, border_radius=5)
+        pygame.draw.rect(
+            screen,
+            self.colors.get("border_primary"),
+            self.rect,
+            2,
+            border_radius=self.layout.get("border_radius_small"),
+        )
 
         self._draw_static_text(screen)
         self._draw_persona_section(screen)
@@ -202,70 +193,71 @@ class UpgradePanel(UIElement):
         self._draw_close_button(screen)
 
     def _draw_persona_section(self, screen: pygame.Surface):
-        padding = 15
+        padding = self.layout.get("padding_medium", 15)
+        spacing = self.layout.get("spacing_medium", 10)
 
-        # --- UI IMPROVEMENT: Draw separated info and button ---
-
-        # 1. Draw Header
         # Calculate Y position based on the layout of the stats section
         stats_to_display = self._get_stats_to_display()
         header_y = (
             self.rect.y
             + padding
             + self.font_title.get_height()
-            + 10
+            + spacing
             + self.font_header.get_height()
-            + 5
-            + (len(stats_to_display) * 24)
-            + 15
+            + (spacing / 2)
+            + (len(stats_to_display) * 22)
+            + spacing
         )
+
         header_surf = self.font_header.render(
-            "Targeting Priority", True, self.colors["header"]
+            "Targeting Priority", True, self.colors.get("text_primary")
         )
         screen.blit(header_surf, (self.rect.x + padding, header_y))
 
-        # 2. Draw Current Persona Info Text
-        info_y = header_y + self.font_header.get_height() + 8
+        info_y = header_y + self.font_header.get_height() + (spacing / 2)
         active_persona_name = self.targeting_ai_config.get(
             self.tower.current_persona, {}
         ).get("name", "N/A")
-
-        label_surf = self.font_stat.render("Current:", True, self.colors["stat_label"])
-        value_surf = self.font_stat.render(
-            active_persona_name, True, self.colors["stat_value"]
+        label_surf = self.font_stat.render(
+            "Current:", True, self.colors.get("text_secondary")
         )
-
+        value_surf = self.font_stat.render(
+            active_persona_name, True, self.colors.get("text_primary")
+        )
         screen.blit(label_surf, (self.rect.x + padding, info_y))
         value_rect = value_surf.get_rect(topright=(self.rect.right - padding, info_y))
         screen.blit(value_surf, value_rect)
 
-        # 3. Draw the "Change..." Button (its rect is already correctly positioned by _perform_layout)
         bg_color = (
-            self.colors["persona_bg_hover"]
+            self.colors.get("panel_interactive_hover")
             if self.is_persona_button_hovered
-            else self.colors["persona_bg_default"]
+            else self.colors.get("panel_secondary")
         )
-        border_color = self.colors["persona_border_default"]
-
+        border_color = self.colors.get("border_primary")
         pygame.draw.rect(
-            screen, bg_color, self.persona_change_button_rect, border_radius=4
+            screen,
+            bg_color,
+            self.persona_change_button_rect,
+            border_radius=self.layout.get("border_radius_small"),
         )
         pygame.draw.rect(
-            screen, border_color, self.persona_change_button_rect, 1, border_radius=4
+            screen,
+            border_color,
+            self.persona_change_button_rect,
+            1,
+            border_radius=self.layout.get("border_radius_small"),
         )
-
-        button_text = "Change Persona..."
         text_surf = self.font_persona.render(
-            button_text, True, self.colors["persona_text"]
+            "Change Persona...", True, self.colors.get("text_primary")
         )
         text_rect = text_surf.get_rect(center=self.persona_change_button_rect.center)
         screen.blit(text_surf, text_rect)
 
     def _draw_close_button(self, screen: pygame.Surface):
         color = (
-            self.colors["close_hover"]
+            self.colors.get("text_error")
             if self.is_close_hovered
-            else self.colors["close_default"]
+            else self.colors.get("text_secondary")
         )
         text_surf = self.font_close.render("X", True, color)
         text_rect = text_surf.get_rect(center=self.close_button_rect.center)
@@ -273,24 +265,23 @@ class UpgradePanel(UIElement):
 
     def _draw_salvage_button(self, screen: pygame.Surface):
         bg_color = (
-            self.colors["salvage_bg_hover"]
+            self.colors.get("panel_interactive_hover")
             if self.is_salvage_hovered
-            else self.colors["salvage_bg_default"]
+            else self.colors.get("text_error")
         )
-        pygame.draw.rect(screen, bg_color, self.salvage_button_rect, border_radius=5)
         pygame.draw.rect(
             screen,
-            self.colors["salvage_border"],
+            bg_color,
             self.salvage_button_rect,
-            2,
-            border_radius=5,
+            border_radius=self.layout.get("border_radius_small"),
         )
+
         refund_amount = int(
             self.tower.total_investment * self.salvage_refund_percentage
         )
         button_text = f"Salvage for {refund_amount}G"
         text_surf = self.font_salvage.render(
-            button_text, True, self.colors["salvage_text"]
+            button_text, True, self.colors.get("text_primary")
         )
         text_rect = text_surf.get_rect(center=self.salvage_button_rect.center)
         screen.blit(text_surf, text_rect)
@@ -314,28 +305,30 @@ class UpgradePanel(UIElement):
         return stats
 
     def _draw_static_text(self, screen: pygame.Surface):
-        padding = 15
+        padding = self.layout.get("padding_medium", 15)
+        spacing = self.layout.get("spacing_medium", 10)
         current_y = self.rect.y + padding
-        title_surf = self.font_title.render(self.tower.name, True, self.colors["title"])
+        title_surf = self.font_title.render(
+            self.tower.name, True, self.colors.get("text_primary")
+        )
         screen.blit(title_surf, (self.rect.x + padding, current_y))
-        current_y += self.font_title.get_height() + 10
+        current_y += title_surf.get_height() + spacing
         stats_header_surf = self.font_header.render(
-            "Statistics", True, self.colors["header"]
+            "Statistics", True, self.colors.get("text_primary")
         )
         screen.blit(stats_header_surf, (self.rect.x + padding, current_y))
-        current_y += stats_header_surf.get_height() + 5
-        stats_to_display = self._get_stats_to_display()
-        for label, value, value_format in stats_to_display:
+        current_y += stats_header_surf.get_height() + (spacing / 2)
+        for label, value, value_format in self._get_stats_to_display():
             value_str = format_stat_value(value, value_format)
             label_surf = self.font_stat.render(
-                f"{label}:", True, self.colors["stat_label"]
+                f"{label}:", True, self.colors.get("text_secondary")
             )
             value_surf = self.font_stat.render(
-                value_str, True, self.colors["stat_value"]
+                value_str, True, self.colors.get("text_primary")
             )
             screen.blit(label_surf, (self.rect.x + padding, current_y))
             value_rect = value_surf.get_rect(
                 topright=(self.rect.right - padding, current_y)
             )
             screen.blit(value_surf, value_rect)
-            current_y += 24
+            current_y += 22
