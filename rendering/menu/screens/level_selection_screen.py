@@ -7,96 +7,22 @@ from rendering.common.ui.ui_element import UIElement
 from ..components.scrollable_grid import ScrollableGrid
 from ..panels.preview_panel import PreviewPanel
 
+# --- NEW: Import the consolidated ListItemButton ---
+from ..buttons.list_item_button import ListItemButton
+
 if TYPE_CHECKING:
     from rendering.text.font_manager import FontManager
 
 logger = logging.getLogger(__name__)
 
-
-class LevelButton(UIElement):
-    """
-    A UI element representing a single, clickable level.
-
-    REFACTORED: Now fully theme-driven. It features a much clearer visual
-    distinction for hover and selected states to improve user experience.
-    """
-
-    def __init__(
-        self,
-        rect: pygame.Rect,
-        level_id: str,
-        level_data: Dict[str, Any],
-        is_locked: bool,
-        ui_theme: Dict[str, Any],
-        font_manager: "FontManager",
-    ):
-        super().__init__(rect)
-        self.level_id = level_id
-        self.level_data = level_data
-        self.name = level_id.replace("_", " ").title()
-        self.description = level_data.get("generation_params", {}).get(
-            "description", "No description available."
-        )
-        self.is_locked = is_locked
-        self.is_selected = False
-
-        # --- NEW: Load styles from theme ---
-        self.colors = ui_theme.get("colors", {})
-        self.layout = ui_theme.get("layout", {})
-        self.font_name = font_manager.get_font("body_large")
-        self.font_locked = font_manager.get_font(
-            "title_small"
-        )  # Larger for the lock icon
-
-    def draw(self, screen: pygame.Surface):
-        """Draws the level button using theme-defined styles."""
-        border_width = self.layout.get("border_width_standard", 2)
-        border_radius = self.layout.get("border_radius_large", 8)
-
-        # Determine colors based on state
-        if self.is_locked:
-            bg_color = self.colors.get("panel_primary")
-            border_color = self.colors.get("border_primary")
-            name_color = self.colors.get("text_disabled")
-        else:
-            name_color = self.colors.get("text_primary")
-            if self.is_selected:
-                bg_color = self.colors.get("panel_secondary")
-                border_color = self.colors.get("border_accent")
-                border_width = self.layout.get("border_width_selected", 3)
-            elif self.is_hovered:
-                bg_color = self.colors.get("panel_interactive_hover")
-                border_color = self.colors.get("border_primary")
-            else:
-                bg_color = self.colors.get("panel_primary")
-                border_color = self.colors.get("border_primary")
-
-        pygame.draw.rect(screen, bg_color, self.rect, border_radius=border_radius)
-        pygame.draw.rect(
-            screen, border_color, self.rect, border_width, border_radius=border_radius
-        )
-
-        # Draw Text Content
-        padding = self.layout.get("padding_medium", 15)
-        name_surf = self.font_name.render(self.name, True, name_color)
-        screen.blit(name_surf, (self.rect.x + padding, self.rect.y + padding))
-
-        if self.is_locked:
-            lock_surf = self.font_locked.render(
-                "🔒", True, self.colors.get("text_disabled")
-            )
-            lock_rect = lock_surf.get_rect(
-                centery=self.rect.centery, right=self.rect.right - padding
-            )
-            screen.blit(lock_surf, lock_rect)
+# --- REMOVED: The old LevelButton class is now obsolete ---
 
 
 class LevelSelectionScreen:
     """
     Manages and renders the level selection UI.
-
-    REFACTORED: Now fully theme-driven, passing the theme and font manager
-    to all its child components for consistent styling.
+    REFACTORED: Now uses the consolidated ListItemButton for its level list,
+    fixing all visual and interaction bugs.
     """
 
     def __init__(
@@ -119,8 +45,9 @@ class LevelSelectionScreen:
         self.start_level_callback = start_level_callback
         self.back_callback = back_callback
 
-        self.buttons: List[LevelButton] = []
-        self.selected_level: Optional[LevelButton] = None
+        # --- MODIFIED: The list now holds the new, generic button type ---
+        self.buttons: List[ListItemButton] = []
+        self.selected_button: Optional[ListItemButton] = None
 
         self._load_theme_assets()
         self._setup_components()
@@ -164,63 +91,80 @@ class LevelSelectionScreen:
         self.back_button = UIElement(back_button_rect)
 
     def _build_layout(self):
-        """Creates the level buttons and populates the grid."""
+        """Creates the level buttons using the new ListItemButton."""
         self.buttons.clear()
         for level_id, level_data in self.level_configs.items():
             is_locked = level_id not in self.unlocked_levels
-            button = LevelButton(
+
+            # --- NEW: Prepare data specifically for the ListItemButton ---
+            button_data = {
+                "id": level_id,
+                "title": level_id.replace("_", " ").title(),
+                "description": level_data.get("generation_params", {}).get(
+                    "description", "No description available."
+                ),
+                "is_locked": is_locked,
+                # Levels don't have status text or stats, so we omit them
+            }
+
+            button = ListItemButton(
                 pygame.Rect(0, 0, 0, 0),
-                level_id,
-                level_data,
-                is_locked,
+                button_data,
                 self.ui_theme,
                 self.font_manager,
             )
             self.buttons.append(button)
+
         self.grid.update_item_count(len(self.buttons))
 
     def handle_event(self, event: pygame.event.Event):
-        """Delegates events to the grid, preview panel, and back button."""
-        self.grid.handle_scroll_event(event)
-        self.preview_panel.handle_event(event)
+        """Handles user input for the level selection screen."""
         mouse_pos = pygame.mouse.get_pos()
 
-        hovered_button = None
+        # Update hover states
+        self.back_button.is_hovered = self.back_button.rect.collidepoint(mouse_pos)
+
+        hovered_button: Optional[ListItemButton] = None
         for i, button in enumerate(self.buttons):
             layout_rect = self.grid.get_item_rect(i)
             on_screen_rect = layout_rect.move(0, -self.grid.scroll_y)
+            button.rect.topleft = on_screen_rect.topleft
             if self.grid.area.contains(on_screen_rect):
-                button.rect.topleft = (
-                    on_screen_rect.topleft
-                )  # Update real position for hover check
                 button.is_hovered = button.rect.collidepoint(mouse_pos)
                 if button.is_hovered:
                     hovered_button = button
             else:
                 button.is_hovered = False
 
-        if hovered_button and hovered_button != self.selected_level:
-            self.selected_level = hovered_button
-            for btn in self.buttons:
-                btn.is_selected = btn == self.selected_level
-            self.preview_panel.set_item(
-                item_data={
-                    "id": self.selected_level.level_id,
-                    "name": self.selected_level.name,
-                    "description": self.selected_level.description,
-                },
-                button_text="Start Mission",
-                button_action=self.start_level_callback,
-                is_button_enabled=not self.selected_level.is_locked,
-            )
+        # Delegate events to children
+        self.grid.handle_scroll_event(event)
+        self.preview_panel.handle_event(event)
 
-        self.back_button.is_hovered = self.back_button.rect.collidepoint(mouse_pos)
-        if (
-            self.back_button.is_hovered
-            and event.type == pygame.MOUSEBUTTONDOWN
-            and event.button == 1
-        ):
-            self.back_callback()
+        # Handle primary actions (clicks)
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.back_button.is_hovered:
+                self.back_callback()
+                return
+
+            if hovered_button:
+                self.selected_button = hovered_button
+                for btn in self.buttons:
+                    btn.is_selected = btn == self.selected_button
+
+                # Get the full data for the preview panel
+                level_id = self.selected_button.item_data["id"]
+                level_data = self.level_configs.get(level_id, {})
+
+                self.preview_panel.set_item(
+                    item_data={
+                        "id": level_id,
+                        "name": self.selected_button.title,
+                        "description": self.selected_button.item_data["description"],
+                    },
+                    button_text="Start Mission",
+                    button_action=self.start_level_callback,
+                    is_button_enabled=not self.selected_button.is_locked,
+                )
 
     def draw(self, screen: pygame.Surface):
         """Draws the entire level selection screen using theme styles."""
@@ -256,10 +200,7 @@ class LevelSelectionScreen:
 
         # Scrollable Content
         screen.set_clip(self.grid.area)
-        for i, button in enumerate(self.buttons):
-            layout_rect = self.grid.get_item_rect(i)
-            # The button's rect is already updated in handle_event, so we can just use it
-            button.rect.topleft = (layout_rect.x, layout_rect.y - self.grid.scroll_y)
+        for button in self.buttons:
             button.draw(screen)
         screen.set_clip(None)
 
