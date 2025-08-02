@@ -269,10 +269,12 @@ class WorkshopScreen:
             # --- FIX: Update the button's internal rect before checking for hover ---
             button.rect = on_screen_rect
 
-            if self.grid.area.contains(on_screen_rect):
-                button.is_hovered = on_screen_rect.collidepoint(mouse_pos)
-                if button.is_hovered:
-                    hovered_button_index = i
+            # --- FIX: Use colliderect instead of contains for more lenient click detection ---
+            if self.grid.area.colliderect(
+                on_screen_rect
+            ) and on_screen_rect.collidepoint(mouse_pos):
+                button.is_hovered = True
+                hovered_button_index = i
             else:
                 button.is_hovered = False
 
@@ -345,7 +347,8 @@ class WorkshopScreen:
         back_surf = self.font_back_button.render(
             "Back", True, self.colors.get("text_primary")
         )
-        screen.blit(back_surf, back_surf.get_rect(center=self.back_button.rect.center))
+        back_text_rect = back_surf.get_rect(center=self.back_button.rect.center)
+        screen.blit(back_surf, back_text_rect)
 
         # Draw child components
         self.preview_panel.draw(screen)
