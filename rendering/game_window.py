@@ -12,6 +12,10 @@ from rendering.menu.menu_manager import MenuManager
 from rendering.game.camera import Camera
 from rendering.game.input_handler import InputHandler
 
+# --- MODIFIED: Import FontManager for type hinting ---
+from rendering.text.font_manager import FontManager
+
+
 if TYPE_CHECKING:
     from game_logic.progression.progression_manager import ProgressionManager
 
@@ -35,6 +39,9 @@ class Game:
         all_configs: Dict[str, Any],
         assets_path: Path,
         progression_manager: "ProgressionManager",
+        # --- NEW: Accept UI theme and FontManager ---
+        ui_theme: Dict[str, Any],
+        font_manager: "FontManager",
     ):
         """
         Initializes Pygame, the window, and all high-level systems.
@@ -46,6 +53,9 @@ class Game:
         self.game_settings = all_configs["game_settings"]
         self.assets_path = assets_path
         self.progression_manager = progression_manager
+        # --- NEW: Store theme and font manager ---
+        self.ui_theme = ui_theme
+        self.font_manager = font_manager
 
         self.screen_width = self.game_settings.get("screen_width", 1280)
         self.screen_height = self.game_settings.get("screen_height", 720)
@@ -61,10 +71,13 @@ class Game:
         self.game_state = GameState.MAIN_MENU
 
         # --- High-Level Managers ---
+        # --- MODIFIED: Pass theme and font manager to MenuManager ---
         self.menu_manager = MenuManager(
             screen_rect=self.screen.get_rect(),
             progression_manager=self.progression_manager,
             all_configs=self.all_configs,
+            ui_theme=self.ui_theme,
+            font_manager=self.font_manager,
             start_level_callback=self._start_new_game,
             quit_callback=self._quit_game,
         )
@@ -75,8 +88,11 @@ class Game:
         self.camera: Optional[Camera] = None
         self.input_handler: Optional[InputHandler] = None
 
-        self.background_color = (15, 20, 25)
-        self.gui_font = pygame.font.SysFont("segoeui", 22, bold=True)
+        # --- MODIFIED: Use theme for background color ---
+        self.background_color = self.ui_theme.get("colors", {}).get(
+            "background_primary", (15, 20, 25)
+        )
+        # The old hardcoded gui_font is now obsolete.
 
     def _start_new_game(self, level_id: str):
         """
@@ -89,11 +105,14 @@ class Game:
         )
         self.progression_manager.apply_global_upgrades(self.game_manager)
 
+        # --- MODIFIED: Pass theme and font manager to UIManager ---
         self.ui_manager = UIManager(
             screen_rect=self.screen.get_rect(),
             game_manager=self.game_manager,
             progression_manager=self.progression_manager,
             assets_path=self.assets_path,
+            ui_theme=self.ui_theme,
+            font_manager=self.font_manager,
         )
 
         self.camera = Camera(self.screen_width, self.screen_height)
@@ -120,10 +139,12 @@ class Game:
         self.input_handler = None
 
         # Reset background color for the menu
-        self.background_color = (15, 20, 25)
+        self.background_color = self.ui_theme.get("colors", {}).get(
+            "background_primary", (15, 20, 25)
+        )
 
         # Rebuild the menu to reflect any new unlocks
-        self.menu_manager._build_main_menu()
+        self.menu_manager.rebuild_all_screens()
 
         self.game_state = GameState.MAIN_MENU
 
@@ -147,6 +168,7 @@ class Game:
         style_config = self.game_manager.level_manager.level_styles.get(
             self.game_manager.current_level_id, {}
         )
+        # The in-game background color is still determined by the level style
         self.background_color = style_config.get("background_color", (10, 10, 10))
         tile_definitions = style_config.get("tile_definitions", {})
 
@@ -204,13 +226,11 @@ class Game:
         self.screen_width, self.screen_height = event.w, event.h
         self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
         if self.ui_manager:
-            self.ui_manager.screen_rect = self.screen.get_rect()
+            self.ui_manager.on_resize(self.screen.get_rect())
         if self.camera:
             self.camera.on_resize(event.w, event.h)
         if self.menu_manager:
-            self.menu_manager.screen_rect = self.screen.get_rect()
-            # Rebuild layouts that depend on screen size
-            self.menu_manager._build_main_menu()
+            self.menu_manager.on_resize(self.screen.get_rect())
 
     def _update(self, dt: float):
         """Updates all systems based on the current game state."""
@@ -222,7 +242,6 @@ class Game:
                 self.game_manager.update(dt)
                 self.ui_manager.update(dt, self.game_manager.game_state)
 
-                # --- NEW: End-of-Game Detection ---
                 gs = self.game_manager.game_state
                 if gs.victory or gs.game_over:
                     self.game_manager.end_game_session(victory=gs.victory)
@@ -270,22 +289,33 @@ class Game:
         if not state or not wave_mgr:
             return
 
-        colors = {"gold": (255, 215, 0), "hp": (220, 20, 60), "wave": (0, 191, 255)}
-        padding, y_pos = 20, 15
+        # --- MODIFIED: Use FontManager and theme for styling ---
+        colors = self.ui_theme.get("colors", {})
+        layout = self.ui_theme.get("layout", {})
+        font = self.font_manager.get_font("body_medium")
+
+        color_gold = colors.get("text_accent", (255, 215, 0))
+        color_hp = colors.get("text_error", (220, 20, 60))
+        color_wave = colors.get("text_primary", (0, 191, 255))
+        padding = layout.get("padding_medium", 15)
+        y_pos = 15
+
         wave_text = f"Wave: {state.current_wave_number} / {wave_mgr.max_waves}"
         surfaces = [
-            self.gui_font.render(f"Gold: {state.gold}", True, colors["gold"]),
-            self.gui_font.render(f"Base HP: {state.base_hp}", True, colors["hp"]),
-            self.gui_font.render(wave_text, True, colors["wave"]),
+            font.render(f"Gold: {state.gold}", True, color_gold),
+            font.render(f"Base HP: {state.base_hp}", True, color_hp),
+            font.render(wave_text, True, color_wave),
         ]
         panel_width = sum(s.get_width() for s in surfaces) + (
             padding * (len(surfaces) + 1)
         )
         panel_height = max(s.get_height() for s in surfaces) + (padding / 2)
         panel_rect = pygame.Rect(5, 5, panel_width, panel_height)
+
         panel_surf = pygame.Surface(panel_rect.size, pygame.SRCALPHA)
-        panel_surf.fill((0, 0, 0, 150))
+        panel_surf.fill(colors.get("panel_primary", (0, 0, 0)) + (200,))  # Add alpha
         self.screen.blit(panel_surf, panel_rect.topleft)
+
         current_x = panel_rect.left + padding
         for surf in surfaces:
             self.screen.blit(surf, (current_x, y_pos))
