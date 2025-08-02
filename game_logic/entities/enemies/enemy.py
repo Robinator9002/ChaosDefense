@@ -19,6 +19,7 @@ class Enemy(Entity):
 
     REFACTORED: With the new intelligent EffectHandler, this class no longer
     requires dummy tower-specific stats (like base_damage) to function correctly.
+    It now also includes logic to draw its own health bar when damaged.
     """
 
     def __init__(
@@ -83,10 +84,6 @@ class Enemy(Entity):
         self.auras = enemy_type_data.get("auras", [])
         self.status_effects_config = status_effects_config
 
-        # --- REMOVED: The dummy tower-specific stats are no longer needed ---
-        # The new EffectHandler is smart enough to handle entities that
-        # do not have stats like 'damage', 'range', or 'fire_rate'.
-
     def take_damage(
         self, amount: int, armor_shred: int = 0, ignores_armor: bool = False
     ):
@@ -145,3 +142,43 @@ class Enemy(Entity):
             game_state.end_game()
         self.kill()
         return self
+
+    def draw(self, screen: pygame.Surface, camera_offset: pygame.Vector2, zoom: float):
+        """
+        Draws the enemy and its health bar to the screen.
+        """
+        # First, call the parent Entity's draw method to draw the main sprite.
+        super().draw(screen, camera_offset, zoom)
+
+        # --- Health Bar Logic ---
+        # Only draw the health bar if the enemy is alive and has taken damage.
+        if self.is_alive and self.current_hp < self.max_hp:
+            # Calculate the on-screen position and dimensions.
+            screen_pos = (self.pos * zoom) + camera_offset
+            bar_width = self.rect.width * zoom * 0.8
+            bar_height = max(2, 4 * zoom)  # Ensure bar is visible even when zoomed out.
+
+            # Position the health bar above the enemy sprite.
+            bar_x = screen_pos.x - bar_width / 2
+            bar_y = (
+                screen_pos.y - (self.rect.height * zoom / 2) - bar_height - (2 * zoom)
+            )
+
+            # Calculate the width of the foreground (current health) bar.
+            health_percentage = self.current_hp / self.max_hp
+            current_health_width = bar_width * health_percentage
+
+            # Define colors for the health bar.
+            background_color = (139, 0, 0)  # Dark Red
+            foreground_color = (255, 0, 0)  # Red
+
+            # Draw the background bar (the empty part).
+            pygame.draw.rect(
+                screen, background_color, (bar_x, bar_y, bar_width, bar_height)
+            )
+            # Draw the foreground bar (the current health).
+            pygame.draw.rect(
+                screen,
+                foreground_color,
+                (bar_x, bar_y, current_health_width, bar_height),
+            )
