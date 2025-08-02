@@ -2,30 +2,27 @@
 import pygame
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from enum import Enum, auto
 
 from game_logic.game_manager import GameManager
 from rendering.sprite_renderer import SpriteRenderer
 from rendering.hud.ui_manager import UIManager
-
-# --- NEW: Import the MenuManager ---
 from rendering.menu.menu_manager import MenuManager
+
+# --- NEW: Import ProgressionManager for type hinting ---
+if TYPE_CHECKING:
+    from game_logic.progression.progression_manager import ProgressionManager
 
 logger = logging.getLogger(__name__)
 
 
-# --- NEW: Game State Enum ---
-# This Enum will manage the overall state of the application, determining
-# whether we are in the menu, playing the game, or on another screen.
 class GameState(Enum):
     MAIN_MENU = auto()
     IN_GAME = auto()
     GAME_OVER = auto()
-    # Add future states like GLOBAL_UPGRADES here
 
 
-# --- Control Constants ---
 MAX_ZOOM = 3.0
 MIN_ZOOM_CLAMP = 0.1
 ZOOM_INCREMENT = 0.07
@@ -41,7 +38,12 @@ class Game:
     between the main menu and the game itself.
     """
 
-    def __init__(self, all_configs: Dict[str, Any], assets_path: Path):
+    def __init__(
+        self,
+        all_configs: Dict[str, Any],
+        assets_path: Path,
+        progression_manager: "ProgressionManager",
+    ):
         """
         Initializes Pygame, the window, and all high-level systems.
         """
@@ -51,6 +53,8 @@ class Game:
         self.all_configs = all_configs
         self.game_settings = all_configs["game_settings"]
         self.assets_path = assets_path
+        # --- NEW: Store the progression manager ---
+        self.progression_manager = progression_manager
 
         self.screen_width = self.game_settings.get("screen_width", 1280)
         self.screen_height = self.game_settings.get("screen_height", 720)
@@ -63,23 +67,18 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
 
-        # --- State Machine Initialization ---
         self.game_state = GameState.MAIN_MENU
 
-        # --- Manager Initialization ---
-        # Menu manager is created immediately.
         self.menu_manager = MenuManager(
             screen_rect=self.screen.get_rect(),
             new_game_callback=self._start_new_game,
             quit_callback=self._quit_game,
         )
-        # In-game managers are initialized lazily (set to None initially).
         self.game_manager: Optional[GameManager] = None
         self.ui_manager: Optional[UIManager] = None
         self.sprite_renderer: Optional[SpriteRenderer] = None
 
-        # --- Rendering & Camera State ---
-        self.background_color = (15, 20, 25)  # Default menu background
+        self.background_color = (15, 20, 25)
         self.gui_font = pygame.font.SysFont("segoeui", 22, bold=True)
         self.tile_size = self.game_settings.get("tile_size", 32)
         self.zoom = 1.0
@@ -95,8 +94,11 @@ class Game:
         switches the game state to IN_GAME.
         """
         logger.info("--- Starting New Game ---")
-        # --- Initialize all in-game managers ---
         self.game_manager = GameManager(self.all_configs)
+
+        # --- NEW: Apply global upgrades before UI is built ---
+        self.progression_manager.apply_global_upgrades(self.game_manager)
+
         self.ui_manager = UIManager(
             self.screen.get_rect(), self.game_manager, self.assets_path
         )
@@ -122,7 +124,6 @@ class Game:
             return
 
         style_config = {}
-        # This logic correctly finds the style config for the generated level
         for style in self.game_manager.level_manager.level_styles.values():
             if isinstance(style, dict):
                 gen_params = style.get("generation_params", {})
@@ -165,7 +166,6 @@ class Game:
                 self.menu_manager.handle_event(event)
 
             elif self.game_state == GameState.IN_GAME:
-                # Ensure in-game managers exist before handling events
                 if not self.ui_manager or not self.game_manager:
                     continue
 
@@ -220,8 +220,6 @@ class Game:
                 self.ui_manager.draw(self.screen, self.game_manager.game_state)
 
         pygame.display.flip()
-
-    # --- All methods below this point are IN_GAME specific ---
 
     def _handle_mouse_down(self, event):
         """Handles all mouse down events, routing them based on the button."""
