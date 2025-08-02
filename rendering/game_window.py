@@ -11,8 +11,6 @@ from rendering.hud.ui_manager import UIManager
 from rendering.menu.menu_manager import MenuManager
 from rendering.game.camera import Camera
 from rendering.game.input_handler import InputHandler
-
-# --- MODIFIED: Import FontManager for type hinting ---
 from rendering.text.font_manager import FontManager
 
 
@@ -25,7 +23,6 @@ logger = logging.getLogger(__name__)
 class GameState(Enum):
     MAIN_MENU = auto()
     IN_GAME = auto()
-    # GAME_OVER state is now handled by a transition back to the menu
 
 
 class Game:
@@ -39,21 +36,19 @@ class Game:
         all_configs: Dict[str, Any],
         assets_path: Path,
         progression_manager: "ProgressionManager",
-        # --- NEW: Accept UI theme and FontManager ---
         ui_theme: Dict[str, Any],
         font_manager: "FontManager",
     ):
         """
-        Initializes Pygame, the window, and all high-level systems.
+        Initializes the window and all high-level systems.
         """
-        pygame.init()
-        pygame.font.init()
+        # --- FIX: Pygame initialization is now done in main.py ---
+        # This class now assumes Pygame has already been initialized.
 
         self.all_configs = all_configs
         self.game_settings = all_configs["game_settings"]
         self.assets_path = assets_path
         self.progression_manager = progression_manager
-        # --- NEW: Store theme and font manager ---
         self.ui_theme = ui_theme
         self.font_manager = font_manager
 
@@ -70,8 +65,6 @@ class Game:
 
         self.game_state = GameState.MAIN_MENU
 
-        # --- High-Level Managers ---
-        # --- MODIFIED: Pass theme and font manager to MenuManager ---
         self.menu_manager = MenuManager(
             screen_rect=self.screen.get_rect(),
             progression_manager=self.progression_manager,
@@ -81,18 +74,15 @@ class Game:
             start_level_callback=self._start_new_game,
             quit_callback=self._quit_game,
         )
-        # In-game managers are initialized lazily.
         self.game_manager: Optional[GameManager] = None
         self.ui_manager: Optional[UIManager] = None
         self.sprite_renderer: Optional[SpriteRenderer] = None
         self.camera: Optional[Camera] = None
         self.input_handler: Optional[InputHandler] = None
 
-        # --- MODIFIED: Use theme for background color ---
         self.background_color = self.ui_theme.get("colors", {}).get(
             "background_primary", (15, 20, 25)
         )
-        # The old hardcoded gui_font is now obsolete.
 
     def _start_new_game(self, level_id: str):
         """
@@ -105,7 +95,6 @@ class Game:
         )
         self.progression_manager.apply_global_upgrades(self.game_manager)
 
-        # --- MODIFIED: Pass theme and font manager to UIManager ---
         self.ui_manager = UIManager(
             screen_rect=self.screen.get_rect(),
             game_manager=self.game_manager,
@@ -127,25 +116,19 @@ class Game:
 
     def _return_to_main_menu(self):
         """
-        Handles the transition from an ended game back to the main menu,
-        cleaning up all in-game objects.
+        Handles the transition from an ended game back to the main menu.
         """
         logger.info("Returning to main menu.")
-        # Unload all game-specific objects to free memory and ensure a clean state
         self.game_manager = None
         self.ui_manager = None
         self.sprite_renderer = None
         self.camera = None
         self.input_handler = None
 
-        # Reset background color for the menu
         self.background_color = self.ui_theme.get("colors", {}).get(
             "background_primary", (15, 20, 25)
         )
-
-        # Rebuild the menu to reflect any new unlocks
         self.menu_manager.rebuild_all_screens()
-
         self.game_state = GameState.MAIN_MENU
 
     def _quit_game(self):
@@ -168,7 +151,6 @@ class Game:
         style_config = self.game_manager.level_manager.level_styles.get(
             self.game_manager.current_level_id, {}
         )
-        # The in-game background color is still determined by the level style
         self.background_color = style_config.get("background_color", (10, 10, 10))
         tile_definitions = style_config.get("tile_definitions", {})
 
@@ -289,7 +271,6 @@ class Game:
         if not state or not wave_mgr:
             return
 
-        # --- MODIFIED: Use FontManager and theme for styling ---
         colors = self.ui_theme.get("colors", {})
         layout = self.ui_theme.get("layout", {})
         font = self.font_manager.get_font("body_medium")
@@ -313,7 +294,7 @@ class Game:
         panel_rect = pygame.Rect(5, 5, panel_width, panel_height)
 
         panel_surf = pygame.Surface(panel_rect.size, pygame.SRCALPHA)
-        panel_surf.fill(colors.get("panel_primary", (0, 0, 0)) + (200,))  # Add alpha
+        panel_surf.fill(colors.get("panel_primary", (0, 0, 0)) + (200,))
         self.screen.blit(panel_surf, panel_rect.topleft)
 
         current_x = panel_rect.left + padding

@@ -4,14 +4,12 @@ import logging
 import sys
 from pathlib import Path
 from typing import Dict
+import pygame
 
 from rendering.game_window import Game
 from game_logic.upgrades.upgrade_loader import load_all_upgrades
 from game_logic.progression.player_data_manager import PlayerDataManager
 from game_logic.progression.progression_manager import ProgressionManager
-
-# --- MODIFIED: Import the new FontManager ---
-# The FontManager is now a core part of the rendering setup.
 from rendering.text.font_manager import FontManager
 
 
@@ -46,10 +44,14 @@ def load_config(path: Path) -> dict:
 
 def main():
     """Main function to set up and run the game."""
+    # --- FIX: Initialize Pygame and its font module at the very start ---
+    # This ensures that all Pygame modules are ready before any other code
+    # that might depend on them (like the FontManager) is executed.
+    pygame.init()
+    pygame.font.init()
+
     logger.info("--- Loading All Game Configurations ---")
     try:
-        # --- MODIFIED: Load the new UI Theme configuration first ---
-        # This theme will govern the appearance of all UI elements.
         ui_theme = load_config(CONFIG_PATH / "ui" / "ui_theme.json")
 
         upgrade_root_dir = CONFIG_PATH / "upgrades"
@@ -82,12 +84,9 @@ def main():
         )
         return
 
-    # --- NEW: Initialize Font Manager ---
-    # This manager uses the loaded theme to prepare all necessary font objects.
     logger.info("--- Initializing Font Manager ---")
     font_manager = FontManager(ui_theme.get("fonts", {}))
 
-    # --- Initialize Progression Systems ---
     logger.info("--- Initializing Progression Systems ---")
     player_data_manager = PlayerDataManager(SAVES_PATH / "player_data.json")
     progression_manager = ProgressionManager(
@@ -97,7 +96,6 @@ def main():
 
     logger.info("--- Initializing Game ---")
     try:
-        # --- MODIFIED: Pass the new UI theme and FontManager to the Game ---
         game = Game(
             all_configs=all_configs,
             assets_path=ASSETS_PATH,

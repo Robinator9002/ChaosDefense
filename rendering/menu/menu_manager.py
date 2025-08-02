@@ -39,17 +39,21 @@ class MenuButton(UIElement):
         super().__init__(rect)
         self.text = text
         self.action = action
-
-        # --- NEW: Load styles from theme ---
         self.colors = ui_theme.get("colors", {})
         self.layout = ui_theme.get("layout", {})
         self.font = font_manager.get_font("button_large")
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         """Handles mouse events for the button. If clicked, it executes its action."""
-        self.is_hovered = self.rect.collidepoint(event.pos)
+        # --- FIX: Only check for mouse position on MOUSEMOTION events ---
+        # This prevents an AttributeError for events that don't have a 'pos' attribute.
+        if event.type == pygame.MOUSEMOTION:
+            self.is_hovered = self.rect.collidepoint(event.pos)
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.is_hovered:
+            # We still need to check hover state on click, in case the mouse
+            # didn't move before clicking.
+            if self.rect.collidepoint(event.pos):
                 self.action()
                 return True
         return False
@@ -94,7 +98,6 @@ class MenuButton(UIElement):
 class MenuManager:
     """
     Manages the state and rendering of all out-of-game UI screens.
-    REFACTORED: Now accepts and distributes the UI theme and font manager.
     """
 
     def __init__(
@@ -161,7 +164,6 @@ class MenuManager:
         self.state = MenuState.LEVEL_SELECT
 
     def _show_workshop(self):
-        # This will still cause a TypeError until WorkshopScreen is refactored
         self.workshop_screen = WorkshopScreen(
             screen_rect=self.screen_rect,
             progression_manager=self.progression_manager,
@@ -211,7 +213,6 @@ class MenuManager:
         return False
 
     def update(self, dt: float):
-        """Updates the currently active screen (if needed)."""
         pass
 
     def draw(self, screen: pygame.Surface):
