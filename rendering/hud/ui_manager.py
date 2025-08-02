@@ -10,8 +10,6 @@ from .buttons.tower_button import TowerButton
 from .buttons.tab_button import TabButton
 from .panels.upgrade_panel import UpgradePanel
 from .panels.tower_info_panel import TowerInfoPanel
-
-# --- NEW: Import the new PersonaSelectionPanel ---
 from .panels.persona_selection_panel import PersonaSelectionPanel
 from rendering.common.ui.ui_action import UIAction, ActionType
 
@@ -41,7 +39,6 @@ class UIManager:
     ):
         self.screen_rect = screen_rect
         self.game_manager = game_manager
-        # --- FIX: Store progression_manager as an attribute ---
         self.progression_manager = progression_manager
         self.assets_path = assets_path
         self.ui_theme = ui_theme
@@ -53,14 +50,7 @@ class UIManager:
 
         self.tower_buttons: List[TowerButton] = []
         self.tab_buttons: List[TabButton] = []
-
-        # --- FIX (Step 1.3): Set "all" as the default active tab ---
-        # This ensures that tower buttons are visible from the start of the game.
         self.active_tab: str = "all"
-
-        # --- FIX (Step 1.3): Initialize the hotkey_map attribute ---
-        # This list will hold the tower_type_ids for the currently visible buttons,
-        # allowing the InputHandler to select them via number keys.
         self.hotkey_map: List[str] = []
 
         self.info_panel: Optional[TowerInfoPanel] = None
@@ -72,7 +62,6 @@ class UIManager:
 
     def _build_static_ui(self):
         """Builds UI elements that don't change during gameplay."""
-        # This can include the bottom panel, etc.
         pass
 
     def _build_dynamic_ui(self):
@@ -82,18 +71,13 @@ class UIManager:
     def _rebuild_tower_buttons(self):
         """
         Rebuilds the tower buttons based on available tower types.
-        This method is now correctly placed to ensure that the buttons
-        are created and styled before they are drawn.
         """
         self.tower_buttons.clear()
         self.tab_buttons.clear()
-
-        # --- FIX (Step 1.3): Clear the hotkey map before rebuilding ---
         self.hotkey_map.clear()
 
         buildable_tower_ids = self.game_manager.get_buildable_towers()
         all_tower_configs = self.game_manager.configs.get("tower_types", {})
-        targeting_ai_config = self.game_manager.configs.get("targeting_ai", {})
 
         categories = sorted(
             list(
@@ -104,9 +88,7 @@ class UIManager:
                 )
             )
         )
-
         categories.insert(0, "all")
-        logger.info(f"Final buildable categories: {categories}")
 
         tab_button_width = 80
         tab_button_height = 30
@@ -125,7 +107,6 @@ class UIManager:
                 TabButton(rect, category, is_active, self.ui_theme, self.font_manager)
             )
 
-        # --- FIX: Filter the tower IDs more robustly to avoid 'str' object errors ---
         filtered_tower_ids = []
         for t_id in buildable_tower_ids:
             tower_data = all_tower_configs.get(t_id, {})
@@ -136,17 +117,12 @@ class UIManager:
                 ):
                     filtered_tower_ids.append(t_id)
 
-        # --- FIX (Step 1.3): Populate the hotkey map ---
-        # The hotkey_map is now a simple list of the tower IDs in the order they
-        # will be displayed. The InputHandler can use an index to get the ID.
         self.hotkey_map = filtered_tower_ids
-
         button_size = 64
         button_spacing = 15
         num_buttons_per_row = (self.screen_rect.width - 2 * button_spacing) // (
             button_size + button_spacing
         )
-
         start_x = (
             self.screen_rect.centerx
             - (num_buttons_per_row * (button_size + button_spacing) - button_spacing)
@@ -164,7 +140,6 @@ class UIManager:
                 + button_spacing
                 + row * (button_size + button_spacing)
             )
-
             button = TowerButton(
                 pygame.Rect(x, y, button_size, button_size),
                 tower_id,
@@ -176,23 +151,41 @@ class UIManager:
             )
             self.tower_buttons.append(button)
 
-    # --- FIX (Step 1.4): Add the missing method for hotkey category selection ---
     def set_active_category_by_index(self, index: int):
         """
         Sets the active tab based on a hotkey index and rebuilds the tower buttons.
-        This method is called by the InputHandler to handle F-key presses.
         """
         if index < 0 or index >= len(self.tab_buttons):
             logger.warning(f"Hotkey index {index} is out of range. Ignoring.")
             return
-
         self.active_tab = self.tab_buttons[index].category_name
         self._rebuild_tower_buttons()
         logger.info(f"Active category changed to: {self.active_tab}")
 
+    # --- NEW: Decoupled method for hotkey selection (Issue #8) ---
+    def select_tower_by_hotkey(self, index: int, game_state: "GameState"):
+        """
+        Selects a tower for building based on a numerical hotkey index (0-9).
+
+        This provides a clean interface for the InputHandler, which no longer
+        needs to know about the internal `hotkey_map` list. It simply tells
+        the UIManager which hotkey was pressed.
+
+        Args:
+            index (int): The zero-based index of the hotkey (e.g., 0 for key '1').
+            game_state (GameState): The current game state object to modify.
+        """
+        if 0 <= index < len(self.hotkey_map):
+            tower_id = self.hotkey_map[index]
+            # Toggle selection: if the same tower is selected, clear it.
+            if game_state.selected_tower_to_build == tower_id:
+                game_state.clear_selection()
+            else:
+                game_state.selected_tower_to_build = tower_id
+                logger.info(f"Player selected '{tower_id}' via hotkey {index + 1}.")
+
     def _open_upgrade_panel(self, tower_id: uuid.UUID):
         """Opens the upgrade panel for a selected tower."""
-        # --- FIX: The tower_id parameter is now correctly typed as UUID ---
         tower = self.game_manager.towers.get(tower_id)
         if tower:
             panel_width = self.screen_rect.width * 0.25
@@ -238,7 +231,7 @@ class UIManager:
             )
 
     def _close_persona_panel(self):
-        """Ccloses the persona selection modal."""
+        """Closes the persona selection modal."""
         self.persona_panel = None
 
     def _change_persona(self, persona_id: str):
@@ -298,8 +291,6 @@ class UIManager:
         if self.info_panel:
             if hasattr(event, "pos") and self.info_panel.rect.collidepoint(event.pos):
                 return True
-            # This logic might be too aggressive, let's refine it.
-            # self.info_panel = None
 
         for button in self.tab_buttons:
             if (
@@ -338,26 +329,16 @@ class UIManager:
                         self.font_manager,
                     )
                 return True
-
-        # --- FIX (Step 2.3): Logic to open upgrade panel when a placed tower is selected ---
-        # This logic was incorrectly placed in handle_event.
-        # It's been moved to the update loop for correct behavior.
         return False
 
     def update(self, dt: float, game_state: "GameState"):
-        # --- FIX (Step 2.3): This is the correct location for this logic ---
-        # We handle UI panel visibility here, driven by game state changes,
-        # which is a clean separation from event handling.
         if game_state.selected_entity_id:
-            # Check if a new tower is selected and an upgrade panel isn't already open for it
             if (
                 not self.upgrade_panel
                 or self.upgrade_panel.tower.entity_id != game_state.selected_entity_id
             ):
-                # --- FIX: The tower_id is already a UUID, no need to cast to str and back ---
                 self._open_upgrade_panel(game_state.selected_entity_id)
         elif not game_state.selected_entity_id:
-            # If the selection is cleared, close any open panels.
             self._close_panel()
 
         if self.persona_panel:

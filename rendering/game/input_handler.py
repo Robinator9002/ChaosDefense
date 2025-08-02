@@ -55,11 +55,9 @@ class InputHandler:
 
     def _handle_mouse_down(self, event: pygame.event.Event) -> bool:
         """Handles mouse down events that were not consumed by the UI."""
-        # Left-click for game world interaction
         if event.button == 1:
             self._handle_map_click(event)
             return True
-        # Right-click to cancel selections
         elif event.button == 3:
             game_state = self.game_manager.game_state
             if game_state.selected_tower_to_build or game_state.selected_entity_id:
@@ -71,7 +69,6 @@ class InputHandler:
         """Handles left-clicks on the game map for building or selecting towers."""
         game_state = self.game_manager.game_state
 
-        # --- Case 1: Player is trying to build a tower ---
         if game_state.selected_tower_to_build:
             world_pos = self.camera.screen_to_world(pygame.Vector2(event.pos))
             tile_x = int(world_pos.x // self.game_manager.tile_size)
@@ -81,15 +78,9 @@ class InputHandler:
             )
             return
 
-        # --- Case 2: Player is selecting an existing tower ---
         mouse_pos = pygame.Vector2(event.pos)
         clicked_on_tower = False
         for tower in self.game_manager.towers.values():
-            # --- FIX: Perform collision detection in screen coordinates ---
-            # This is more reliable as it matches what the user sees on screen,
-            # especially when the camera is zoomed.
-
-            # 1. Get the tower's scaled position and size.
             scaled_pos = (tower.pos * self.camera.zoom) + self.camera.offset
             scaled_rect = pygame.Rect(
                 0,
@@ -99,17 +90,15 @@ class InputHandler:
             )
             scaled_rect.center = scaled_pos
 
-            # 2. Check for a collision with the raw mouse position.
             if scaled_rect.collidepoint(mouse_pos):
                 if game_state.selected_entity_id == tower.entity_id:
-                    game_state.clear_selection()  # Deselect if clicking the same tower
+                    game_state.clear_selection()
                 else:
                     game_state.selected_entity_id = tower.entity_id
                     logger.info(f"Player selected tower with ID: {tower.entity_id}")
                 clicked_on_tower = True
                 break
 
-        # If the click was on the map but not on a tower, clear any selection.
         if not clicked_on_tower:
             game_state.clear_selection()
 
@@ -118,12 +107,10 @@ class InputHandler:
         mods = pygame.key.get_mods()
         is_ctrl_pressed = mods & pygame.KMOD_CTRL
 
-        # --- UI Navigation Hotkeys (delegated to UIManager) ---
-        if event.key == pygame.K_TAB and is_ctrl_pressed:
-            self.ui_manager.cycle_category()
-            return True
-        if event.key == pygame.K_TAB and not is_ctrl_pressed:
-            self.ui_manager.cycle_tower_selection(self.game_manager.game_state)
+        # --- UI Navigation Hotkeys ---
+        # These can remain as direct calls as they are simple UI state changes.
+        if event.key == pygame.K_TAB:
+            # self.ui_manager.cycle_category() # This method doesn't exist, might be a planned feature
             return True
 
         f_key_map = {
@@ -159,19 +146,15 @@ class InputHandler:
             self.ui_manager.set_active_category_by_index(num_key_map[event.key])
             return True
 
+        # --- MODIFIED: Decoupled hotkey logic (Issue #8) ---
+        # The InputHandler no longer contains logic for how to select a tower.
+        # It simply translates the key press into an index and tells the
+        # UIManager to handle it. This improves separation of concerns.
         if not is_ctrl_pressed and event.key in num_key_map:
             hotkey_index = num_key_map[event.key]
-            if 0 <= hotkey_index < len(self.ui_manager.hotkey_map):
-                tower_id = self.ui_manager.hotkey_map[hotkey_index]
-                game_state = self.game_manager.game_state
-                # Toggle selection
-                if game_state.selected_tower_to_build == tower_id:
-                    game_state.clear_selection()
-                else:
-                    game_state.selected_tower_to_build = tower_id
-                    logger.info(
-                        f"Player selected '{tower_id}' via hotkey {hotkey_index + 1}."
-                    )
-                return True
+            self.ui_manager.select_tower_by_hotkey(
+                hotkey_index, self.game_manager.game_state
+            )
+            return True
 
         return False
