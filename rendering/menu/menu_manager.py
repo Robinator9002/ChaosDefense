@@ -45,17 +45,19 @@ class MenuButton(UIElement):
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         """Handles mouse events for the button. If clicked, it executes its action."""
-        # --- FIX: Only check for mouse position on MOUSEMOTION events ---
-        # This prevents an AttributeError for events that don't have a 'pos' attribute.
+        # --- FIX (Step 1.1): Prevent crash on non-mouse events & fix stale hover state ---
+        # This handler now robustly processes only mouse events by checking the event type.
+        # This prevents crashes when keyboard events are passed to this handler.
         if event.type == pygame.MOUSEMOTION:
             self.is_hovered = self.rect.collidepoint(event.pos)
+            return False  # A hover event is never "handled" in a way that stops propagation
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # We still need to check hover state on click, in case the mouse
-            # didn't move before clicking.
+            # We check the position directly on click, which is the most reliable way.
             if self.rect.collidepoint(event.pos):
                 self.action()
-                return True
+                return True  # The click was handled by this button.
+
         return False
 
     def draw(self, screen: pygame.Surface):

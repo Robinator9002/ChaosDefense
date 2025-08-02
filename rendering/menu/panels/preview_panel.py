@@ -147,7 +147,8 @@ class PreviewPanel(UIElement):
                         if self.active_item_data
                         else None
                     )
-                    self.action_callback(item_id)
+                    if item_id:
+                        self.action_callback(item_id)
 
     def draw(self, screen: pygame.Surface):
         """Draws the panel and its contents using styles from the theme."""
@@ -156,7 +157,10 @@ class PreviewPanel(UIElement):
 
         # Draw panel background and border
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        # --- FIX: Convert list from theme to tuple before adding alpha tuple ---
+
+        # --- FIX (Step 1.2): Convert list-based color to tuple before concatenation ---
+        # The color is loaded from JSON as a list. We must cast it to a tuple
+        # before we can add the alpha tuple `(230,)` to it. This resolves the TypeError.
         bg_color_list = self.colors.get("panel_primary", [25, 30, 40])
         panel_surf.fill(tuple(bg_color_list) + (230,))
         screen.blit(panel_surf, self.rect.topleft)

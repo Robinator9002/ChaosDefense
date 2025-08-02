@@ -92,8 +92,13 @@ class TowerInfoPanel(UIElement):
         border_width = self.layout.get("border_width_standard", 2)
 
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        panel_surf.fill(bg_color + (230,))
+
+        # --- FIX (Step 1.2): Convert list-based color to tuple before concatenation ---
+        # The color is loaded from JSON as a list. We must cast it to a tuple
+        # before we can add the alpha tuple `(230,)` to it. This resolves the TypeError.
+        panel_surf.fill(tuple(bg_color) + (230,))
         screen.blit(panel_surf, self.rect.topleft)
+
         pygame.draw.rect(
             screen, border_color, self.rect, border_width, border_radius=border_radius
         )
