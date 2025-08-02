@@ -1,7 +1,7 @@
 # rendering/menu/components/scrollable_grid.py
 import pygame
 import logging
-from typing import List, Tuple, Any
+from typing import Tuple, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class ScrollableGrid:
     """
     A helper class to manage the layout and scrolling logic for a grid of UI elements.
-    This is not a drawable UI element itself but a state manager for a parent screen.
+    REFACTORED: Now fully theme-driven for consistent scrollbar styling.
     """
 
     def __init__(
@@ -18,6 +18,7 @@ class ScrollableGrid:
         item_size: Tuple[int, int],
         item_spacing: Tuple[int, int],
         columns: int,
+        ui_theme: Dict[str, Any],
     ):
         """
         Initializes the ScrollableGrid manager.
@@ -25,13 +26,18 @@ class ScrollableGrid:
         Args:
             area (pygame.Rect): The visible area for the grid content.
             item_size (Tuple[int, int]): The (width, height) of each grid item.
-            item_spacing (Tuple[int, int]): The (horizontal, vertical) spacing between items.
+            item_spacing (Tuple[int, int]): The (h, v) spacing between items.
             columns (int): The number of columns in the grid.
+            ui_theme (Dict[str, Any]): The UI theme dictionary.
         """
         self.area = area
         self.item_width, self.item_height = item_size
         self.spacing_x, self.spacing_y = item_spacing
         self.columns = columns
+
+        # --- NEW: Load styles from theme ---
+        self.colors = ui_theme.get("colors", {})
+        self.layout = ui_theme.get("layout", {})
 
         # --- Scrolling State ---
         self.scroll_y = 0
@@ -41,11 +47,7 @@ class ScrollableGrid:
 
     def update_item_count(self, num_items: int):
         """
-        Recalculates the grid's total height and scrolling parameters based on
-        the number of items it needs to display.
-
-        Args:
-            num_items (int): The total number of items in the grid.
+        Recalculates the grid's total height and scrolling parameters.
         """
         if self.columns <= 0:
             return
@@ -61,19 +63,11 @@ class ScrollableGrid:
 
     def get_item_rect(self, index: int) -> pygame.Rect:
         """
-        Calculates the layout position (relative to the content area) for an item
-        at a given index.
-
-        Args:
-            index (int): The index of the item in the list.
-
-        Returns:
-            pygame.Rect: The rectangle for the item's position and size.
+        Calculates the layout position for an item at a given index.
         """
         col = index % self.columns
         row = index // self.columns
 
-        # Calculate x position to center the grid of columns within the area
         total_grid_width = (self.columns * self.item_width) + (
             max(0, self.columns - 1) * self.spacing_x
         )
@@ -85,14 +79,8 @@ class ScrollableGrid:
         return pygame.Rect(x_pos, y_pos, self.item_width, self.item_height)
 
     def handle_scroll_event(self, event: pygame.event.Event):
-        """
-        Processes mouse wheel events to update the scroll offset.
-
-        Args:
-            event (pygame.event.Event): The Pygame event to process.
-        """
+        """Processes mouse wheel events to update the scroll offset."""
         if self.is_scrollable and event.type == pygame.MOUSEBUTTONDOWN:
-            # Check if the mouse is within the scrollable area to avoid scrolling when hovering over other UI
             if self.area.collidepoint(pygame.mouse.get_pos()):
                 if event.button == 4:  # Scroll up
                     self.scroll_y = max(0, self.scroll_y - 40)
@@ -100,16 +88,16 @@ class ScrollableGrid:
                     self.scroll_y = min(self.max_scroll, self.scroll_y + 40)
 
     def draw_scrollbar(self, screen: pygame.Surface):
-        """
-        Draws a visual scrollbar next to the grid area.
-
-        Args:
-            screen (pygame.Surface): The surface to draw on.
-        """
+        """Draws a visual scrollbar next to the grid area using theme styles."""
         if not self.is_scrollable:
             return
 
-        track_width = 10
+        # --- NEW: Use theme for styling ---
+        track_color = self.colors.get("scrollbar_track", (30, 35, 45))
+        handle_color = self.colors.get("scrollbar_handle", (80, 90, 100))
+        track_width = self.layout.get("scrollbar_width", 10)
+        border_radius = self.layout.get("border_radius_small", 5)
+
         track_rect = pygame.Rect(
             self.area.right + 5, self.area.top, track_width, self.area.height
         )
@@ -122,6 +110,5 @@ class ScrollableGrid:
             track_rect.x, handle_y, track_rect.width, handle_height
         )
 
-        # Colors can be passed in or defined in a theme later
-        pygame.draw.rect(screen, (30, 35, 45), track_rect, border_radius=5)
-        pygame.draw.rect(screen, (80, 90, 100), handle_rect, border_radius=5)
+        pygame.draw.rect(screen, track_color, track_rect, border_radius=border_radius)
+        pygame.draw.rect(screen, handle_color, handle_rect, border_radius=border_radius)
