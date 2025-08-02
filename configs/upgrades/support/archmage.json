@@ -1,14 +1,14 @@
 {
-  "//": "BALANCE PASS 2: Upgrades have been massively buffed to make the Archmage a truly elite support tower and a worthwhile late-game investment.",
+  "//": "BALANCE OVERHAUL (DAY 7): The Archmage has been completely redesigned to be a true late-game powerhouse. Both paths offer game-changing auras and abilities that create powerful synergies, justifying its high cost.",
   "path_a": {
-    "name": "Amplification",
-    "description": "Focuses on raw amplification of magical effects and auras.",
+    "name": "Nexus of Power",
+    "description": "Focuses on raw, exponential amplification of magical effects, turning a group of debuff towers into an unstoppable damage-dealing engine.",
     "upgrades": [
       {
         "id": "archmage_a1",
         "name": "Focusing Crystals",
-        "cost": 250,
-        "description": "Significantly increases the potency of the Effect Potency Boost aura.",
+        "cost": 300,
+        "description": "Massively increases the potency of the Effect Potency Boost aura, from +30% to +50%.",
         "effects": [
           {
             "type": "modify_nested",
@@ -22,16 +22,22 @@
       },
       {
         "id": "archmage_a2",
-        "name": "Resonant Fields",
-        "cost": 380,
-        "description": "Significantly increases the potency of the Aura Size Boost aura.",
+        "name": "Arcane Resonance",
+        "cost": 550,
+        "description": "Unlocks a new aura that makes enemies vulnerable, causing them to take 20% increased damage from all sources.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
-              "path": "auras[0].effects.aura_size_boost.potency",
-              "operation": "add",
-              "amount": 0.15
+              "path": "auras",
+              "operation": "add_aura",
+              "amount": {
+                "range": 100,
+                "target_type": "ENEMY",
+                "effects": {
+                  "vulnerability": { "potency": 1.2, "duration": 1.0 }
+                }
+              }
             }
           }
         ]
@@ -39,15 +45,23 @@
       {
         "id": "archmage_a3",
         "name": "Leyline Attunement",
-        "cost": 500,
-        "description": "Increases the Arch-Mage's own aura radius by 30.",
+        "cost": 700,
+        "description": "Increases the radius of all the Archmage's auras by 40.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
               "path": "auras[0].range",
               "operation": "add",
-              "amount": 30
+              "amount": 40
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "path": "auras[1].range",
+              "operation": "add",
+              "amount": 40
             }
           }
         ]
@@ -55,13 +69,13 @@
       {
         "id": "archmage_a4",
         "name": "Power Overwhelming",
-        "cost": 1000,
-        "description": "Greatly increases the potency of the Effect Potency Boost aura.",
+        "cost": 1500,
+        "description": "The Arcane Resonance aura is supercharged, increasing its vulnerability effect from 20% to 50%.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
-              "path": "auras[0].effects.effect_potency_boost.potency",
+              "path": "auras[1].effects.vulnerability.potency",
               "operation": "add",
               "amount": 0.3
             }
@@ -70,24 +84,24 @@
       },
       {
         "id": "archmage_a5",
-        "name": "Nexus of Power",
-        "cost": 3000,
-        "description": "Becomes a nexus of raw magic, massively amplifying the potency and size of all nearby magical effects.",
+        "name": "Archon Form",
+        "cost": 4000,
+        "description": "The Archmage transcends, gaining a long-range attack that stuns enemies, feeding its own power.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
-              "path": "auras[0].effects.effect_potency_boost.potency",
-              "operation": "add",
-              "amount": 0.7
-            }
-          },
-          {
-            "type": "modify_nested",
-            "value": {
-              "path": "auras[0].effects.aura_size_boost.potency",
-              "operation": "add",
-              "amount": 0.3
+              "path": "attack",
+              "operation": "set",
+              "amount": {
+                "type": "standard_projectile",
+                "data": {
+                  "damage": 50,
+                  "range": 300,
+                  "fire_rate": 0.5,
+                  "effects": { "stun": { "potency": 0, "duration": 1.0 } }
+                }
+              }
             }
           }
         ]
@@ -95,14 +109,74 @@
     ]
   },
   "path_b": {
-    "name": "Metamagic",
-    "description": "Focuses on granting new, unique magical properties to nearby towers.",
+    "name": "Master of Elements",
+    "description": "Grants new, devastating elemental abilities to nearby towers, creating powerful chain reactions.",
     "upgrades": [
       {
         "id": "archmage_b1",
-        "name": "Arcane Reach",
-        "cost": 220,
-        "description": "Increases the Arch-Mage's own aura radius by 30.",
+        "name": "Elemental Infusion",
+        "cost": 350,
+        "description": "Unlocks a new aura that ignites enemies near allied towers, dealing damage over time.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "path": "auras",
+              "operation": "add_aura",
+              "amount": {
+                "range": 110,
+                "target_type": "ENEMY",
+                "effects": { "fire": { "potency": 25, "duration": 2.0 } }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_b2",
+        "name": "Cryo Core",
+        "cost": 500,
+        "description": "The Elemental Infusion aura is upgraded, now also slowing enemies who are on fire.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "path": "auras[1].effects",
+              "operation": "add_effect",
+              "amount": { "slow": { "potency": 0.3, "duration": 1.0 } }
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_b3",
+        "name": "Chain Lightning",
+        "cost": 800,
+        "description": "The Archmage gains a new, rapid-fire attack that chains between 2 enemies.",
+        "effects": [
+          {
+            "type": "modify_nested",
+            "value": {
+              "path": "attack",
+              "operation": "set",
+              "amount": {
+                "type": "standard_projectile",
+                "data": {
+                  "damage": 15,
+                  "range": 250,
+                  "fire_rate": 2.0,
+                  "chains": 2
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "archmage_b4",
+        "name": "Expanded Influence",
+        "cost": 1300,
+        "description": "Increases the radius of all auras and the potency of the elemental effects.",
         "effects": [
           {
             "type": "modify_nested",
@@ -111,97 +185,53 @@
               "operation": "add",
               "amount": 30
             }
-          }
-        ]
-      },
-      {
-        "id": "archmage_b2",
-        "name": "Empower Projectiles",
-        "cost": 450,
-        "description": "The Arch-Mage's aura now also grants a significant Damage Boost to nearby towers.",
-        "effects": [
+          },
           {
             "type": "modify_nested",
             "value": {
-              "path": "auras[0].effects",
-              "operation": "add_effect",
-              "amount": {
-                "damage_boost": { "potency": 1.2, "duration": 0.5 }
-              }
-            }
-          }
-        ]
-      },
-      {
-        "id": "archmage_b3",
-        "name": "Empower Speed",
-        "cost": 450,
-        "description": "The Arch-Mage's aura now also grants a Fire Rate Boost to nearby towers.",
-        "effects": [
-          {
-            "type": "modify_nested",
-            "value": {
-              "path": "auras[0].effects",
-              "operation": "add_effect",
-              "amount": {
-                "fire_rate_boost": { "potency": 1.15, "duration": 0.5 }
-              }
-            }
-          }
-        ]
-      },
-      {
-        "id": "archmage_b4",
-        "name": "Greater Empowerment",
-        "cost": 750,
-        "description": "Increases the potency of the granted Damage and Fire Rate boosts.",
-        "effects": [
-          {
-            "type": "modify_nested",
-            "value": {
-              "path": "auras[0].effects.damage_boost.potency",
+              "path": "auras[1].range",
               "operation": "add",
-              "amount": 0.1
+              "amount": 30
             }
           },
           {
             "type": "modify_nested",
             "value": {
-              "path": "auras[0].effects.fire_rate_boost.potency",
+              "path": "auras[1].effects.fire.potency",
+              "operation": "multiply",
+              "amount": 1.5
+            }
+          },
+          {
+            "type": "modify_nested",
+            "value": {
+              "path": "auras[1].effects.slow.potency",
               "operation": "add",
-              "amount": 0.1
+              "amount": 0.15
             }
           }
         ]
       },
       {
         "id": "archmage_b5",
-        "name": "Archon's Blessing",
-        "cost": 3200,
-        "description": "All towers in the aura are blessed, gaining a significant boost to all stats and effect potencies.",
+        "name": "Elemental Cascade",
+        "cost": 4500,
+        "description": "The Chain Lightning attack becomes a devastating storm, chaining to 5 targets and dealing massively increased damage.",
         "effects": [
           {
             "type": "modify_nested",
             "value": {
-              "path": "auras[0].effects.effect_potency_boost.potency",
+              "path": "attack.data.damage",
               "operation": "add",
-              "amount": 0.3
+              "amount": 35
             }
           },
           {
             "type": "modify_nested",
             "value": {
-              "path": "auras[0].effects.damage_boost.potency",
-              "operation": "add",
-              "amount": 0.2
-            }
-          },
-          {
-            "type": "modify_nested",
-            "value": {
-              "path": "auras[0].effects.fire_rate_boost.potency",
-              "operation": "add",
-              "amount": 0.15
+              "path": "attack.data.chains",
+              "operation": "set",
+              "amount": 5
             }
           }
         ]
