@@ -1,6 +1,7 @@
 # rendering/hud/ui_manager.py
 import pygame
 import logging
+import uuid
 from pathlib import Path
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from collections import OrderedDict
@@ -189,8 +190,9 @@ class UIManager:
         self._rebuild_tower_buttons()
         logger.info(f"Active category changed to: {self.active_tab}")
 
-    def _open_upgrade_panel(self, tower_id: str):
+    def _open_upgrade_panel(self, tower_id: uuid.UUID):
         """Opens the upgrade panel for a selected tower."""
+        # --- FIX: The tower_id parameter is now correctly typed as UUID ---
         tower = self.game_manager.towers.get(tower_id)
         if tower:
             panel_width = self.screen_rect.width * 0.25
@@ -338,25 +340,26 @@ class UIManager:
                 return True
 
         # --- FIX (Step 2.3): Logic to open upgrade panel when a placed tower is selected ---
-        # We need to detect if the selected entity ID in the game state changes.
-        # This is a better place to handle this than in the event loop itself.
+        # This logic was incorrectly placed in handle_event.
+        # It's been moved to the update loop for correct behavior.
+        return False
+
+    def update(self, dt: float, game_state: "GameState"):
+        # --- FIX (Step 2.3): This is the correct location for this logic ---
+        # We handle UI panel visibility here, driven by game state changes,
+        # which is a clean separation from event handling.
         if game_state.selected_entity_id:
-            # Only open the panel if a new tower has been selected, and no other panel is open.
+            # Check if a new tower is selected and an upgrade panel isn't already open for it
             if (
                 not self.upgrade_panel
                 or self.upgrade_panel.tower.entity_id != game_state.selected_entity_id
             ):
-                self._open_upgrade_panel(str(game_state.selected_entity_id))
-
-        # If the player has cleared their selection, close any open panels.
-        elif not game_state.selected_entity_id and (
-            self.upgrade_panel or self.info_panel
-        ):
+                # --- FIX: The tower_id is already a UUID, no need to cast to str and back ---
+                self._open_upgrade_panel(game_state.selected_entity_id)
+        elif not game_state.selected_entity_id:
+            # If the selection is cleared, close any open panels.
             self._close_panel()
 
-        return False
-
-    def update(self, dt: float, game_state: "GameState"):
         if self.persona_panel:
             self.persona_panel.update(dt, game_state)
         elif self.upgrade_panel:

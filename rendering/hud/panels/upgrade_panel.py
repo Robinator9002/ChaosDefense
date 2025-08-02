@@ -175,7 +175,9 @@ class UpgradePanel(UIElement):
 
     def draw(self, screen: pygame.Surface):
         panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        panel_surf.fill(self.colors.get("panel_primary", (25, 30, 40)) + (230,))
+        # --- FIX (Step 1.2): Convert the list-based color from theme to a tuple ---
+        panel_color = self.colors.get("panel_primary", [25, 30, 40])
+        panel_surf.fill(tuple(panel_color) + (230,))
         screen.blit(panel_surf, self.rect.topleft)
         pygame.draw.rect(
             screen,

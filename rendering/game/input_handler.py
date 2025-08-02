@@ -82,14 +82,30 @@ class InputHandler:
             return
 
         # --- Case 2: Player is selecting an existing tower ---
-        world_pos = self.camera.screen_to_world(pygame.Vector2(event.pos))
+        mouse_pos = pygame.Vector2(event.pos)
         clicked_on_tower = False
         for tower in self.game_manager.towers.values():
-            if tower.rect.collidepoint(world_pos):
+            # --- FIX: Perform collision detection in screen coordinates ---
+            # This is more reliable as it matches what the user sees on screen,
+            # especially when the camera is zoomed.
+
+            # 1. Get the tower's scaled position and size.
+            scaled_pos = (tower.pos * self.camera.zoom) + self.camera.offset
+            scaled_rect = pygame.Rect(
+                0,
+                0,
+                tower.rect.width * self.camera.zoom,
+                tower.rect.height * self.camera.zoom,
+            )
+            scaled_rect.center = scaled_pos
+
+            # 2. Check for a collision with the raw mouse position.
+            if scaled_rect.collidepoint(mouse_pos):
                 if game_state.selected_entity_id == tower.entity_id:
                     game_state.clear_selection()  # Deselect if clicking the same tower
                 else:
                     game_state.selected_entity_id = tower.entity_id
+                    logger.info(f"Player selected tower with ID: {tower.entity_id}")
                 clicked_on_tower = True
                 break
 

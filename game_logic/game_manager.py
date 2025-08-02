@@ -49,7 +49,10 @@ class GameManager:
         self.progression_manager = progression_manager
         self.current_level_id = level_id
 
-        self.tile_size = self.configs["game_settings"].get("tile_size", 32)
+        self.game_settings = self.configs[
+            "game_settings"
+        ]  # --- FIX: Make game_settings a class attribute ---
+        self.tile_size = self.game_settings.get("tile_size", 32)
         self.game_state: GameState = GameState()
         self.level_manager: LevelManager = LevelManager(self.configs["level_styles"])
         self.upgrade_manager: UpgradeManager = UpgradeManager(
@@ -59,7 +62,9 @@ class GameManager:
         self.targeting_manager: TargetingManager = TargetingManager(
             cell_size=120, targeting_ai_config=targeting_ai_config
         )
-        player_difficulty = self.configs["game_settings"].get("difficulty", 1)
+        player_difficulty = self.game_settings.get(
+            "difficulty", 1
+        )  # --- FIX: Access from class attribute ---
         self.director_ai: DirectorAI = DirectorAI(
             difficulty_settings=self.configs["difficulty_scaling"].get(
                 str(player_difficulty)
@@ -94,7 +99,9 @@ class GameManager:
             self.game_state.end_game()
             return
 
-        player_difficulty = self.configs["game_settings"].get("difficulty", 1)
+        player_difficulty = self.game_settings.get(
+            "difficulty", 1
+        )  # --- FIX: Access from class attribute ---
         level_difficulty = gen_params.get("level_difficulty", 1)
         self.wave_manager = WaveManager(
             difficulty_config=self.configs["difficulty_scaling"],
@@ -381,8 +388,9 @@ class GameManager:
 
     def get_salvage_rate(self) -> float:
         """Safely retrieves the current salvage refund percentage."""
-        if self.wave_manager and self.wave_manager.difficulty_settings:
-            return self.wave_manager.difficulty_settings.get(
-                "salvage_refund_percentage", 0.0
-            )
-        return 0.0
+        # --- FIX: We can no longer rely on `self.wave_manager` here as it is not always guaranteed to exist when this function is called.
+        # We will instead retrieve the difficulty settings directly from `self.configs` as it is a guaranteed attribute.
+        difficulty_setting = self.configs.get("difficulty_scaling", {}).get(
+            str(self.game_settings.get("difficulty", 1)), {}
+        )
+        return difficulty_setting.get("salvage_refund_percentage", 0.0)
