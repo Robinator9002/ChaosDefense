@@ -32,7 +32,7 @@ class GameManager:
     The central "headless" engine for the game.
 
     REFACTORED: Now integrates with the ProgressionManager to handle the end-of-game
-    reward loop.
+    reward loop and level unlocking.
     """
 
     def __init__(
@@ -43,7 +43,6 @@ class GameManager:
         """
         logger.info("--- Initializing Game Manager ---")
         self.configs = all_configs
-        # --- NEW: Store the progression manager ---
         self.progression_manager = progression_manager
 
         self.tile_size = self.configs["game_settings"].get("tile_size", 32)
@@ -66,6 +65,7 @@ class GameManager:
         self.wave_manager: Optional[WaveManager] = None
         self.grid: Optional[Grid] = None
         self.paths: List[List[Tuple[int, int]]] = []
+        self.current_level_id: Optional[str] = None
 
         self.enemies: Dict[uuid.UUID, Enemy] = {}
         self.towers: Dict[uuid.UUID, Tower] = {}
@@ -77,9 +77,9 @@ class GameManager:
         """Sets up all necessary objects for a new game session."""
         logger.info("--- Setting up new game via Game Manager ---")
         try:
-            preset_to_load = "Forest"  # TODO: Make this selectable
+            self.current_level_id = "Forest"  # TODO: Make this selectable
             self.grid, self.paths, style_config = (
-                self.level_manager.build_level_from_preset(preset_to_load)
+                self.level_manager.build_level_from_preset(self.current_level_id)
             )
             gen_params = style_config.get("generation_params", {})
             start_gold = gen_params.get("starting_gold", 150)
@@ -110,8 +110,8 @@ class GameManager:
 
     def end_game_session(self, victory: bool):
         """
-        Calculates and awards meta-currency at the end of a game, then saves
-        the player's progress.
+        Calculates and awards meta-currency and unlocks the next level upon
+        victory, then saves the player's progress.
 
         Args:
             victory (bool): Whether the player won the game.
@@ -119,27 +119,37 @@ class GameManager:
         logger.info(f"Game session ended. Victory: {victory}")
         waves_cleared = self.game_state.current_wave_number
 
+        player_data = self.progression_manager.get_player_data()
+
         # --- Reward Calculation ---
-        # A simple formula: 5 shards per wave cleared, plus a big bonus for winning.
         shards_per_wave = 5
         victory_bonus = 100 if victory else 0
-
         total_shards_earned = (waves_cleared * shards_per_wave) + victory_bonus
 
         if total_shards_earned > 0:
             logger.info(f"Awarding {total_shards_earned} Chaos Shards to the player.")
-            player_data = self.progression_manager.get_player_data()
             player_data.meta_currency += total_shards_earned
 
-            # Update highest wave for stats
-            if waves_cleared > player_data.highest_wave_reached:
-                player_data.highest_wave_reached = waves_cleared
+        # Update highest wave for stats
+        if waves_cleared > player_data.highest_wave_reached:
+            player_data.highest_wave_reached = waves_cleared
 
-            # TODO: Add level unlocking logic here
+        # --- Level Unlocking Logic ---
+        if victory and self.current_level_id:
+            all_levels = self.level_manager.get_level_presets()
+            try:
+                current_level_index = all_levels.index(self.current_level_id)
+                if current_level_index + 1 < len(all_levels):
+                    next_level_id = all_levels[current_level_index + 1]
+                    if next_level_id not in player_data.unlocked_levels:
+                        player_data.unlocked_levels.add(next_level_id)
+                        logger.warning(f"NEW LEVEL UNLOCKED: {next_level_id}")
+            except ValueError:
+                logger.error(
+                    f"Could not find current level '{self.current_level_id}' in level list for unlocking."
+                )
 
-            self.progression_manager.player_data_manager.save_data(player_data)
-        else:
-            logger.info("No Chaos Shards earned this session.")
+        self.progression_manager.player_data_manager.save_data(player_data)
 
     def update(self, dt: float):
         """The main update loop for the entire game simulation."""
