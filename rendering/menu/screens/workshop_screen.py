@@ -144,11 +144,9 @@ class WorkshopScreen:
 
     def _build_layout(self):
         """Filters tower data and builds the UI with new ListItemButtons."""
-        # First, get the latest tower data
         all_unlockable_towers = self.progression_manager.get_unlockable_towers()
         all_tower_configs = self.progression_manager.all_tower_configs
 
-        # Filter the raw data
         if self.active_filter.lower() == "all":
             self.filtered_towers_data = all_unlockable_towers
         else:
@@ -159,13 +157,11 @@ class WorkshopScreen:
                 == self.active_filter
             ]
 
-        # Now, create the button objects from the filtered data
         self.tower_buttons.clear()
         for tower_data in self.filtered_towers_data:
             full_config = all_tower_configs.get(tower_data["id"], {})
             tower_info_full = {**full_config, **tower_data}
 
-            # --- NEW: Prepare data specifically for the ListItemButton ---
             player_currency = self.progression_manager.get_player_data().meta_currency
             can_afford = player_currency >= tower_info_full.get("cost", 0)
 
@@ -191,7 +187,7 @@ class WorkshopScreen:
             button_data = {
                 "id": tower_info_full.get("id"),
                 "title": tower_info_full.get("name", "N/A"),
-                "is_locked": False,  # Workshop items are never "locked", just not purchased
+                "is_locked": False,
                 "can_afford": can_afford,
                 "status_text": status_text,
                 "stats": stats,
@@ -266,10 +262,9 @@ class WorkshopScreen:
         for i, button in enumerate(self.tower_buttons):
             layout_rect = self.grid.get_item_rect(i)
             on_screen_rect = layout_rect.move(0, -self.grid.scroll_y)
-            # --- FIX: Update the button's internal rect before checking for hover ---
             button.rect = on_screen_rect
 
-            # --- FIX: Use colliderect instead of contains for more lenient click detection ---
+            # --- FIX: Use colliderect instead of contains for more lenient hover/click detection ---
             if self.grid.area.colliderect(
                 on_screen_rect
             ) and on_screen_rect.collidepoint(mouse_pos):
@@ -278,13 +273,11 @@ class WorkshopScreen:
             else:
                 button.is_hovered = False
 
-        # Delegate events to child components
         self.grid.handle_scroll_event(event)
         self.preview_panel.handle_event(event)
         for btn in self.filter_buttons:
             btn.handle_event(event)
 
-        # Handle primary actions (clicks)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.back_button.is_hovered:
                 self.back_callback()
@@ -295,7 +288,6 @@ class WorkshopScreen:
                 for btn in self.tower_buttons:
                     btn.is_selected = btn == self.selected_tower_button
 
-                # Get the full data for the preview panel
                 selected_tower_data = self.filtered_towers_data[hovered_button_index]
                 full_config = self.progression_manager.all_tower_configs.get(
                     selected_tower_data["id"], {}
@@ -315,7 +307,6 @@ class WorkshopScreen:
                 )
 
     def draw(self, screen: pygame.Surface):
-        # Draw static elements
         title_surf = self.font_title.render(
             "The Workshop", True, self.colors.get("text_primary")
         )
@@ -350,19 +341,17 @@ class WorkshopScreen:
         back_text_rect = back_surf.get_rect(center=self.back_button.rect.center)
         screen.blit(back_surf, back_text_rect)
 
-        # Draw child components
         self.preview_panel.draw(screen)
         for btn in self.filter_buttons:
             btn.draw(screen)
 
-        # Draw scrollable content
         screen.set_clip(self.grid.area)
         for i, button in enumerate(self.tower_buttons):
-            # The button's rect is updated in handle_event, so we can just draw it
             layout_rect = self.grid.get_item_rect(i)
-            # --- FIX: Update the button's internal rect for drawing ---
             button.rect.topleft = (layout_rect.x, layout_rect.y - self.grid.scroll_y)
-            button.draw(screen)
+            # --- FIX: Only draw buttons that are at least partially visible ---
+            if self.grid.area.colliderect(button.rect):
+                button.draw(screen)
         screen.set_clip(None)
 
         self.grid.draw_scrollbar(screen)
