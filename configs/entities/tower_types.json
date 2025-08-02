@@ -1,5 +1,5 @@
 {
-  "//": "TOWER DATA OVERHAUL: Removed the hard-coded 'ai_config' block from all towers. Persona eligibility will now be determined dynamically by the game logic based on a tower's current abilities.",
+  "//": "TOWER DATA OVERHAUL: Removed the hard-coded 'ai_config' block from all towers. Persona eligibility is now determined dynamically. Added 'unlock_cost' for meta-progression.",
   "turret": {
     "name": "Basic Turret",
     "category": "military",
@@ -51,6 +51,7 @@
     "name": "Cannon Tower",
     "category": "military",
     "cost": 80,
+    "unlock_cost": 50,
     "description": "A heavy-hitting cannon that deals area-of-effect damage in a small radius.",
     "sprite_key": "towers/cannon.png",
     "placeholder_color": [80, 80, 100],
@@ -73,6 +74,7 @@
     "name": "Energy Beacon",
     "category": "elemental",
     "cost": 100,
+    "unlock_cost": 75,
     "description": "Fires a rapid stream of energy pulses that slow targets. Highly effective at locking down single enemies.",
     "sprite_key": "towers/beam.png",
     "placeholder_color": [255, 0, 255],
@@ -99,6 +101,7 @@
     "name": "Mortar",
     "category": "artillery",
     "cost": 120,
+    "unlock_cost": 100,
     "description": "Lob explosive shells over a very long distance, dealing area damage and slowing enemies. Cannot target nearby enemies.",
     "sprite_key": "towers/mortar.png",
     "placeholder_color": [60, 80, 60],
@@ -123,6 +126,7 @@
     "name": "Inferno Weaver",
     "category": "magic",
     "cost": 150,
+    "unlock_cost": 125,
     "description": "Creates persistent firewalls on the ground that burn any enemy who walks through them.",
     "sprite_key": "towers/inferno_weaver.png",
     "placeholder_color": [255, 100, 0],
@@ -149,6 +153,7 @@
     "name": "Stormcaller",
     "category": "magic",
     "cost": 165,
+    "unlock_cost": 150,
     "description": "Summons a storm that attaches to an enemy, dealing low continuous damage but massively increased damage based on the target's armor. Also slightly slows enemies.",
     "sprite_key": "towers/stormcaller.png",
     "placeholder_color": [180, 180, 255],
@@ -175,6 +180,7 @@
     "name": "Curse Weaver",
     "category": "magic",
     "cost": 130,
+    "unlock_cost": 125,
     "description": "Applies a powerful curse to enemies, causing them to take massively increased damage from all sources.",
     "sprite_key": "towers/curse_weaver.png",
     "placeholder_color": [140, 0, 255],
@@ -203,8 +209,7 @@
     "name": "Commander",
     "category": "support",
     "cost": 160,
-    "sprite_key": "towers/commander.png",
-    "placeholder_color": [255, 215, 0],
+    "unlock_cost": 200,
     "description": "Aura tower that provides combat buffs to nearby towers.",
     "info_panel_stats": [
       { "label": "Aura Range", "value_path": "auras[0].range" },
@@ -218,9 +223,7 @@
       {
         "range": 120,
         "target_type": "TOWER",
-        "effects": {
-          "damage_boost": { "potency": 1.1, "duration": 0.5 }
-        }
+        "effects": { "damage_boost": { "potency": 1.1, "duration": 0.5 } }
       }
     ]
   },
@@ -228,8 +231,7 @@
     "name": "Arch-Mage",
     "category": "support",
     "cost": 190,
-    "sprite_key": "towers/archmage.png",
-    "placeholder_color": [200, 180, 255],
+    "unlock_cost": 250,
     "description": "Aura tower that amplifies the magical effects and area of nearby towers.",
     "info_panel_stats": [
       { "label": "Aura Range", "value_path": "auras[0].range" },
