@@ -34,7 +34,7 @@ class UIManager:
         screen_rect: pygame.Rect,
         game_manager: "GameManager",
         progression_manager: "ProgressionManager",
-        tooltip_manager: "TooltipManager",  # <-- NEW: Accept TooltipManager
+        tooltip_manager: "TooltipManager",
         assets_path: Path,
         ui_theme: Dict[str, Any],
         font_manager: "FontManager",
@@ -42,7 +42,7 @@ class UIManager:
         self.screen_rect = screen_rect
         self.game_manager = game_manager
         self.progression_manager = progression_manager
-        self.tooltip_manager = tooltip_manager  # <-- NEW: Store TooltipManager
+        self.tooltip_manager = tooltip_manager
         self.assets_path = assets_path
         self.ui_theme = ui_theme
         self.font_manager = font_manager
@@ -65,17 +65,12 @@ class UIManager:
         self._build_dynamic_ui()
 
     def _build_static_ui(self):
-        """Builds UI elements that don't change during gameplay."""
         pass
 
     def _build_dynamic_ui(self):
-        """Builds UI elements that depend on game state, like tower buttons."""
         self._rebuild_tower_buttons()
 
     def _rebuild_tower_buttons(self):
-        """
-        Rebuilds the tower buttons based on available tower types.
-        """
         self.tower_buttons.clear()
         self.tab_buttons.clear()
         self.hotkey_map.clear()
@@ -167,9 +162,6 @@ class UIManager:
             self.tower_buttons.append(button)
 
     def set_active_category_by_index(self, index: int):
-        """
-        Sets the active tab based on a hotkey index and rebuilds the tower buttons.
-        """
         if index < 0 or index >= len(self.tab_buttons):
             logger.warning(f"Hotkey index {index} is out of range. Ignoring.")
             return
@@ -178,9 +170,6 @@ class UIManager:
         logger.info(f"Active category changed to: {self.active_tab}")
 
     def select_tower_by_hotkey(self, index: int, game_state: "GameState"):
-        """
-        Selects a tower for building based on a numerical hotkey index (0-9).
-        """
         if 0 <= index < len(self.hotkey_map):
             tower_id = self.hotkey_map[index]
             if game_state.selected_tower_to_build == tower_id:
@@ -190,7 +179,6 @@ class UIManager:
                 logger.info(f"Player selected '{tower_id}' via hotkey {index + 1}.")
 
     def _open_upgrade_panel(self, tower_id: uuid.UUID):
-        """Opens the upgrade panel for a selected tower."""
         tower = self.game_manager.towers.get(tower_id)
         if tower:
             panel_width = self.screen_rect.width * 0.25
@@ -202,7 +190,6 @@ class UIManager:
                 panel_width,
                 self.screen_rect.height * 0.9,
             )
-            # --- MODIFIED: Pass the tooltip_manager to the UpgradePanel ---
             self.upgrade_panel = UpgradePanel(
                 rect=panel_rect,
                 tower=tower,
@@ -220,19 +207,37 @@ class UIManager:
                 tooltip_manager=self.tooltip_manager,
             )
 
+    def _open_info_panel(self, tower_id: str):
+        tower_data = self.game_manager.configs["tower_types"].get(tower_id)
+        if tower_data:
+            panel_width = self.screen_rect.width * 0.25
+            panel_rect = pygame.Rect(
+                self.screen_rect.right
+                - panel_width
+                - self.layout.get("padding_medium", 15),
+                self.screen_rect.y + self.layout.get("padding_medium", 15),
+                panel_width,
+                self.screen_rect.height * 0.9,
+            )
+            self.info_panel = TowerInfoPanel(
+                rect=panel_rect,
+                tower_data=tower_data,
+                targeting_ai_config=self.game_manager.configs.get("targeting_ai", {}),
+                ui_theme=self.ui_theme,
+                font_manager=self.font_manager,
+                tooltip_manager=self.tooltip_manager,
+            )
+
     def _close_panel(self):
-        """Closes the currently active panel (upgrade or info)."""
         self.info_panel = None
         self.upgrade_panel = None
 
     def _open_persona_panel(self):
-        """Opens the persona selection modal."""
         if self.upgrade_panel and self.upgrade_panel.tower:
             tower = self.upgrade_panel.tower
             all_personas = self.game_manager.configs.get("targeting_ai", {})
             eligible_personas = tower.get_eligible_personas(all_personas)
             active_persona = tower.current_persona
-            # --- MODIFIED: Pass the tooltip_manager to the PersonaSelectionPanel ---
             self.persona_panel = PersonaSelectionPanel(
                 screen_rect=self.screen_rect,
                 all_personas=all_personas,
@@ -244,11 +249,9 @@ class UIManager:
             )
 
     def _close_persona_panel(self):
-        """Closes the persona selection modal."""
         self.persona_panel = None
 
     def _change_persona(self, persona_id: str):
-        """Changes the persona for the selected tower."""
         if self.upgrade_panel and self.upgrade_panel.tower:
             self.game_manager.change_tower_persona(
                 self.upgrade_panel.tower.entity_id, persona_id
@@ -256,7 +259,6 @@ class UIManager:
             self._close_persona_panel()
 
     def on_resize(self, new_screen_rect: pygame.Rect):
-        """Handles screen resize events."""
         self.screen_rect = new_screen_rect
         self.hud_panel_height = self.layout.get("hud_panel_height", 80)
         self._rebuild_tower_buttons()
@@ -268,7 +270,6 @@ class UIManager:
             self.persona_panel.on_resize(new_screen_rect)
 
     def handle_event(self, event: pygame.event.Event, game_state: "GameState") -> bool:
-        """Processes Pygame events for the UI."""
         if self.persona_panel:
             action = self.persona_panel.handle_event(event, game_state)
             if action:
@@ -322,29 +323,6 @@ class UIManager:
             if action:
                 if action.type == ActionType.SELECT_TOWER:
                     game_state.selected_tower_to_build = action.entity_id
-                    tower_data = self.game_manager.configs["tower_types"].get(
-                        action.entity_id
-                    )
-                    panel_width = self.screen_rect.width * 0.25
-                    panel_rect = pygame.Rect(
-                        self.screen_rect.right
-                        - panel_width
-                        - self.layout.get("padding_medium", 15),
-                        self.screen_rect.y + self.layout.get("padding_medium", 15),
-                        panel_width,
-                        self.screen_rect.height * 0.9,
-                    )
-                    # --- MODIFIED: Pass the tooltip_manager to the TowerInfoPanel ---
-                    self.info_panel = TowerInfoPanel(
-                        rect=panel_rect,
-                        tower_data=tower_data,
-                        targeting_ai_config=self.game_manager.configs.get(
-                            "targeting_ai", {}
-                        ),
-                        ui_theme=self.ui_theme,
-                        font_manager=self.font_manager,
-                        tooltip_manager=self.tooltip_manager,
-                    )
                 return True
         return False
 
@@ -354,14 +332,30 @@ class UIManager:
                 not self.upgrade_panel
                 or self.upgrade_panel.tower.entity_id != game_state.selected_entity_id
             ):
+                self._close_panel()
                 self._open_upgrade_panel(game_state.selected_entity_id)
-        elif not game_state.selected_entity_id:
-            self._close_panel()
+
+        elif game_state.selected_tower_to_build:
+            if not self.info_panel or self.info_panel.tower_data.get(
+                "name"
+            ) != self.game_manager.configs["tower_types"][
+                game_state.selected_tower_to_build
+            ].get(
+                "name"
+            ):
+                self._close_panel()
+                self._open_info_panel(game_state.selected_tower_to_build)
+
+        else:
+            if self.info_panel or self.upgrade_panel:
+                self._close_panel()
 
         if self.persona_panel:
             self.persona_panel.update(dt, game_state)
         elif self.upgrade_panel:
             self.upgrade_panel.update(dt, game_state)
+        elif self.info_panel:
+            self.info_panel.update(dt, game_state)
 
         self.hovered_tower_button = None
         for button in self.tower_buttons:
@@ -369,18 +363,44 @@ class UIManager:
             if button.is_hovered:
                 self.hovered_tower_button = button
 
+    # --- MODIFIED: Enhanced styling for the tower bar (Step 2.1) ---
     def draw(self, screen: pygame.Surface, game_state: "GameState"):
+        """Draws all UI elements, including the newly styled tower bar."""
         panel_rect = pygame.Rect(
             0,
             self.screen_rect.height - self.hud_panel_height,
             self.screen_rect.width,
             self.hud_panel_height,
         )
-        panel_color = self.colors.get("panel_primary", [25, 30, 40])
+
+        # Create a dedicated surface for the panel to draw gradients and effects on.
         panel_surf = pygame.Surface(panel_rect.size, pygame.SRCALPHA)
-        panel_surf.fill(tuple(panel_color) + (200,))
+
+        # Define gradient colors from the theme.
+        color_top = self.colors.get("panel_secondary", [40, 50, 60])
+        color_bottom = self.colors.get("panel_primary", [25, 30, 40])
+
+        # Draw the gradient by iterating through each vertical line of the panel.
+        for y in range(panel_rect.height):
+            # Interpolate color from top to bottom
+            ratio = y / panel_rect.height
+            r = int(color_top[0] * (1 - ratio) + color_bottom[0] * ratio)
+            g = int(color_top[1] * (1 - ratio) + color_bottom[1] * ratio)
+            b = int(color_top[2] * (1 - ratio) + color_bottom[2] * ratio)
+
+            # Draw a horizontal line with the calculated color and alpha.
+            pygame.draw.line(panel_surf, (r, g, b, 220), (0, y), (panel_rect.width, y))
+
+        # Add a bright inner highlight along the top edge for a nice finish.
+        highlight_color = self.colors.get(
+            "border_interactive_selected", (150, 180, 200)
+        )
+        pygame.draw.line(panel_surf, highlight_color, (0, 0), (panel_rect.width, 0), 2)
+
+        # Blit the final styled surface to the screen.
         screen.blit(panel_surf, panel_rect.topleft)
 
+        # Draw the rest of the UI elements on top of the new panel.
         for button in self.tower_buttons:
             button.draw(screen, game_state)
         for button in self.tab_buttons:
@@ -388,8 +408,7 @@ class UIManager:
 
         if self.upgrade_panel:
             self.upgrade_panel.draw(screen)
-        elif self.info_panel:
+        if self.info_panel:
             self.info_panel.draw(screen)
-
         if self.persona_panel:
             self.persona_panel.draw(screen)
