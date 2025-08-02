@@ -25,6 +25,7 @@ class LevelButton(UIElement):
         super().__init__(rect)
         self.level_id = level_id
         self.name = level_id.replace("_", " ").title()
+        # --- FIX: Added a description to the generation_params in level_styles.json ---
         self.description = level_data.get("generation_params", {}).get(
             "description", "No description available."
         )
@@ -131,12 +132,16 @@ class LevelSelectionScreen:
         )
 
         button_width, button_height, button_spacing = 350, 100, 20
-        num_buttons = len(self.level_configs)
 
-        # Simple vertical list layout for now
         start_y = self.title_rect.bottom + 50
 
         for i, (level_id, level_data) in enumerate(self.level_configs.items()):
+            # --- BUG FIX: Ensure the level_data value is a dictionary ---
+            # This gracefully skips any top-level keys in the JSON that are not
+            # level definitions, such as comments (e.g., "//": "comment text").
+            if not isinstance(level_data, dict):
+                continue
+
             is_locked = level_id not in self.unlocked_levels
             button_rect = pygame.Rect(
                 self.screen_rect.centerx - button_width / 2,
@@ -156,7 +161,6 @@ class LevelSelectionScreen:
 
         # Back Button
         back_button_rect = pygame.Rect(30, self.screen_rect.bottom - 80, 150, 50)
-        # Using a generic UIElement for the back button for simplicity
         self.back_button = UIElement(back_button_rect)
         self.back_font = pygame.font.SysFont("segoeui", 24, bold=True)
 
