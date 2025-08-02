@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 class TowerButton(UIElement):
     """
     A UI element representing a clickable button to select a tower for building.
-    REFACTORED: Now fully theme-driven for consistent styling and improved
-    visual feedback for selection and affordability states.
+    MODIFIED: Now includes a smooth animation for hover and selection states
+    to provide better visual feedback.
     """
 
     def __init__(
@@ -41,7 +41,16 @@ class TowerButton(UIElement):
         self.hotkey_number = hotkey_number
         self.cost = self.tower_data.get("cost", 0)
 
-        # --- NEW: Load styles from theme ---
+        # --- NEW: Animation attributes ---
+        # The base_rect stores the button's original, resting position.
+        self.base_rect = rect.copy()
+        # y_offset tracks the current vertical position for smooth animation.
+        self.y_offset = 0.0
+        # target_y_offset is the position we want to animate towards.
+        self.target_y_offset = 0.0
+        # animation_speed controls how quickly the button moves.
+        self.animation_speed = 10.0
+
         self.colors = ui_theme.get("colors", {})
         self.layout = ui_theme.get("layout", {})
         self.font_cost = font_manager.get_font("body_tiny", bold=True)
@@ -74,14 +83,10 @@ class TowerButton(UIElement):
         self, event: pygame.event.Event, game_state: "GameState"
     ) -> Optional[UIAction]:
         """Handles mouse clicks and returns a structured UIAction."""
-        # --- FIX (Step 1.1): Prevent crash on non-mouse events ---
-        # The crash happens when a keyboard event is passed in.
-        # This check ensures that we only access `event.pos` when it exists.
         if event.type == pygame.MOUSEMOTION:
             self.is_hovered = self.rect.collidepoint(event.pos)
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # The is_hovered state is now safely set by the check above.
             if self.is_hovered:
                 logger.info(f"Player clicked tower button: {self.tower_type_id}")
                 return UIAction(
@@ -89,13 +94,36 @@ class TowerButton(UIElement):
                 )
         return None
 
+    # --- NEW: Update method for animations ---
+    def update(self, dt: float, game_state: "GameState"):
+        """
+        Updates the button's animation state for hover and selection effects.
+        This method is called every frame by the UIManager.
+        """
+        is_selected = game_state.selected_tower_to_build == self.tower_type_id
+
+        # 1. Determine the target Y position based on the button's state.
+        # If hovered or selected, the button should move up.
+        if self.is_hovered or is_selected:
+            self.target_y_offset = -8  # Move up by 8 pixels
+        else:
+            self.target_y_offset = 0  # Return to base position
+
+        # 2. Smoothly interpolate the current offset towards the target offset.
+        # This creates a fluid "ease-out" animation effect.
+        delta = self.target_y_offset - self.y_offset
+        self.y_offset += delta * self.animation_speed * dt
+
+        # 3. Update the actual drawing rectangle's position.
+        # This ensures the animation is visually represented.
+        self.rect.y = self.base_rect.y + int(self.y_offset)
+
     def draw(self, screen: pygame.Surface, game_state: "GameState"):
         """Draws the button using theme-defined styles."""
         is_selected = game_state.selected_tower_to_build == self.tower_type_id
         can_afford = game_state.gold >= self.cost
         border_radius = self.layout.get("border_radius_small", 5)
 
-        # Determine background color
         if is_selected:
             bg_color = self.colors.get("panel_interactive_hover")
         elif self.is_hovered:
@@ -105,11 +133,9 @@ class TowerButton(UIElement):
 
         pygame.draw.rect(screen, bg_color, self.rect, border_radius=border_radius)
 
-        # Draw icon
         icon_rect = self.icon.get_rect(centerx=self.rect.centerx, y=self.rect.y + 5)
         screen.blit(self.icon, icon_rect)
 
-        # Draw cost text
         cost_color = (
             self.colors.get("text_accent")
             if can_afford
@@ -121,9 +147,7 @@ class TowerButton(UIElement):
         )
         screen.blit(cost_text, text_rect)
 
-        # Determine border color and width
         if is_selected:
-            # --- FIX: Use border_interactive_selected for a more pleasing look ---
             border_color = self.colors.get("border_interactive_selected")
             border_width = self.layout.get("border_width_selected", 3)
         elif self.is_hovered:
@@ -137,7 +161,6 @@ class TowerButton(UIElement):
             screen, border_color, self.rect, border_width, border_radius=border_radius
         )
 
-        # Draw hotkey number
         hotkey_surf = self.font_hotkey.render(
             str(self.hotkey_number), True, self.colors.get("text_secondary")
         )
