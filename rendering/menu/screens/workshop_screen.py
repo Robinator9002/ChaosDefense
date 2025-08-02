@@ -50,10 +50,11 @@ class WorkshopButton(UIElement):
 
     def draw(self, screen: pygame.Surface):
         border_radius = self.layout.get("border_radius_small", 5)
+        # --- FIX: Use border_interactive_selected for consistency ---
         if self.is_active:
             bg_color = self.colors.get("panel_interactive_hover")
             text_color = self.colors.get("text_primary")
-            border_color = self.colors.get("border_accent")
+            border_color = self.colors.get("border_interactive_selected")
         else:
             bg_color = (
                 self.colors.get("panel_interactive_hover")
