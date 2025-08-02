@@ -60,9 +60,29 @@ class _PersonaButton(UIElement):
         border_radius = self.layout.get("border_radius_small", 5)
         border_width = self.layout.get("border_width_standard", 2)
 
+        if self.is_hovered and self.is_eligible and not self.is_active:
+            glow_color_list = self.colors.get(
+                "border_interactive_selected", (150, 180, 200)
+            )
+            # --- FIX: Convert list to tuple before concatenation to prevent TypeError ---
+            glow_color_tuple = tuple(glow_color_list)
+            glow_rect = self.rect.inflate(6, 6)
+            glow_surface = pygame.Surface(glow_rect.size, pygame.SRCALPHA)
+            pygame.draw.rect(
+                glow_surface,
+                glow_color_tuple + (80,),
+                glow_surface.get_rect(),
+                border_radius=border_radius + 2,
+            )
+            screen.blit(glow_surface, glow_rect.topleft)
+
+        # --- MODIFIED: Improved styling for the active persona button ---
         if self.is_active:
-            bg_color = self.colors.get("panel_interactive_hover")
-            border_color = self.colors.get("border_accent")
+            bg_color = self.colors.get("panel_secondary")
+            # Use the standard selection color instead of the jarring yellow accent.
+            border_color = self.colors.get("border_interactive_selected")
+            # Make the border thicker to emphasize that it's the active selection.
+            border_width = self.layout.get("border_width_selected", 3)
             name_color = self.colors.get("text_primary")
             desc_color = self.colors.get("text_secondary")
         elif self.is_eligible:
@@ -78,7 +98,7 @@ class _PersonaButton(UIElement):
             )
             name_color = self.colors.get("text_primary")
             desc_color = self.colors.get("text_secondary")
-        else:
+        else:  # Ineligible
             bg_color = self.colors.get("panel_primary")
             border_color = self.colors.get("border_primary")
             name_color = self.colors.get("text_disabled")
@@ -108,7 +128,7 @@ class _PersonaButton(UIElement):
 class PersonaSelectionPanel(UIElement):
     """
     A modal panel for selecting a tower's AI persona.
-    MODIFIED: Now integrated with the TooltipManager.
+    MODIFIED: Now includes animated transitions and enhanced styling.
     """
 
     def __init__(
@@ -129,6 +149,9 @@ class PersonaSelectionPanel(UIElement):
         self.tooltip_manager = tooltip_manager
         self.buttons: List[_PersonaButton] = []
 
+        self.animation_progress = 0.0
+        self.animation_speed = 5.0
+
         self._load_theme_assets()
         self._create_buttons(all_personas, eligible_personas, active_persona)
 
@@ -139,9 +162,10 @@ class PersonaSelectionPanel(UIElement):
         self.is_scrollable = False
 
         self._perform_layout()
-        self.rect.center = screen_rect.center
+        self.final_rect = self.rect.copy()
+        self.final_rect.center = screen_rect.center
         self.close_button_rect = pygame.Rect(
-            self.rect.right - 32, self.rect.y + 8, 24, 24
+            self.final_rect.right - 32, self.final_rect.y + 8, 24, 24
         )
         self.is_close_hovered = False
 
@@ -154,8 +178,11 @@ class PersonaSelectionPanel(UIElement):
     def on_resize(self, new_screen_rect: pygame.Rect):
         self.screen_rect = new_screen_rect
         self._perform_layout()
-        self.rect.center = new_screen_rect.center
-        self.close_button_rect.topright = (self.rect.right - 8, self.rect.y + 8)
+        self.final_rect.center = new_screen_rect.center
+        self.close_button_rect.topright = (
+            self.final_rect.right - 8,
+            self.final_rect.y + 8,
+        )
 
     def _create_buttons(self, all_personas, eligible_personas, active_persona):
         for persona_id, persona_data in all_personas.items():
@@ -201,14 +228,18 @@ class PersonaSelectionPanel(UIElement):
             current_y += button_height + spacing
 
     def update(self, dt: float, game_state: "GameState"):
-        """Updates hover states and manages tooltip requests for persona buttons."""
+        if self.animation_progress < 1.0:
+            self.animation_progress = min(
+                1.0, self.animation_progress + self.animation_speed * dt
+            )
+
         mouse_pos = pygame.mouse.get_pos()
         self.is_close_hovered = self.close_button_rect.collidepoint(mouse_pos)
 
         hovered_item = False
         for button in self.buttons:
             on_screen_rect = button.rect.move(
-                self.rect.x, self.rect.y + 60 - self.scroll_y
+                self.final_rect.x, self.final_rect.y + 60 - self.scroll_y
             )
             button.is_hovered = on_screen_rect.collidepoint(mouse_pos)
 
@@ -242,18 +273,29 @@ class PersonaSelectionPanel(UIElement):
         return None
 
     def draw(self, screen: pygame.Surface):
+        ease_out_progress = 1 - (1 - self.animation_progress) ** 3
+
+        current_width = self.final_rect.width * ease_out_progress
+        current_height = self.final_rect.height * ease_out_progress
+        self.rect.size = (current_width, current_height)
+        self.rect.center = self.final_rect.center
+
         overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 150))
+        overlay.fill((0, 0, 0, int(150 * ease_out_progress)))
         screen.blit(overlay, (0, 0))
 
-        panel_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-        panel_color = self.colors.get("panel_primary", [25, 30, 40])
-        panel_surf.fill(tuple(panel_color) + (245,))
-        screen.blit(panel_surf, self.rect.topleft)
+        if self.animation_progress < 0.1:
+            return
+
+        panel_surf = pygame.Surface(self.final_rect.size, pygame.SRCALPHA)
+
+        panel_color = tuple(self.colors.get("panel_primary", [25, 30, 40]))
+        panel_surf.fill(panel_color + (int(245 * ease_out_progress),))
+
         pygame.draw.rect(
-            screen,
+            panel_surf,
             self.colors.get("border_primary"),
-            self.rect,
+            panel_surf.get_rect(),
             2,
             border_radius=self.layout.get("border_radius_large"),
         )
@@ -261,31 +303,29 @@ class PersonaSelectionPanel(UIElement):
         title_surf = self.font_title.render(
             "Change Targeting Persona", True, self.colors.get("text_primary")
         )
-        title_rect = title_surf.get_rect(centerx=self.rect.centerx, y=self.rect.y + 20)
-        screen.blit(title_surf, title_rect)
+        title_rect = title_surf.get_rect(centerx=panel_surf.get_width() / 2, y=20)
+        panel_surf.blit(title_surf, title_rect)
 
         content_area_rect = pygame.Rect(
-            self.rect.x + 1, self.rect.y + 60, self.rect.width - 2, self.visible_height
+            1, 60, panel_surf.get_width() - 2, self.visible_height
         )
-        screen.set_clip(content_area_rect)
+        content_surf = pygame.Surface(content_area_rect.size, pygame.SRCALPHA)
 
         for button in self.buttons:
-            on_screen_pos_y = content_area_rect.y + button.rect.y - self.scroll_y
-            if (
-                on_screen_pos_y < content_area_rect.bottom
-                and on_screen_pos_y + button.rect.height > content_area_rect.top
-            ):
-                draw_rect = button.rect.copy()
-                draw_rect.topleft = (self.rect.x + button.rect.x, on_screen_pos_y)
+            draw_rect = button.rect.copy()
+            # We need to calculate the on-screen position for drawing, not just relative
+            draw_rect.topleft = (button.rect.x, button.rect.y - self.scroll_y)
 
-                original_rect = button.rect
-                button.rect = draw_rect
-                button.draw(screen)
-                button.rect = original_rect
+            # Temporarily set the button's rect for the draw call
+            original_rect = button.rect
+            button.rect = draw_rect
+            button.draw(content_surf)
+            button.rect = original_rect
 
-        screen.set_clip(None)
+        panel_surf.blit(content_surf, content_area_rect.topleft)
+
         if self.is_scrollable:
-            self._draw_scrollbar(screen)
+            self._draw_scrollbar(panel_surf)
 
         close_color = (
             self.colors.get("text_error")
@@ -293,24 +333,24 @@ class PersonaSelectionPanel(UIElement):
             else self.colors.get("text_secondary")
         )
         close_surf = self.font_close.render("X", True, close_color)
-        close_rect = close_surf.get_rect(center=self.close_button_rect.center)
-        screen.blit(close_surf, close_rect)
+        close_rect = close_surf.get_rect(topright=(self.final_rect.width - 8, 8))
+        panel_surf.blit(close_surf, close_rect)
 
-    def _draw_scrollbar(self, screen: pygame.Surface):
+        if self.rect.width > 0 and self.rect.height > 0:
+            scaled_panel = pygame.transform.smoothscale(panel_surf, self.rect.size)
+            screen.blit(scaled_panel, self.rect)
+
+    def _draw_scrollbar(self, surface: pygame.Surface):
         track_width = self.layout.get("scrollbar_width", 10)
         track_rect = pygame.Rect(
-            self.rect.right - track_width - 5,
-            self.rect.top + 60,
-            track_width,
-            self.visible_height,
+            surface.get_width() - track_width - 5, 60, track_width, self.visible_height
         )
         pygame.draw.rect(
-            screen,
+            surface,
             self.colors.get("scrollbar_track"),
             track_rect,
             border_radius=self.layout.get("border_radius_small"),
         )
-
         if self.content_height > self.visible_height:
             handle_height = max(
                 20, self.visible_height * (self.visible_height / self.content_height)
@@ -321,7 +361,7 @@ class PersonaSelectionPanel(UIElement):
                 track_rect.x, handle_y, track_rect.width, handle_height
             )
             pygame.draw.rect(
-                screen,
+                surface,
                 self.colors.get("scrollbar_handle"),
                 handle_rect,
                 border_radius=self.layout.get("border_radius_small"),
