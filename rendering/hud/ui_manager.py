@@ -57,9 +57,6 @@ class UIManager:
         self.upgrade_panel: Optional[UpgradePanel] = None
         self.persona_panel: Optional[PersonaSelectionPanel] = None
 
-        # --- NEW: Track hovered tower button for range preview ---
-        # This attribute will hold a reference to the tower button the mouse
-        # is currently over, allowing the GameWindow to draw its range.
         self.hovered_tower_button: Optional[TowerButton] = None
 
         self._build_static_ui()
@@ -84,16 +81,36 @@ class UIManager:
         buildable_tower_ids = self.game_manager.get_buildable_towers()
         all_tower_configs = self.game_manager.configs.get("tower_types", {})
 
-        categories = sorted(
-            list(
-                set(
-                    tower_data.get("category", "basic")
-                    for t_id in buildable_tower_ids
-                    if isinstance(tower_data := all_tower_configs.get(t_id), dict)
-                )
-            )
+        # --- MODIFIED: Implement custom category sorting ---
+        # 1. Determine the canonical order of all categories from tower_types.json.
+        # This preserves the intended progression order from the config file.
+        canonical_category_order = []
+        for tower_id, config in all_tower_configs.items():
+            if isinstance(config, dict):
+                category = config.get("category")
+                if category and category not in canonical_category_order:
+                    canonical_category_order.append(category)
+
+        # 2. Get the unique set of categories that are actually buildable by the player.
+        available_categories_set = set()
+        for t_id in buildable_tower_ids:
+            if isinstance(tower_data := all_tower_configs.get(t_id), dict):
+                available_categories_set.add(tower_data.get("category", "basic"))
+
+        # 3. Sort the available categories based on the canonical order.
+        # This replaces the simple alphabetical sort with a more logical one.
+        sorted_available_categories = sorted(
+            list(available_categories_set),
+            key=lambda cat: (
+                canonical_category_order.index(cat)
+                if cat in canonical_category_order
+                else float("inf")
+            ),
         )
-        categories.insert(0, "all")
+
+        # 4. Finalize the list for the tabs, ensuring "all" is always first.
+        categories = ["all"] + sorted_available_categories
+        # --- END OF SORTING LOGIC ---
 
         tab_button_width = 80
         tab_button_height = 30
@@ -341,9 +358,6 @@ class UIManager:
         elif self.upgrade_panel:
             self.upgrade_panel.update(dt, game_state)
 
-        # --- MODIFIED: Update hovered tower button state ---
-        # This loop now serves two purposes: updating the button animations
-        # and checking which button is currently hovered for the range preview.
         self.hovered_tower_button = None
         for button in self.tower_buttons:
             button.update(dt, game_state)
