@@ -5,7 +5,7 @@ from typing import Optional, TYPE_CHECKING
 
 from rendering.common.ui.ui_element import UIElement
 from rendering.common.ui.ui_action import UIAction, ActionType
-from rendering.common.text.text_renderer import render_text_wrapped
+from rendering.text.text_renderer import render_text_wrapped
 
 if TYPE_CHECKING:
     from game_logic.upgrades.upgrade import Upgrade

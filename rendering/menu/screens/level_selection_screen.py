@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any, Callable, Set, Optional
 
 from rendering.common.ui.ui_element import UIElement
-from rendering.common.text.text_renderer import render_text_wrapped
+from rendering.text.text_renderer import render_text_wrapped
 
 # --- NEW: Import reusable components ---
 from ..components.scrollable_grid import ScrollableGrid

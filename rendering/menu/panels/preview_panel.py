@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any, Optional, Callable
 
 from ...common.ui.ui_element import UIElement
-from ...common.text.text_renderer import render_text_wrapped
+from ...text.text_renderer import render_text_wrapped
 
 logger = logging.getLogger(__name__)
 

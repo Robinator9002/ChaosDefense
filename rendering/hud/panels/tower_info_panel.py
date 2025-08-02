@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any, TYPE_CHECKING
 
 from rendering.common.ui.ui_element import UIElement
-from rendering.common.text.text_renderer import render_text_wrapped
+from rendering.text.text_renderer import render_text_wrapped
 
 # --- NEW: Import shared utility functions ---
 from rendering.common.panels.panel_utils import get_nested_value, format_stat_value
