@@ -3,5 +3,8 @@
   "screen_height": 720,
   "screen_title": "ChaosDefense",
   "tile_size": 32,
-  "difficulty": 4
+  "difficulty": 4,
+
+  "initial_chaos_shards": 25,
+  "initial_unlocked_towers": ["turret", "freezer"]
 }
