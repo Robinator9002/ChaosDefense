@@ -59,16 +59,14 @@ class SpriteRenderer:
             if not sprite_path.is_file():
                 raise FileNotFoundError(f"Sprite file not found at {sprite_path}")
 
-            # Load the image and scale it to the correct tile size.
             image = pygame.image.load(sprite_path).convert_alpha()
             return pygame.transform.scale(image, (self.tile_size, self.tile_size))
 
         except (KeyError, FileNotFoundError, pygame.error) as e:
-            # Fallback: create a colored square if the image fails to load.
             logger.warning(
                 f"Could not load sprite for '{tile_key}' ({e}). Creating color fallback."
             )
-            color = tile_def.get("color", (255, 0, 255))  # Default to magenta
+            color = tile_def.get("color", (255, 0, 255))
             surface = pygame.Surface((self.tile_size, self.tile_size))
             surface.fill(color)
             return surface
@@ -76,26 +74,14 @@ class SpriteRenderer:
     def _create_map_surface(self) -> pygame.Surface:
         """
         Creates a single, large surface with the entire static map pre-drawn.
-
-        This is highly efficient for static backgrounds, as it avoids re-drawing
-        thousands of individual tiles every frame.
-
-        Returns:
-            pygame.Surface: A surface containing the complete rendered map.
         """
         map_width_px = self.grid.width * self.tile_size
         map_height_px = self.grid.height * self.tile_size
         logger.info(f"Creating {map_width_px}x{map_height_px} map surface...")
 
-        # Use SRCALPHA to support transparent parts of sprites (if any).
         map_surface = pygame.Surface((map_width_px, map_height_px), pygame.SRCALPHA)
-        # --- FIX: Fill the map surface with a solid color before drawing tiles.
-        # This prevents the "empty green map" bug by ensuring a non-transparent
-        # surface is always returned, even if no tiles can be rendered.
-        map_surface.fill((0, 255, 0))  # Using a bright color to make the issue obvious.
+        map_surface.fill((0, 255, 0))
 
-        # --- FIX (Step 2.2): Add a counter to diagnose the 'Empty Green Map' bug ---
-        # This counter will track how many tiles were successfully drawn.
         drawn_tiles_count = 0
         for y in range(self.grid.height):
             for x in range(self.grid.width):
@@ -110,14 +96,9 @@ class SpriteRenderer:
                     )
                     continue
 
-                # Get the visual representation for this tile.
                 tile_surface = self._load_tile_image(tile_def, tile.tile_key)
-
-                # Blit the tile onto the main map surface at the correct pixel position.
                 px_position = (x * self.tile_size, y * self.tile_size)
                 map_surface.blit(tile_surface, px_position)
-
-                # Increment the counter
                 drawn_tiles_count += 1
 
         if drawn_tiles_count == 0:
@@ -142,16 +123,16 @@ class SpriteRenderer:
             zoom (float): The current zoom level.
         """
         if zoom == 1.0:
-            # If no zoom, blit directly for max performance.
             scaled_surface = self.map_surface
         else:
-            # If zoomed, scale the pre-rendered map surface.
             new_size = (
                 int(self.map_surface.get_width() * zoom),
                 int(self.map_surface.get_height() * zoom),
             )
-            # smoothscale provides better quality than scale, but is slower.
-            # For a static map, this is usually acceptable.
-            scaled_surface = pygame.transform.smoothscale(self.map_surface, new_size)
+            # --- MODIFIED: Switched to pygame.transform.scale for better performance (Issue #4) ---
+            # smoothscale provides higher quality but is too slow for real-time
+            # map scaling. 'scale' is much faster and the quality difference
+            # is acceptable for this use case.
+            scaled_surface = pygame.transform.scale(self.map_surface, new_size)
 
         screen.blit(scaled_surface, camera_offset)
