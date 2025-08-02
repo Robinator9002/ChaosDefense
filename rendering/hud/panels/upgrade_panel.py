@@ -3,10 +3,10 @@ import pygame
 import logging
 from typing import Optional, List, TYPE_CHECKING, Dict, Any
 
-from ..ui_element import UIElement
+from rendering.common.ui.ui_element import UIElement
 from ..buttons.upgrade_button import UpgradeButton
-from ..ui_action import UIAction, ActionType
-from .panel_utils import get_nested_value, format_stat_value
+from rendering.common.ui.ui_action import UIAction, ActionType
+from rendering.common.panels.panel_utils import get_nested_value, format_stat_value
 
 if TYPE_CHECKING:
     from game_logic.entities.tower import Tower

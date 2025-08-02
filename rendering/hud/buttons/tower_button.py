@@ -4,12 +4,12 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from ..ui_element import UIElement
+from rendering.common.ui.ui_element import UIElement
 
 # --- MODIFIED: Import the new structured action classes ---
 # We now import the specific, well-defined action types and the dataclass
 # that will carry our event information. This replaces the ambiguous use of strings.
-from ..ui_action import UIAction, ActionType
+from rendering.common.ui.ui_action import UIAction, ActionType
 
 
 # Using Any for game_state to avoid circular dependencies

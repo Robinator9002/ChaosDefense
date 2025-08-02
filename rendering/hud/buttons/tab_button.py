@@ -3,7 +3,7 @@ import pygame
 import logging
 from typing import Optional
 
-from ..ui_element import UIElement
+from rendering.common.ui.ui_element import UIElement
 
 # We don't need UIAction here, as this button's action is handled directly
 # by the UIManager in a special way (changing the active tab).

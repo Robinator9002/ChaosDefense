@@ -12,7 +12,7 @@ from .panels.tower_info_panel import TowerInfoPanel
 
 # --- NEW: Import the new PersonaSelectionPanel ---
 from .panels.persona_selection_panel import PersonaSelectionPanel
-from .ui_action import UIAction, ActionType
+from rendering.common.ui.ui_action import UIAction, ActionType
 
 if TYPE_CHECKING:
     from game_logic.game_state import GameState
