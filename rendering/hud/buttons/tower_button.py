@@ -74,8 +74,15 @@ class TowerButton(UIElement):
         self, event: pygame.event.Event, game_state: "GameState"
     ) -> Optional[UIAction]:
         """Handles mouse clicks and returns a structured UIAction."""
-        self.is_hovered = self.rect.collidepoint(event.pos)
+        # --- FIX (Step 1.1): Prevent crash on non-mouse events ---
+        # We now check if the event has a 'pos' attribute before trying to
+        # access it. This prevents the game from crashing when keyboard
+        # events are passed to this handler.
+        if hasattr(event, "pos"):
+            self.is_hovered = self.rect.collidepoint(event.pos)
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # The is_hovered state is now safely set by the check above.
             if self.is_hovered:
                 logger.info(f"Player clicked tower button: {self.tower_type_id}")
                 return UIAction(
