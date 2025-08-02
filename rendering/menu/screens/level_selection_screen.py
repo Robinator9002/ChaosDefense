@@ -131,8 +131,11 @@ class LevelSelectionScreen:
                 # --- FIX: Update the button's internal rect before checking for hover ---
                 button.rect = on_screen_rect
 
-                if self.grid.area.contains(on_screen_rect):
-                    button.is_hovered = on_screen_rect.collidepoint(mouse_pos)
+                # --- FIX: Use colliderect instead of contains for more lenient hover detection ---
+                if self.grid.area.colliderect(
+                    on_screen_rect
+                ) and on_screen_rect.collidepoint(mouse_pos):
+                    button.is_hovered = True
                 else:
                     button.is_hovered = False
 
@@ -150,7 +153,8 @@ class LevelSelectionScreen:
                 # --- FIX: Update the button's internal rect before checking for clicks ---
                 button.rect = on_screen_rect
 
-                if self.grid.area.contains(
+                # --- FIX: Use colliderect instead of contains for more lenient click detection ---
+                if self.grid.area.colliderect(
                     on_screen_rect
                 ) and on_screen_rect.collidepoint(mouse_pos):
                     clicked_button = button
@@ -213,7 +217,9 @@ class LevelSelectionScreen:
             layout_rect = self.grid.get_item_rect(i)
             # --- FIX: Update the button's internal rect for drawing ---
             button.rect.topleft = (layout_rect.x, layout_rect.y - self.grid.scroll_y)
-            button.draw(screen)
+            # --- FIX: Only draw buttons that are at least partially visible ---
+            if self.grid.area.colliderect(button.rect):
+                button.draw(screen)
         screen.set_clip(None)
 
         self.grid.draw_scrollbar(screen)
