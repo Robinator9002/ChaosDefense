@@ -1,17 +1,21 @@
-ChaosDefense
+# ChaosDefense 🚀
 
-A minimalist yet engaging Tower Defense game built with Python and the Pygame library. The core innovation is an adaptive enemy AI that learns from player strategies and procedurally generated levels with distinct environmental styles.
-Core Concept
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Pygame](https://img.shields.io/badge/Pygame-FF1493?style=for-the-badge&logo=pygame&logoColor=white)
+![Status](https://img.shields.io/badge/Status-In%20Development-blue)
 
-"ChaosDefense" is a single-player Tower Defense game where players build defenses to protect their base from waves of enemies. The key differentiator is the enemy AI, which dynamically adjusts its pathfinding and wave composition based on the player's defensive setup and the outcomes of previous waves within the current game session.
-Key Features
+Ein minimalistisches, aber fesselndes Tower Defense-Spiel, entwickelt mit Python und der Pygame-Bibliothek. Unsere Kerninnovation ist eine **adaptive KI**, die aus den Strategien des Spielers lernt, sowie prozedural generierte Level mit einzigartigen Umweltstilen.
 
-    Adaptive Enemy AI: Enemies employ a heuristic-based system to evaluate path effectiveness after each wave, adjusting future waves to exploit weaknesses.
+## 🎯 Kernkonzept
 
-    Procedural Level Generation: Levels are generated programmatically at the start of each game, adhering to specific stylistic themes (e.g., "Forest", "Rocky").
+"ChaosDefense" ist ein Single-Player-Tower Defense-Spiel, in dem Spieler Verteidigungsanlagen errichten, um ihre Basis vor Wellen von Feinden zu schützen. Der entscheidende Unterschied liegt in der **dynamischen Feind-KI**, die ihre Wegfindung und die Zusammensetzung der Wellen basierend auf der Verteidigungsstrategie des Spielers und den Ergebnissen vorheriger Wellen innerhalb der aktuellen Spielsitzung anpasst.
 
-    Dynamic Economy & Upgrades: Earn resources by defeating enemies to build, upgrade towers, and purchase game-wide enhancements.
+## ✨ Hauptmerkmale
 
-    Minimalist Aesthetics: Focus on clean, functional, and clear geometric visuals over high-fidelity art.
+* **🧠 Adaptive Feind-KI:** Feinde nutzen ein heuristikbasiertes System, um die Effektivität ihrer Pfade nach jeder Welle zu bewerten. Künftige Wellen werden angepasst, um Schwachstellen auszunutzen.
+* **🗺️ Prozedurale Level-Generierung:** Levels werden zu Beginn jedes Spiels programmatisch generiert und folgen spezifischen stilistischen Themen (z. B. "Wald", "Felsig").
+* **💰 Dynamische Ökonomie & Upgrades:** Verdiene Ressourcen, indem du Feinde besiegst, um Türme zu bauen, zu verbessern und spielweite Verbesserungen zu kaufen.
+* **🎨 Minimalistische Ästhetik:** Ein Fokus auf saubere, funktionale und klare geometrische Grafiken statt auf hochauflösende Kunst.
+* **🧱 Saubere Architektur:** Eine strikte Trennung zwischen Spiellogik (headless) und Rendering (Pygame).
 
-    Clean Architecture: A strict separation between game logic (headless) and rendering (Pygame).
+---
