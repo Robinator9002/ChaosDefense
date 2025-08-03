@@ -31,18 +31,18 @@ ChaosDefense ist ein Leidenschaftsprojekt, und wir sind fest davon überzeugt, d
 
 ## 🗺️ Roadmap & To-do-Liste
 
-### ✅ Abgeschlossen
+### ✅ Missionsabschluss: Was wir bereits geschafft haben
 
-* **Basis-Implementierung der adaptiven Feind-KI:** Das Kernsystem, das Feindpfade analysiert und anpasst, ist fertiggestellt.
-* **Entwicklung der Turm-KI und des Zielsystems:** Die logische Grundlage für Turmverhalten und Zielerfassung ist geschaffen.
-* **Erstellung des Hauptmenüs und der Benutzeroberfläche:** Die grundlegende Navigationsstruktur und das Menü sind funktionsfähig.
-* **Überarbeitung des In-Game-HUDs:** Das HUD wurde für eine bessere Übersichtlichkeit und Benutzerfreundlichkeit optimiert.
-* **Entwicklung eines Werkstatt-Systems zum Freischalten von Türmen:** Ein System zur Freischaltung neuer Türme ist implementiert.
-* **Implementierung der Level-Auswahl:** Die Möglichkeit, zwischen verschiedenen prozedural generierten Levels zu wählen, existiert.
-* **Entwicklung eines Fortschrittssystems:** Ein einfaches System für den Fortschritt von Türmen und Karten ist integriert.
+* **Implementierung der adaptiven Feind-KI:** Das intelligente Kernsystem, das Feindpfade analysiert und anpasst, ist fertiggestellt und einsatzbereit.
+* **Grundgerüst für Turm-KI und Zielsystem:** Die logische Grundlage für das Verhalten von Türmen und die Zielerfassung ist geschaffen.
+* **Funktionsfähiges Hauptmenü & Benutzeroberfläche:** Das grundlegende Menü und die Navigationsstruktur stehen.
+* **Überarbeitung des In-Game-HUDs:** Das Head-up-Display wurde für eine bessere Übersicht und Benutzerfreundlichkeit optimiert.
+* **Werkstatt-System für Turm-Freischaltungen:** Ein System, um neue Türme freizuschalten, ist implementiert.
+* **Entwicklung der Level-Auswahl:** Die Möglichkeit, zwischen den prozedural generierten Levels zu wählen, ist jetzt Teil des Spiels.
+* **Fortschrittssystem für Türme & Karten:** Ein einfaches System für den Fortschritt und die Entwicklung von Türmen und Karten ist integriert.
 
-### ⏳ In Arbeit & Zukünftige Pläne
+### ⏳ Zukünftige Missionen: Was als Nächstes ansteht
 
-* **Entwicklung neuer Türme und Feindtypen:** Wir planen, das Arsenal an Türmen und die Vielfalt der Gegner zu erweitern.
-* **Gestaltung neuer prozedural generierter Level-Themes:** Neue visuelle Themen und mechanische Herausforderungen für die Levels sind in Planung.
-* **Integration von Sprites und visuellen Effekten:** Die minimalistische Ästhetik soll um ansprechendere Grafiken und Effekte ergänzt werden.
+* **Neue Türme & Feindtypen:** Wir arbeiten daran, das Arsenal an Türmen und die Vielfalt der Gegner kontinuierlich zu erweitern.
+* **Level-Generierung und neue Themen:** Neue prozedurale Level-Designs mit einzigartigen visuellen Themen und mechanischen Herausforderungen sind in Planung.
+* **Grafische Überarbeitung:** Die minimalistische Ästhetik soll um ansprechendere Sprites, Animationen und visuelle Effekte ergänzt werden.
