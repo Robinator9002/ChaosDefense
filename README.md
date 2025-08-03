@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Pygame](https://img.shields.io/badge/Pygame-FF1493?style=for-the-badge&logo=pygame&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-In%20Development-blue)
-![Contributors](https://img.shields.io/github/contributors/ihr-github-name/chaosdefense)
+![Contributors](https://img.shields.io/github/contributors/Robinator9002/ChaosDefense)
 
 Ein minimalistisches, aber fesselndes Tower Defense-Spiel, entwickelt mit Python und der Pygame-Bibliothek. Unsere Kerninnovation ist eine **adaptive KI**, die aus den Strategien des Spielers lernt, sowie prozedural generierte Level mit einzigartigen Umweltstilen.
 
