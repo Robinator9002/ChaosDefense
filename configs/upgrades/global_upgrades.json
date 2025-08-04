@@ -1,0 +1,48 @@
+{
+  "//": "This file defines all permanent, global upgrades available for purchase in the Workshop.",
+
+  "starting_gold_1": {
+    "name": "Bonus Gold I",
+    "cost": 100,
+    "description": "Start every mission with +50 gold.",
+    "effects": [
+      {
+        "type": "modify_game_state",
+        "value": { "stat": "gold", "amount": 50 }
+      }
+    ]
+  },
+  "starting_gold_2": {
+    "name": "Bonus Gold II",
+    "cost": 250,
+    "description": "Start every mission with an additional +100 gold.",
+    "effects": [
+      {
+        "type": "modify_game_state",
+        "value": { "stat": "gold", "amount": 100 }
+      }
+    ]
+  },
+  "base_hp_1": {
+    "name": "Reinforced Base I",
+    "cost": 150,
+    "description": "Start every mission with +5 base HP.",
+    "effects": [
+      {
+        "type": "modify_game_state",
+        "value": { "stat": "base_hp", "amount": 5 }
+      }
+    ]
+  },
+  "turret_damage_1": {
+    "name": "Turret Specialization",
+    "cost": 200,
+    "description": "All Basic Turrets permanently deal +2 damage.",
+    "effects": [
+      {
+        "type": "modify_tower_stat",
+        "value": { "tower_id": "turret", "stat": "damage", "amount": 2 }
+      }
+    ]
+  }
+}
