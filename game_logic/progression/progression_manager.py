@@ -15,7 +15,12 @@ class ProgressionManager:
     """
 
     def __init__(
-        self, player_data_manager: PlayerDataManager, all_tower_configs: Dict[str, Any]
+        self,
+        player_data_manager: PlayerDataManager,
+        all_tower_configs: Dict[str, Any],
+        global_upgrades_config: Dict[
+            str, Any
+        ],  # --- NEW: Accept global upgrades config ---
     ):
         """
         Initializes the ProgressionManager.
@@ -23,45 +28,21 @@ class ProgressionManager:
         Args:
             player_data_manager (PlayerDataManager): The manager for save file I/O.
             all_tower_configs (Dict[str, Any]): The full tower_types.json config.
+            global_upgrades_config (Dict[str, Any]): The loaded global_upgrades.json config.
         """
         self.player_data_manager = player_data_manager
         self.all_tower_configs = all_tower_configs
-
-        self.global_upgrades: Dict[str, Dict[str, Any]] = {
-            "starting_gold_1": {
-                "name": "Bonus Gold I",
-                "cost": 100,
-                "description": "Start with +50 gold.",
-            },
-            "starting_gold_2": {
-                "name": "Bonus Gold II",
-                "cost": 250,
-                "description": "Start with +100 gold.",
-            },
-            "base_hp_1": {
-                "name": "Reinforced Base I",
-                "cost": 150,
-                "description": "Start with +5 base HP.",
-            },
-            "turret_damage_1": {
-                "name": "Turret Specialization",
-                "cost": 200,
-                "description": "All Turrets deal +2 damage.",
-            },
-        }
+        # --- REFACTORED: Load global upgrades from config instead of hardcoding (Issue #6) ---
+        self.global_upgrades = global_upgrades_config
 
     def get_player_data(self) -> PlayerData:
         """Convenience method to get the current player data."""
         return self.player_data_manager.get_data()
 
-    # --- MODIFIED: Logic updated to include already-unlocked base towers (Your Plan / Step 2.4) ---
     def get_unlockable_towers(self) -> List[Dict[str, Any]]:
         """
         Gets a list of all towers for the Workshop, including purchasable
         towers and towers the player already owns.
-
-        Returns:
-            List[Dict[str, Any]]: A list of dictionaries, each representing a tower.
         """
         unlockable = []
         player_data = self.get_player_data()
@@ -73,34 +54,22 @@ class ProgressionManager:
             is_unlocked = tower_id in player_data.unlocked_towers
             has_unlock_cost = "unlock_cost" in config
 
-            # A tower should appear in the workshop if it's a purchasable unlock,
-            # OR if it's a base tower that the player already has. This ensures
-            # base towers without an `unlock_cost` are still displayed.
             if has_unlock_cost or is_unlocked:
                 unlockable.append(
                     {
                         "id": tower_id,
                         "name": config.get("name", "Unknown"),
-                        # Use unlock_cost if it exists; otherwise, it's a base tower
-                        # with no cost to display in the Workshop.
                         "cost": config.get("unlock_cost", 0),
                         "unlocked": is_unlocked,
                         "description": config.get("description", ""),
                     }
                 )
 
-        # Sort to show locked towers first, then by their cost.
         return sorted(unlockable, key=lambda x: (x["unlocked"], x["cost"]))
 
     def purchase_tower(self, tower_id: str) -> bool:
         """
         Attempts to purchase and unlock a tower.
-
-        Args:
-            tower_id (str): The ID of the tower to unlock.
-
-        Returns:
-            bool: True if the purchase was successful, False otherwise.
         """
         player_data = self.get_player_data()
         tower_info = self.all_tower_configs.get(tower_id)
@@ -127,7 +96,8 @@ class ProgressionManager:
 
     def get_global_upgrade_modifiers(self) -> Dict[str, Any]:
         """
-        Calculates the total effect of all purchased global upgrades.
+        Calculates the total effect of all purchased global upgrades by reading
+        their definitions from the loaded configuration.
         """
         player_data = self.get_player_data()
         logger.info("Calculating global upgrade modifiers from purchased upgrades...")
@@ -137,18 +107,39 @@ class ProgressionManager:
             "tower_stat_mods": {},
         }
 
+        # --- REFACTORED: Data-driven modifier calculation (Issue #6) ---
+        # This loop replaces the large, hardcoded if/elif block. It processes
+        # any purchased upgrade by looking up its definition and applying its
+        # effects, making the system entirely data-driven and easy to extend.
         for upgrade_id in player_data.purchased_upgrades:
-            if upgrade_id == "starting_gold_1":
-                modifiers["game_state_mods"]["gold"] += 50
-            elif upgrade_id == "starting_gold_2":
-                modifiers["game_state_mods"]["gold"] += 100
-            elif upgrade_id == "base_hp_1":
-                modifiers["game_state_mods"]["base_hp"] += 5
-            elif upgrade_id == "turret_damage_1":
-                if "turret" not in modifiers["tower_stat_mods"]:
-                    modifiers["tower_stat_mods"]["turret"] = {}
-                current_mod = modifiers["tower_stat_mods"]["turret"].get("damage", 0)
-                modifiers["tower_stat_mods"]["turret"]["damage"] = current_mod + 2
+            upgrade_data = self.global_upgrades.get(upgrade_id)
+            if not upgrade_data or not isinstance(upgrade_data, dict):
+                continue
+
+            for effect in upgrade_data.get("effects", []):
+                effect_type = effect.get("type")
+                effect_value = effect.get("value")
+                if not effect_type or not isinstance(effect_value, dict):
+                    continue
+
+                if effect_type == "modify_game_state":
+                    stat = effect_value.get("stat")
+                    amount = effect_value.get("amount", 0)
+                    if stat in modifiers["game_state_mods"]:
+                        modifiers["game_state_mods"][stat] += amount
+
+                elif effect_type == "modify_tower_stat":
+                    tower_id = effect_value.get("tower_id")
+                    stat = effect_value.get("stat")
+                    amount = effect_value.get("amount", 0)
+                    if not tower_id or not stat:
+                        continue
+
+                    if tower_id not in modifiers["tower_stat_mods"]:
+                        modifiers["tower_stat_mods"][tower_id] = {}
+
+                    current_mod = modifiers["tower_stat_mods"][tower_id].get(stat, 0)
+                    modifiers["tower_stat_mods"][tower_id][stat] = current_mod + amount
 
         logger.info(f"Global modifiers calculated: {modifiers}")
         return modifiers
