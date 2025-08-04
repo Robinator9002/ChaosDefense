@@ -12,8 +12,6 @@ from rendering.menu.menu_manager import MenuManager
 from rendering.game.camera import Camera
 from rendering.game.input_handler import InputHandler
 from rendering.text.font_manager import FontManager
-
-# --- NEW: Import the TooltipManager ---
 from rendering.common.tooltips import TooltipManager
 
 
@@ -65,9 +63,6 @@ class Game:
 
         self.game_state = GameState.MAIN_MENU
 
-        # --- NEW: Instantiate the TooltipManager ---
-        # The main Game class owns the tooltip manager. It will be passed down
-        # to other UI components that need to create tooltips.
         self.tooltip_manager = TooltipManager(
             screen_rect=self.screen.get_rect(),
             ui_theme=self.ui_theme,
@@ -103,12 +98,11 @@ class Game:
             self.all_configs, self.progression_manager, level_id
         )
 
-        # --- MODIFIED: Pass the tooltip_manager to the UIManager ---
         self.ui_manager = UIManager(
             screen_rect=self.screen.get_rect(),
             game_manager=self.game_manager,
             progression_manager=self.progression_manager,
-            tooltip_manager=self.tooltip_manager,  # Pass instance here
+            tooltip_manager=self.tooltip_manager,
             assets_path=self.assets_path,
             ui_theme=self.ui_theme,
             font_manager=self.font_manager,
@@ -223,7 +217,6 @@ class Game:
             self.camera.on_resize(event.w, event.h)
         if self.menu_manager:
             self.menu_manager.on_resize(self.screen.get_rect())
-        # --- NEW: Update tooltip manager on resize ---
         if self.tooltip_manager:
             self.tooltip_manager.screen_rect = self.screen.get_rect()
 
@@ -242,7 +235,6 @@ class Game:
                     self.game_manager.end_game_session(victory=gs.victory)
                     self._return_to_main_menu()
 
-        # --- NEW: Update the tooltip manager every frame ---
         self.tooltip_manager.update(dt)
 
     def _draw(self):
@@ -264,20 +256,21 @@ class Game:
 
                 self.sprite_renderer.draw(self.screen, cam_offset, cam_zoom)
 
-                all_entities = (
-                    list(self.game_manager.enemies.values())
-                    + list(self.game_manager.towers.values())
-                    + list(self.game_manager.projectiles.values())
-                )
-                for entity in all_entities:
+                # --- OPTIMIZED: Iterate directly over dictionaries (Issue #2) ---
+                # This avoids creating a new, combined list of all entities
+                # every single frame, which is inefficient and causes
+                # unnecessary memory allocation.
+                for entity in self.game_manager.towers.values():
+                    entity.draw(self.screen, cam_offset, cam_zoom)
+                for entity in self.game_manager.enemies.values():
+                    entity.draw(self.screen, cam_offset, cam_zoom)
+                for entity in self.game_manager.projectiles.values():
                     entity.draw(self.screen, cam_offset, cam_zoom)
 
                 self._draw_range_indicator()
                 self._draw_top_gui()
                 self.ui_manager.draw(self.screen, self.game_manager.game_state)
 
-        # --- NEW: Draw the tooltip manager last ---
-        # Drawing last ensures the tooltip always appears on top of all other UI.
         self.tooltip_manager.draw(self.screen)
 
         pygame.display.flip()
