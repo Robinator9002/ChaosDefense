@@ -22,10 +22,13 @@ class UpgradeManager:
         Initializes the UpgradeManager.
         """
         self.definitions: Dict[str, Dict[str, list[Upgrade]]] = {}
+        # --- MODIFIED: Registered the missing effect handler (Issue #13) ---
+        # By adding 'multiply_effect_duration' to this dictionary, we connect the
+        # upgrade data from the JSON files to the actual game logic that
+        # applies the effect. This fixes the bug where duration-modifying
+        # upgrades were having no effect.
         self._effect_handlers: Dict[str, Callable[["Tower", Any], None]] = {
             "modify_attack_data": effect_applicators.modify_attack_data,
-            # --- FIX: Register the new, powerful generic handler for all nested property modifications. ---
-            # This replaces the old, specific handler and is the key to fixing support tower upgrades.
             "modify_nested": effect_applicators.modify_nested_property,
             "add_damage": effect_applicators.add_damage,
             "add_range": effect_applicators.add_range,
@@ -38,6 +41,7 @@ class UpgradeManager:
             "multiply_blast_radius": effect_applicators.multiply_blast_radius,
             "add_blast_effect": effect_applicators.add_blast_effect,
             "multiply_effect_potency": effect_applicators.multiply_effect_potency,
+            "multiply_effect_duration": effect_applicators.multiply_effect_duration,
             "add_on_apply_damage": effect_applicators.add_on_apply_damage,
             "add_on_death_explosion": effect_applicators.add_on_death_explosion,
             "add_bonus_damage_per_debuff": effect_applicators.add_bonus_damage_per_debuff,
