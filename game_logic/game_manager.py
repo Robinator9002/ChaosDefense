@@ -30,9 +30,6 @@ logger = logging.getLogger(__name__)
 class GameManager:
     """
     The central "headless" engine for the game.
-
-    REFACTORED: Now accepts a level_id upon creation to dynamically build
-    the selected level.
     """
 
     def __init__(
@@ -214,11 +211,7 @@ class GameManager:
     def _cleanup_dead_entities(self):
         """
         Removes all dead entities from the game in a single, efficient pass.
-        This method iterates over copies of the entity lists, allowing safe
-        deletion from the original dictionaries during iteration.
         """
-        # --- OPTIMIZED: Staged Removal (Issue #1) ---
-        # Iterate over a copy of the items to allow safe deletion from the original dict.
         for enemy_id, enemy in list(self.enemies.items()):
             if not enemy.is_alive:
                 self.game_state.add_gold(enemy.bounty)
@@ -247,7 +240,6 @@ class GameManager:
                     self._create_explosion(
                         dead_enemy.pos, source_tower.on_death_explosion
                     )
-                    break
 
     def _create_explosion(
         self, position: pygame.Vector2, explosion_data: Dict[str, Any]
@@ -360,9 +352,10 @@ class GameManager:
         if not target_tower:
             return
 
-        path_char = upgrade_id.split("_")[-1][0]
-        path_id = f"path_{path_char}"
-        upgrade = self.upgrade_manager.get_next_upgrade(target_tower, path_id)
+        # Determine path_id from upgrade_id for the lookup
+        path_lookup_id = f"path_{upgrade_id.split('_')[-1][0]}"
+        upgrade = self.upgrade_manager.get_next_upgrade(target_tower, path_lookup_id)
+
         if not upgrade or upgrade.id != upgrade_id:
             return
         if not self.game_state.spend_gold(upgrade.cost):
@@ -370,9 +363,13 @@ class GameManager:
 
         self.upgrade_manager.apply_upgrade(target_tower, upgrade)
         target_tower.total_investment += upgrade.cost
-        if path_id == "path_a":
+
+        # --- REFACTORED: Use the explicit `path` attribute from the Upgrade object (Issue #3) ---
+        # This removes the brittle string parsing and relies on the data-driven
+        # path definition we added to the JSON files and Upgrade dataclass.
+        if upgrade.path == "a":
             target_tower.path_a_tier += 1
-        elif path_id == "path_b":
+        elif upgrade.path == "b":
             target_tower.path_b_tier += 1
 
     def salvage_tower(self, tower_id: uuid.UUID):
