@@ -18,10 +18,6 @@ logger = logging.getLogger(__name__)
 class Entity:
     """
     The base class for all game objects that exist on the map.
-
-    REFACTORED: Now includes a sprite caching system to prevent expensive
-    on-the-fly scaling operations every frame, improving rendering performance
-    when the camera is zoomed.
     """
 
     def __init__(self, x: float, y: float, max_hp: int, sprite: pygame.Surface = None):
@@ -43,6 +39,14 @@ class Entity:
 
         self.rect = self.sprite.get_rect(center=self.pos)
         self._sprite_cache: Dict[float, pygame.Surface] = {}
+
+        # --- FIX: Added missing attributes to prevent crash (AttributeError) ---
+        # Since any entity can broadcast an aura, and auras can be scaled by
+        # this multiplier, it must be defined on the base Entity class.
+        # Towers modify this value; for enemies, it will remain 1.0.
+        self.effect_potency_multiplier = 1.0
+        self.base_effect_potency_multiplier = 1.0  # For the EffectHandler's reset logic
+
         self.effect_handler = EffectHandler(self)
         self.auras: List[dict] = []
         self.status_effects_config: dict = {}
@@ -94,15 +98,10 @@ class Entity:
                     if effect_id in self.status_effects_config:
                         effect_def = self.status_effects_config[effect_id]
 
-                        # --- FIX: Aura effects now scale with the broadcaster's potency (Issue #11) ---
-                        # This is a critical fix for support towers. It ensures that if this entity
-                        # (e.g., a Commander) is being buffed by another tower (e.g., an Arch-Mage),
-                        # its own aura becomes stronger as a result.
                         base_potency = params.get("potency", 1.0)
-                        final_potency = (
-                            base_potency
-                            * self.effect_handler.owner.effect_potency_multiplier
-                        )
+                        # The crash occurred here. Now `self.effect_potency_multiplier`
+                        # is guaranteed to exist on all entities.
+                        final_potency = base_potency * self.effect_potency_multiplier
 
                         effect = StatusEffect(
                             effect_id=effect_id,
