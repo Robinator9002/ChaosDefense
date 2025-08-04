@@ -56,6 +56,8 @@ class Pathfinder:
         Creates a relatively direct but slightly randomized path that respects buffer zones.
         """
         logger.info(f"Creating wandering path from {start} to {end}.")
+        # Note: The generator will create the final, comprehensive cost function.
+        # This is a simplified version for the fallback path.
         cost_function = Pathfinder._create_buffered_cost_func(occupied, buffer=2)
         return Pathfinder.find_path(grid, start, end, cost_function)
 
@@ -66,11 +68,10 @@ class Pathfinder:
         end: Tuple[int, int],
         turn_x_range: Tuple[int, int],
         occupied: Set[Tuple[int, int]],
+        cost_func_factory: Callable,
     ) -> List[Tuple[int, int]] | None:
         """
         Creates a path with a guaranteed 'elbow' shape, but a wandering second half.
-        1. A straight horizontal line is drawn to a random x in the turn_x_range.
-        2. A wandering, buffered A* path is found from the elbow to the target.
         """
         logger.info(
             f"Creating hybrid elbow path from {start} to {end} via x-range {turn_x_range}."
@@ -94,7 +95,7 @@ class Pathfinder:
 
         # 2. Find the second segment with A*
         newly_occupied = occupied.union(segment1)
-        cost_func_seg2 = Pathfinder._create_buffered_cost_func(newly_occupied, buffer=2)
+        cost_func_seg2 = cost_func_factory(newly_occupied)
         segment2 = Pathfinder.find_path(grid, turn_point, end, cost_func_seg2)
 
         if not segment2:
@@ -103,7 +104,7 @@ class Pathfinder:
             )
             return None
 
-        # Combine and return
+        # Combine and return, removing duplicates from the turn point
         return list(dict.fromkeys(segment1 + segment2))
 
     @staticmethod
@@ -116,24 +117,32 @@ class Pathfinder:
         """Finds a path between two points using the A* algorithm."""
 
         def heuristic(a: Tuple[int, int], b: Tuple[int, int]) -> float:
+            # Manhattan distance is a perfect heuristic for a 4-directional grid
             return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
-        open_set = [(0, start)]
+        open_set = [(0, start)]  # Priority queue: (f_score, position)
         heapq.heapify(open_set)
-        came_from = {}
+
+        came_from = {}  # Stores the preceding node in the best path
+
         g_score = {
             (x, y): float("inf") for y in range(grid.height) for x in range(grid.width)
         }
         g_score[start] = 0
+
         f_score = {
             (x, y): float("inf") for y in range(grid.height) for x in range(grid.width)
         }
         f_score[start] = heuristic(start, end)
 
+        open_set_hash = {start}  # For fast lookups
+
         while open_set:
             _, current = heapq.heappop(open_set)
+            open_set_hash.remove(current)
 
             if current == end:
+                # Reconstruct path from end to start
                 path = []
                 while current in came_from:
                     path.append(current)
@@ -141,31 +150,26 @@ class Pathfinder:
                 path.append(start)
                 return path[::-1]
 
-            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:  # 4-directional movement
                 neighbor = (current[0] + dx, current[1] + dy)
 
                 if not grid.is_valid_coord(neighbor[0], neighbor[1]):
                     continue
 
-                tile = grid.get_tile(neighbor[0], neighbor[1])
-
-                # --- FIX (Step 2.1): Make the base zone impassable for pathfinding ---
-                # By adding "BASE_ZONE" to this list of impassable tile keys, we prevent
-                # the A* algorithm from ever routing a path through the player's base.
-                # The `neighbor != end` condition is still important to allow paths to
-                # terminate at a target point right next to an obstacle.
-                impassable_keys = ["BORDER", "MOUNTAIN", "BASE_ZONE"]
-                if tile.tile_key in impassable_keys and neighbor != end:
-                    continue
+                # --- REFACTORED: Removed hardcoded impassable tile check (Issue #8) ---
+                # The responsibility for determining if a tile is impassable
+                # now belongs entirely to the cost_func. The Pathfinder is now
+                # a generic algorithm that only cares about costs, not tile types.
 
                 tentative_g_score = g_score[current] + cost_func(neighbor)
 
-                if tentative_g_score < g_score[neighbor]:
+                if tentative_g_score < g_score.get(neighbor, float("inf")):
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g_score
                     f_score[neighbor] = tentative_g_score + heuristic(neighbor, end)
-                    if not any(n[1] == neighbor for n in open_set):
+                    if neighbor not in open_set_hash:
                         heapq.heappush(open_set, (f_score[neighbor], neighbor))
+                        open_set_hash.add(neighbor)
 
         logger.warning(f"A* could not find a path from {start} to {end}.")
         return None
