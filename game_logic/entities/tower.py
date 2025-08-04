@@ -49,6 +49,10 @@ class Tower(Entity):
         self.status_effects_config = status_effects_config
 
         self.attack = copy.deepcopy(self.tower_type_data.get("attack", {}))
+        # --- FIX: Use deepcopy to prevent towers sharing aura data (Issue #10) ---
+        # Without a deepcopy, all towers of the same type would share a single
+        # aura list object. Modifying one tower's aura (e.g., via an upgrade)
+        # would unintentionally modify the auras of all other towers of that type.
         self.auras = copy.deepcopy(self.tower_type_data.get("auras", []))
 
         self.attack.setdefault("data", {})
@@ -157,7 +161,6 @@ class Tower(Entity):
             return self._fire()
         return []
 
-    # --- MODIFIED: Return signature now includes tooltip description ---
     def get_displayable_stats(
         self,
     ) -> List[Tuple[str, Any, Optional[str], Optional[str]]]:
@@ -175,7 +178,6 @@ class Tower(Entity):
             value_path = stat_info.get("value_path")
             live_value = get_nested_value(self, value_path) if value_path else None
             if label and live_value is not None:
-                # Append the description from the config to the tuple
                 stats.append(
                     (
                         label,
@@ -185,7 +187,6 @@ class Tower(Entity):
                     )
                 )
 
-        # Add special stats with their own hardcoded tooltips
         if self.pierce_count > 0 and not any(s[0] == "Pierce" for s in stats):
             stats.append(
                 (
