@@ -71,10 +71,6 @@ class GameManager:
         self.grid: Optional[Grid] = None
         self.paths: List[List[Tuple[int, int]]] = []
 
-        # --- NEW: Store global modifiers ---
-        # This dictionary holds all modifications from permanent workshop upgrades.
-        # It is fetched once at the start of a game and used to modify game state
-        # and new tower instances without altering the base configuration files.
         self.global_modifiers = self.progression_manager.get_global_upgrade_modifiers()
 
         self.enemies: Dict[uuid.UUID, Enemy] = {}
@@ -101,9 +97,6 @@ class GameManager:
             self.game_state.end_game()
             return
 
-        # --- MODIFIED: Apply game state modifiers from global upgrades ---
-        # This ensures that bonuses like starting gold and HP are added to the
-        # fresh GameState object for this specific game session.
         game_state_mods = self.global_modifiers.get("game_state_mods", {})
         self.game_state.gold += game_state_mods.get("gold", 0)
         self.game_state.base_hp += game_state_mods.get("base_hp", 0)
@@ -130,8 +123,7 @@ class GameManager:
     def get_buildable_towers(self) -> List[str]:
         """
         Retrieves a list of tower IDs that the player has unlocked, sorted
-        according to their definition order in the configuration file. This
-        fixes both the instant unlock and incorrect sorting bugs.
+        according to their definition order in the configuration file.
         """
         player_data = self.progression_manager.get_player_data()
         unlocked_set = player_data.unlocked_towers
@@ -220,30 +212,31 @@ class GameManager:
         self._cleanup_dead_entities()
 
     def _cleanup_dead_entities(self):
-        """Removes all dead entities from the game."""
-        dead_enemy_ids = [eid for eid, e in self.enemies.items() if not e.is_alive]
-        for enemy_id in dead_enemy_ids:
-            dead_enemy = self.enemies[enemy_id]
-            self.game_state.add_gold(dead_enemy.bounty)
-            self._handle_on_death_effects(dead_enemy)
-            self.director_ai.record_enemy_death(dead_enemy)
-            self.targeting_manager.remove_entity(dead_enemy)
-            del self.enemies[enemy_id]
+        """
+        Removes all dead entities from the game in a single, efficient pass.
+        This method iterates over copies of the entity lists, allowing safe
+        deletion from the original dictionaries during iteration.
+        """
+        # --- OPTIMIZED: Staged Removal (Issue #1) ---
+        # Iterate over a copy of the items to allow safe deletion from the original dict.
+        for enemy_id, enemy in list(self.enemies.items()):
+            if not enemy.is_alive:
+                self.game_state.add_gold(enemy.bounty)
+                self._handle_on_death_effects(enemy)
+                self.director_ai.record_enemy_death(enemy)
+                self.targeting_manager.remove_entity(enemy)
+                del self.enemies[enemy_id]
 
-        dead_projectile_ids = [
-            pid for pid, p in self.projectiles.items() if not p.is_alive
-        ]
-        for proj_id in dead_projectile_ids:
-            entity_to_remove = self.projectiles[proj_id]
-            if not isinstance(entity_to_remove, Projectile):
-                self.targeting_manager.remove_entity(entity_to_remove)
-            del self.projectiles[proj_id]
+        for proj_id, projectile in list(self.projectiles.items()):
+            if not projectile.is_alive:
+                if not isinstance(projectile, Projectile):
+                    self.targeting_manager.remove_entity(projectile)
+                del self.projectiles[proj_id]
 
-        dead_tower_ids = [tid for tid, t in self.towers.items() if not t.is_alive]
-        for tower_id in dead_tower_ids:
-            dead_tower = self.towers[tower_id]
-            self.targeting_manager.remove_entity(dead_tower)
-            del self.towers[tower_id]
+        for tower_id, tower in list(self.towers.items()):
+            if not tower.is_alive:
+                self.targeting_manager.remove_entity(tower)
+                del self.towers[tower_id]
 
     def _handle_on_death_effects(self, dead_enemy: Enemy):
         """Checks for on-death effects, like explosions."""
@@ -342,10 +335,6 @@ class GameManager:
         if not self.game_state.spend_gold(tower_data.get("cost", 9999)):
             return False
 
-        # --- MODIFIED: Pass tower-specific modifiers to the Tower constructor ---
-        # This is the second half of the mutable config fix. We retrieve the
-        # specific modifiers for this tower type and pass them along. The Tower
-        # class will now be responsible for applying them.
         tower_mods = self.global_modifiers.get("tower_stat_mods", {}).get(
             tower_type_id, {}
         )
@@ -357,7 +346,7 @@ class GameManager:
             tower_type_id=tower_type_id,
             tower_type_data=tower_data,
             status_effects_config=self.configs.get("status_effects", {}),
-            global_mods=tower_mods,  # Pass the modifiers here
+            global_mods=tower_mods,
         )
 
         self.towers[new_tower.entity_id] = new_tower
