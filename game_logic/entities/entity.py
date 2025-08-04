@@ -37,21 +37,13 @@ class Entity:
         if sprite:
             self.sprite = sprite
         else:
-            # Create a default placeholder sprite if none is provided
             self.sprite = pygame.Surface((32, 32))
             self.sprite.fill((255, 0, 255))
             self.sprite.set_colorkey((0, 0, 0))
 
         self.rect = self.sprite.get_rect(center=self.pos)
-
-        # --- NEW: Sprite cache for rendering optimization ---
-        # The key will be the zoom level (float), the value will be the pre-scaled sprite surface.
         self._sprite_cache: Dict[float, pygame.Surface] = {}
-
-        # The EffectHandler must be initialized *after* all stats on the subclass
-        # have been set, so it can take an accurate snapshot.
         self.effect_handler = EffectHandler(self)
-
         self.auras: List[dict] = []
         self.status_effects_config: dict = {}
 
@@ -101,11 +93,22 @@ class Entity:
                 for effect_id, params in effects_to_apply.items():
                     if effect_id in self.status_effects_config:
                         effect_def = self.status_effects_config[effect_id]
+
+                        # --- FIX: Aura effects now scale with the broadcaster's potency (Issue #11) ---
+                        # This is a critical fix for support towers. It ensures that if this entity
+                        # (e.g., a Commander) is being buffed by another tower (e.g., an Arch-Mage),
+                        # its own aura becomes stronger as a result.
+                        base_potency = params.get("potency", 1.0)
+                        final_potency = (
+                            base_potency
+                            * self.effect_handler.owner.effect_potency_multiplier
+                        )
+
                         effect = StatusEffect(
                             effect_id=effect_id,
                             effect_data=effect_def,
                             duration=params.get("duration", 1.0),
-                            potency=params.get("potency", 1.0),
+                            potency=final_potency,
                             source_entity_id=self.entity_id,
                         )
                         ally.apply_status_effect(effect)
@@ -121,19 +124,13 @@ class Entity:
         screen_pos = (self.pos * zoom) + camera_offset
 
         if zoom == 1.0:
-            # If no zoom, draw directly with no scaling.
             self.rect.center = screen_pos
             screen.blit(self.sprite, self.rect)
         else:
-            # --- OPTIMIZED: Use the sprite cache ---
-            # Check if a pre-scaled sprite for this zoom level already exists.
             if zoom not in self._sprite_cache:
-                # If not, create it once and store it in the cache.
                 new_size = (int(self.rect.width * zoom), int(self.rect.height * zoom))
-                # Use scale for performance; smoothscale is too slow for many entities.
                 self._sprite_cache[zoom] = pygame.transform.scale(self.sprite, new_size)
 
-            # Retrieve the pre-scaled sprite from the cache.
             scaled_sprite = self._sprite_cache[zoom]
             scaled_rect = scaled_sprite.get_rect(center=screen_pos)
             screen.blit(scaled_sprite, scaled_rect)
@@ -160,7 +157,6 @@ class Entity:
         Marks the entity as no longer alive.
         """
         self.is_alive = False
-        # Clear the cache to free up memory when the entity is no longer needed.
         self._sprite_cache.clear()
         logger.debug(f"Entity {self.entity_id} has been killed.")
 
