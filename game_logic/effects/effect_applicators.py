@@ -96,12 +96,39 @@ def add_area_effect_on_hit(tower: "Tower", value: Any):
         tower.on_hit_area_effects.append(value)
 
 
+# --- NEW: Handler for missing effect type from Issue #13 ---
+def multiply_effect_duration(tower: "Tower", value: Any):
+    """
+    Multiplies the duration of a tower's primary on-hit status effect.
+    This is a more complex handler as it needs to find the effect first.
+    """
+    if not isinstance(value, (int, float)):
+        return
+
+    # This logic assumes we want to modify the *first* defined effect in the attack data.
+    # This is a reasonable assumption for towers like the Freezer or Energy Beacon.
+    if tower.attack and "data" in tower.attack and "effects" in tower.attack["data"]:
+        effects_dict = tower.attack["data"]["effects"]
+        if effects_dict:
+            # Get the key of the first effect (e.g., "slow")
+            primary_effect_key = next(iter(effects_dict))
+            if "duration" in effects_dict[primary_effect_key]:
+                original_duration = effects_dict[primary_effect_key]["duration"]
+                effects_dict[primary_effect_key]["duration"] *= value
+                logger.debug(
+                    f"Multiplied duration of '{primary_effect_key}' for tower {tower.name}: {original_duration} -> {effects_dict[primary_effect_key]['duration']}"
+                )
+            else:
+                logger.warning(
+                    f"Upgrade tried to modify duration, but no 'duration' key found for effect '{primary_effect_key}' on tower {tower.name}"
+                )
+
+
 def modify_attack_data(tower: "Tower", value: Dict[str, Any]):
     """Modifies a key within the tower's attack.data dictionary."""
     if not isinstance(value, dict):
         return
 
-    # --- FIX: Use tower.attack, not tower.attack_data ---
     if not hasattr(tower, "attack") or "data" not in tower.attack:
         logger.warning(f"Tower {tower.name} has no attack data to modify.")
         return
@@ -135,28 +162,23 @@ def modify_nested_property(tower: "Tower", value: Dict[str, Any]):
             Expected format:
             {
                 "path": "auras[0].effects.damage_boost.potency",
-                "operation": "add" | "multiply",
-                "amount": <float_or_int>
+                "operation": "add" | "multiply" | "set" | "add_aura" | "add_effect",
+                "amount": <any>
             }
     """
     path_str = value.get("path")
     operation = value.get("operation")
     amount = value.get("amount")
 
-    # --- 1. Validate the input data from the JSON config ---
     if not all([path_str, operation, amount is not None]):
         logger.error(f"Invalid value for modify_nested_property: {value}")
         return
 
-    # --- 2. Parse the path string into a list of keys ---
-    # This standardizes access for attributes, dict keys, and list indices.
-    # e.g., "auras[0].effects" becomes ["auras", "0", "effects"]
     keys = path_str.replace("[", ".").replace("]", "").split(".")
 
     try:
-        # --- 3. Traverse the structure to find the parent of the target property ---
         current_level = tower
-        for key in keys[:-1]:  # Go up to the second-to-last key
+        for key in keys[:-1]:
             if key.isdigit() and isinstance(current_level, list):
                 current_level = current_level[int(key)]
             elif isinstance(current_level, dict):
@@ -166,32 +188,60 @@ def modify_nested_property(tower: "Tower", value: Dict[str, Any]):
 
         final_key = keys[-1]
 
-        # --- 4. Get the original value and apply the operation ---
-        if final_key.isdigit() and isinstance(current_level, list):
-            original_value = current_level[int(final_key)]
-            final_key = int(final_key)  # Cast to int for list indexing
-        elif isinstance(current_level, dict):
-            original_value = current_level[final_key]
-        else:
-            original_value = getattr(current_level, final_key)
+        # --- MODIFIED: Expanded logic to handle new operations (Issue #14) ---
+        if operation in ["add", "multiply", "set"]:
+            # Logic for modifying existing values
+            if final_key.isdigit() and isinstance(current_level, list):
+                original_value = current_level[int(final_key)]
+                final_key = int(final_key)
+            elif isinstance(current_level, dict):
+                original_value = current_level[final_key]
+            else:
+                original_value = getattr(current_level, final_key)
 
-        if operation == "add":
-            new_value = original_value + amount
-        elif operation == "multiply":
-            new_value = original_value * amount
+            if operation == "add":
+                new_value = original_value + amount
+            elif operation == "multiply":
+                new_value = original_value * amount
+            else:  # operation == "set"
+                new_value = amount
+
+            if isinstance(current_level, (dict, list)):
+                current_level[final_key] = new_value
+            else:
+                setattr(current_level, final_key, new_value)
+
+            logger.debug(f"Modified '{path_str}': {original_value} -> {new_value}")
+
+        elif operation == "add_aura":
+            # Logic for appending a new aura object to the 'auras' list
+            target_list = getattr(tower, final_key)
+            if isinstance(target_list, list) and isinstance(amount, dict):
+                target_list.append(amount)
+                logger.debug(f"Added new aura to '{final_key}' on tower {tower.name}")
+            else:
+                logger.error(
+                    f"Cannot 'add_aura' to non-list or with non-dict amount for path '{path_str}'"
+                )
+
+        elif operation == "add_effect":
+            # Logic for adding a new effect to an 'effects' dictionary
+            target_dict = getattr(current_level, final_key)
+            if isinstance(target_dict, dict) and isinstance(amount, dict):
+                target_dict.update(amount)
+                logger.debug(
+                    f"Added new effect to '{final_key}' on tower {tower.name}: {amount}"
+                )
+            else:
+                logger.error(
+                    f"Cannot 'add_effect' to non-dict or with non-dict amount for path '{path_str}'"
+                )
+
         else:
             logger.warning(
                 f"Unknown operation '{operation}' for modify_nested_property"
             )
             return
-
-        # --- 5. Set the new value back on the parent object/dict/list ---
-        if isinstance(current_level, dict) or isinstance(current_level, list):
-            current_level[final_key] = new_value
-        else:
-            setattr(current_level, final_key, new_value)
-
-        logger.debug(f"Modified '{path_str}': {original_value} -> {new_value}")
 
     except (KeyError, IndexError, TypeError, AttributeError) as e:
         logger.error(f"Could not modify nested property with path '{path_str}': {e}")
