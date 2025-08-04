@@ -119,16 +119,14 @@ class GameManager:
 
     def get_buildable_towers(self) -> List[str]:
         """
-        Retrieves a list of tower IDs that the player has unlocked, sorted
-        according to their definition order in the configuration file.
+        Retrieves a list of tower IDs that the player has unlocked.
         """
         player_data = self.progression_manager.get_player_data()
         unlocked_set = player_data.unlocked_towers
         all_tower_ids_in_order = self.configs.get("tower_types", {}).keys()
-        buildable_towers = [
+        return [
             tower_id for tower_id in all_tower_ids_in_order if tower_id in unlocked_set
         ]
-        return buildable_towers
 
     def end_game_session(self, victory: bool):
         """
@@ -143,7 +141,6 @@ class GameManager:
         total_shards_earned = (waves_cleared * shards_per_wave) + victory_bonus
 
         if total_shards_earned > 0:
-            logger.info(f"Awarding {total_shards_earned} Chaos Shards to the player.")
             player_data.meta_currency += total_shards_earned
 
         if waves_cleared > player_data.highest_wave_reached:
@@ -159,9 +156,7 @@ class GameManager:
                         player_data.unlocked_levels.add(next_level_id)
                         logger.warning(f"NEW LEVEL UNLOCKED: {next_level_id}")
             except ValueError:
-                logger.error(
-                    f"Could not find current level '{self.current_level_id}' in level list."
-                )
+                logger.error(f"Could not find current level '{self.current_level_id}'")
 
         self.progression_manager.player_data_manager.save_data(player_data)
 
@@ -209,9 +204,7 @@ class GameManager:
         self._cleanup_dead_entities()
 
     def _cleanup_dead_entities(self):
-        """
-        Removes all dead entities from the game in a single, efficient pass.
-        """
+        """Removes all dead entities from the game in a single, efficient pass."""
         for enemy_id, enemy in list(self.enemies.items()):
             if not enemy.is_alive:
                 self.game_state.add_gold(enemy.bounty)
@@ -232,7 +225,9 @@ class GameManager:
                 del self.towers[tower_id]
 
     def _handle_on_death_effects(self, dead_enemy: Enemy):
-        """Checks for on-death effects, like explosions."""
+        """
+        Checks for on-death effects, like explosions, and triggers all of them.
+        """
         for effect in dead_enemy.effect_handler.status_effects:
             if effect.source_entity_id:
                 source_tower = self.towers.get(effect.source_entity_id)
@@ -240,6 +235,10 @@ class GameManager:
                     self._create_explosion(
                         dead_enemy.pos, source_tower.on_death_explosion
                     )
+                    # --- FIX: Removed 'break' to allow multiple on-death effects (Issue #4) ---
+                    # This allows for more complex tower synergies, where an enemy
+                    # can trigger multiple different explosions upon death if it
+                    # was affected by multiple different towers.
 
     def _create_explosion(
         self, position: pygame.Vector2, explosion_data: Dict[str, Any]
@@ -352,7 +351,6 @@ class GameManager:
         if not target_tower:
             return
 
-        # Determine path_id from upgrade_id for the lookup
         path_lookup_id = f"path_{upgrade_id.split('_')[-1][0]}"
         upgrade = self.upgrade_manager.get_next_upgrade(target_tower, path_lookup_id)
 
@@ -364,9 +362,6 @@ class GameManager:
         self.upgrade_manager.apply_upgrade(target_tower, upgrade)
         target_tower.total_investment += upgrade.cost
 
-        # --- REFACTORED: Use the explicit `path` attribute from the Upgrade object (Issue #3) ---
-        # This removes the brittle string parsing and relies on the data-driven
-        # path definition we added to the JSON files and Upgrade dataclass.
         if upgrade.path == "a":
             target_tower.path_a_tier += 1
         elif upgrade.path == "b":
