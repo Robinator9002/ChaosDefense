@@ -50,10 +50,6 @@ class BossHandler:
         level and schedules their special waves.
         """
         for boss_id, boss_data in self.all_bosses.items():
-            # --- BUG FIX: VALIDATION STEP ---
-            # This check ensures that we only process entries that are dictionaries.
-            # It gracefully skips any top-level keys in the JSON file that are
-            # not boss definitions, such as comments (e.g., "//": "comment text").
             if not isinstance(boss_data, dict):
                 continue
 
@@ -86,7 +82,6 @@ class BossHandler:
 
         boss_path_index = random.randint(0, num_paths - 1)
 
-        # 1. Create the spawn job for the boss itself.
         spawn_jobs.append(
             {
                 "type": boss_id,
@@ -96,7 +91,6 @@ class BossHandler:
             }
         )
 
-        # 2. Create spawn jobs for the phalanx.
         phalanx_data = boss_data.get("phalanx", [])
         for group in phalanx_data:
             for _ in range(group["count"]):
@@ -124,6 +118,9 @@ class BossHandler:
         """
         updated_pool = current_enemy_pool.copy()
         for boss_id, boss_data in self.all_bosses.items():
+            # --- FIX: Added validation to prevent crashes from JSON comments (Issue #5) ---
+            # This check ensures we only process actual boss data dictionaries,
+            # safely ignoring any string-based comments in the config file.
             if not isinstance(boss_data, dict):
                 continue
 
