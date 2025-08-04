@@ -52,8 +52,14 @@ def main():
         ui_theme = load_config(CONFIG_PATH / "ui" / "ui_theme.json")
         game_settings = load_config(CONFIG_PATH / "gameplay/game_settings.json")
 
-        upgrade_root_dir = CONFIG_PATH / "upgrades"
-        all_upgrade_defs = load_all_upgrades([upgrade_root_dir])
+        # --- MODIFIED: Load the new global upgrades config ---
+        global_upgrades_config = load_config(
+            CONFIG_PATH / "gameplay" / "global_upgrades.json"
+        )
+
+        # --- MODIFIED: Updated path to the new subfolder for tower upgrades ---
+        tower_upgrade_dir = CONFIG_PATH / "upgrades" / "towers"
+        all_upgrade_defs = load_all_upgrades([tower_upgrade_dir])
 
         all_configs: Dict[str, Dict] = {
             "game_settings": game_settings,
@@ -86,15 +92,15 @@ def main():
     font_manager = FontManager(ui_theme.get("fonts", {}))
 
     logger.info("--- Initializing Progression Systems ---")
-    # --- MODIFIED: Pass game_settings to the PlayerDataManager constructor ---
-    # This resolves the dependency introduced in Step 2.2, allowing the manager
-    # to read initial player stats from the config file when creating a new save.
     player_data_manager = PlayerDataManager(
         save_path=SAVES_PATH / "player_data.json", game_settings=game_settings
     )
+
+    # --- MODIFIED: Pass the global upgrades config to the ProgressionManager ---
     progression_manager = ProgressionManager(
         player_data_manager=player_data_manager,
         all_tower_configs=all_configs["tower_types"],
+        global_upgrades_config=global_upgrades_config,
     )
 
     logger.info("--- Initializing Game ---")
