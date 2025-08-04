@@ -54,7 +54,7 @@ def main():
 
         # --- MODIFIED: Load the new global upgrades config ---
         global_upgrades_config = load_config(
-            CONFIG_PATH / "gameplay" / "global_upgrades.json"
+            CONFIG_PATH / "upgrades" / "global_upgrades.json"
         )
 
         # --- MODIFIED: Updated path to the new subfolder for tower upgrades ---
