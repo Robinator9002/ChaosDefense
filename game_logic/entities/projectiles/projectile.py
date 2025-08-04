@@ -77,8 +77,6 @@ class Projectile(Entity):
         if not self.is_alive:
             return
 
-        all_enemies = targeting_manager.enemy_grid  # A way to get all enemies for now
-
         if not self.target or not self.target.is_alive:
             new_target = self._find_new_target_nearby(targeting_manager)
             if new_target:
@@ -198,7 +196,7 @@ class Projectile(Entity):
             impact_pos, self.blast_radius
         )
         for enemy in nearby_enemies:
-            if enemy.is_alive and enemy.entity_id not in self.enemies_hit:
+            if enemy.entity_id not in self.enemies_hit:
                 enemy.take_damage(splash_damage)
                 for effect_data in self.on_blast_effects_data:
                     effect_id = effect_data["id"]
@@ -225,29 +223,38 @@ class Projectile(Entity):
         nearby_enemies = targeting_manager.get_nearby_enemies(center_pos, radius)
 
         for enemy in nearby_enemies:
-            if enemy.is_alive:
-                if damage > 0:
-                    enemy.take_damage(damage)
-                if effect_def and effect_def["id"] in self.status_effects_config:
-                    effect_instance = StatusEffect(
-                        effect_id=effect_def["id"],
-                        effect_data=self.status_effects_config[effect_def["id"]],
-                        duration=effect_def.get("duration", 1.0),
-                        potency=effect_def.get("potency", 1.0),
-                    )
-                    enemy.apply_status_effect(effect_instance)
+            if damage > 0:
+                enemy.take_damage(damage)
+            if effect_def and effect_def["id"] in self.status_effects_config:
+                effect_instance = StatusEffect(
+                    effect_id=effect_def["id"],
+                    effect_data=self.status_effects_config[effect_def["id"]],
+                    duration=effect_def.get("duration", 1.0),
+                    potency=effect_def.get("potency", 1.0),
+                )
+                enemy.apply_status_effect(effect_instance)
 
     def _find_next_pierce_target(
         self, targeting_manager: "TargetingManager"
     ) -> Optional["Enemy"]:
-        """Finds the next valid target for a piercing shot."""
-        # This is a less efficient query, but acceptable for a single event.
-        all_enemies = [
-            enemy for cell in targeting_manager.enemy_grid.values() for enemy in cell
-        ]
+        """
+        Finds the next valid target for a piercing shot using an efficient
+        spatial query.
+        """
+        # --- OPTIMIZED: Use a spatial query instead of a full map scan (Issue #9) ---
+        # Define a reasonable radius to search for the next target.
+        pierce_search_radius = 150
+        potential_targets = targeting_manager.get_nearby_enemies(
+            self.pos, pierce_search_radius
+        )
+
+        # Filter out enemies that have already been hit by this projectile.
         valid_targets = [
-            e for e in all_enemies if e.is_alive and e.entity_id not in self.enemies_hit
+            e for e in potential_targets if e.entity_id not in self.enemies_hit
         ]
+
         if not valid_targets:
             return None
+
+        # Return the closest valid target.
         return min(valid_targets, key=lambda e: self.pos.distance_squared_to(e.pos))
