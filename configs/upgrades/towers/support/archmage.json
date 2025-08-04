@@ -9,6 +9,7 @@
         "name": "Focusing Crystals",
         "cost": 300,
         "description": "Massively increases the potency of the Effect Potency Boost aura, from +30% to +50%.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -25,6 +26,7 @@
         "name": "Arcane Resonance",
         "cost": 550,
         "description": "Unlocks a new aura that makes enemies vulnerable, causing them to take 20% increased damage from all sources.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -47,6 +49,7 @@
         "name": "Leyline Attunement",
         "cost": 700,
         "description": "Increases the radius of all the Archmage's auras by 40.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -71,6 +74,7 @@
         "name": "Power Overwhelming",
         "cost": 1500,
         "description": "The Arcane Resonance aura is supercharged, increasing its vulnerability effect from 20% to 50%.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -87,6 +91,7 @@
         "name": "Archon Form",
         "cost": 4000,
         "description": "The Archmage transcends, gaining a long-range attack that stuns enemies, feeding its own power.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -117,6 +122,7 @@
         "name": "Elemental Infusion",
         "cost": 350,
         "description": "Unlocks a new aura that ignites enemies near allied towers, dealing damage over time.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_nested",
@@ -137,6 +143,7 @@
         "name": "Cryo Core",
         "cost": 500,
         "description": "The Elemental Infusion aura is upgraded, now also slowing enemies who are on fire.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_nested",
@@ -153,6 +160,7 @@
         "name": "Chain Lightning",
         "cost": 800,
         "description": "The Archmage gains a new, rapid-fire attack that chains between 2 enemies.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_nested",
@@ -177,6 +185,7 @@
         "name": "Expanded Influence",
         "cost": 1300,
         "description": "Increases the radius of all auras and the potency of the elemental effects.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_nested",
@@ -217,6 +226,7 @@
         "name": "Elemental Cascade",
         "cost": 4500,
         "description": "The Chain Lightning attack becomes a devastating storm, chaining to 5 targets and dealing massively increased damage.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_nested",

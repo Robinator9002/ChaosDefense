@@ -8,6 +8,7 @@
         "name": "Lasting Hex",
         "cost": 110,
         "description": "Increases the duration of the vulnerability curse by 2 seconds.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -24,6 +25,7 @@
         "name": "Potent Curse",
         "cost": 170,
         "description": "Increases the damage amplification of the curse.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -40,6 +42,7 @@
         "name": "Enfeeble",
         "cost": 240,
         "description": "Cursed enemies are also slowed.",
+        "path": "a",
         "effects": [
           {
             "type": "add_effect",
@@ -52,6 +55,7 @@
         "name": "Armor Wrack",
         "cost": 300,
         "description": "The curse now also breaks enemy armor.",
+        "path": "a",
         "effects": [
           {
             "type": "add_effect",
@@ -64,6 +68,7 @@
         "name": "Doom",
         "cost": 500,
         "description": "Cursed enemies that die will explode, dealing damage to nearby foes.",
+        "path": "a",
         "effects": [
           {
             "type": "add_on_death_explosion",
@@ -82,6 +87,7 @@
         "name": "Faster Casting",
         "cost": 100,
         "description": "Increases fire rate by 30%.",
+        "path": "b",
         "effects": [{ "type": "multiply_fire_rate", "value": 1.3 }]
       },
       {
@@ -89,6 +95,7 @@
         "name": "Piercing Hex",
         "cost": 180,
         "description": "Cursing bolts now pierce through one additional enemy.",
+        "path": "b",
         "effects": [{ "type": "set_pierce", "value": 1 }]
       },
       {
@@ -96,6 +103,7 @@
         "name": "Curse Miasma",
         "cost": 260,
         "description": "Cursing bolts now explode in a small area, cursing multiple enemies.",
+        "path": "b",
         "effects": [
           { "type": "multiply_blast_radius", "value": 50 },
           {
@@ -113,6 +121,7 @@
         "name": "Accelerated Casting",
         "cost": 320,
         "description": "Further increases fire rate by 40%.",
+        "path": "b",
         "effects": [{ "type": "multiply_fire_rate", "value": 1.4 }]
       },
       {
@@ -120,6 +129,7 @@
         "name": "Epidemic",
         "cost": 550,
         "description": "The curse can now pierce through two enemies and has a larger blast radius.",
+        "path": "b",
         "effects": [
           { "type": "set_pierce", "value": 2 },
           { "type": "multiply_blast_radius", "value": 1.5 }

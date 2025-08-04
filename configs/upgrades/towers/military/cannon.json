@@ -8,6 +8,7 @@
         "name": "High-Explosive Shells",
         "cost": 70,
         "description": "Increases blast radius by 15%.",
+        "path": "a",
         "effects": [{ "type": "multiply_blast_radius", "value": 1.15 }]
       },
       {
@@ -15,6 +16,7 @@
         "name": "Rangefinder",
         "cost": 90,
         "description": "Increases attack range by 40.",
+        "path": "a",
         "effects": [{ "type": "add_range", "value": 40 }]
       },
       {
@@ -22,6 +24,7 @@
         "name": "Shrapnel Shells",
         "cost": 120,
         "description": "Explosions cause enemies to bleed, taking damage over time.",
+        "path": "a",
         "effects": [
           {
             "type": "add_blast_effect",
@@ -34,6 +37,7 @@
         "name": "Reinforced Cannon",
         "cost": 185,
         "description": "Greatly increases projectile damage by 25.",
+        "path": "a",
         "effects": [{ "type": "add_damage", "value": 25 }]
       },
       {
@@ -41,6 +45,7 @@
         "name": "Earthshaker",
         "cost": 250,
         "description": "Explosions now also daze enemies, slowing them significantly.",
+        "path": "a",
         "effects": [
           {
             "type": "add_blast_effect",
@@ -63,6 +68,7 @@
         "name": "Lightened Shells",
         "cost": 90,
         "description": "Increases fire rate by 20%.",
+        "path": "b",
         "effects": [{ "type": "multiply_fire_rate", "value": 1.2 }]
       },
       {
@@ -70,6 +76,7 @@
         "name": "Improved Gearing",
         "cost": 120,
         "description": "Increases fire rate by another 20%.",
+        "path": "b",
         "effects": [{ "type": "multiply_fire_rate", "value": 1.2 }]
       },
       {
@@ -77,6 +84,7 @@
         "cost": 220,
         "name": "Corrosive Payload",
         "description": "Shells corrode armor, making targets take more damage from all sources.",
+        "path": "b",
         "effects": [
           {
             "type": "add_effect",
@@ -89,6 +97,7 @@
         "name": "Tungsten Core",
         "cost": 220,
         "description": "Shells now pierce through one enemy.",
+        "path": "b",
         "effects": [{ "type": "set_pierce", "value": 1 }]
       },
       {
@@ -96,6 +105,7 @@
         "name": "High-Velocity Autoloader",
         "cost": 320,
         "description": "Greatly increases fire rate and adds a significant amount of bonus damage.",
+        "path": "b",
         "effects": [
           { "type": "multiply_fire_rate", "value": 1.1 },
           { "type": "add_damage", "value": 15 }

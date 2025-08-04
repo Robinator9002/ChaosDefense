@@ -9,6 +9,7 @@
         "name": "Lingering Flames",
         "cost": 120,
         "description": "Increases the duration of the firewall by 1.5 seconds.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -21,6 +22,7 @@
         "name": "Wildfire",
         "cost": 180,
         "description": "Increases the radius of the firewall by 25%.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -37,6 +39,7 @@
         "name": "Intense Heat",
         "cost": 250,
         "description": "Significantly increases the damage per second of the firewall by 15.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -49,6 +52,7 @@
         "name": "Flash Point",
         "cost": 320,
         "description": "Firewall placement now creates an initial burst of 100 damage in the area.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -65,6 +69,7 @@
         "name": "Firestorm",
         "cost": 600,
         "description": "The firewall becomes a raging inferno that makes enemies vulnerable, taking increased damage from all sources.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -93,6 +98,7 @@
         "name": "Kindling",
         "cost": 100,
         "description": "Increases the rate of fire by 30%.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -109,6 +115,7 @@
         "name": "Fuel Air Mixture",
         "cost": 160,
         "description": "Increases damage per second by 10.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -121,6 +128,7 @@
         "name": "Combustion Engine",
         "cost": 220,
         "description": "Further increases the rate of fire by 40%.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -137,6 +145,7 @@
         "name": "Heat Shimmer",
         "cost": 280,
         "description": "Enemies leaving the firewall are slowed significantly for 2 seconds.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_attack_data",
@@ -153,6 +162,7 @@
         "name": "Wall of Fire",
         "cost": 550,
         "description": "Can place firewalls extremely rapidly and makes the burn effect much more potent.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_attack_data",

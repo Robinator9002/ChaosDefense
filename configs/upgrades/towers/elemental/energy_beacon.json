@@ -8,6 +8,7 @@
         "name": "Corrosive Particles",
         "cost": 80,
         "description": "Beacon now applies a potent, stacking armor break effect.",
+        "path": "a",
         "effects": [
           {
             "type": "add_effect",
@@ -20,6 +21,7 @@
         "name": "Vulnerability Scan",
         "cost": 110,
         "description": "Beacon now also makes targets vulnerable, taking 20% more damage.",
+        "path": "a",
         "effects": [
           {
             "type": "add_effect",
@@ -36,6 +38,7 @@
         "name": "Long-Range Emitter",
         "cost": 140,
         "description": "Increases range and fire rate to apply effects more reliably.",
+        "path": "a",
         "effects": [
           { "type": "add_range", "value": 50 },
           { "type": "multiply_fire_rate", "value": 1.25 }
@@ -46,6 +49,7 @@
         "name": "Hemorrhage Signal",
         "cost": 220,
         "description": "Beacon now also applies a powerful stacking bleed effect.",
+        "path": "a",
         "effects": [
           {
             "type": "add_effect",
@@ -58,6 +62,7 @@
         "name": "System Shock",
         "cost": 400,
         "description": "Beacon deals massive bonus damage for each unique status effect on the target.",
+        "path": "a",
         "effects": [{ "type": "add_bonus_damage_per_debuff", "value": 12 }]
       }
     ]
@@ -71,6 +76,7 @@
         "name": "Lingering Field",
         "cost": 70,
         "description": "Greatly increases the duration of the slow effect.",
+        "path": "b",
         "effects": [{ "type": "multiply_effect_duration", "value": 2.5 }]
       },
       {
@@ -78,6 +84,7 @@
         "name": "Deep Chill",
         "cost": 100,
         "description": "Greatly increases the potency of the slow effect.",
+        "path": "b",
         "effects": [{ "type": "multiply_effect_potency", "value": 1.8 }]
       },
       {
@@ -85,6 +92,7 @@
         "name": "Cryo-Shock",
         "cost": 130,
         "description": "Deals a burst of 25 damage when the slow is first applied.",
+        "path": "b",
         "effects": [{ "type": "add_on_apply_damage", "value": 25 }]
       },
       {
@@ -92,6 +100,7 @@
         "name": "Flash Freeze",
         "cost": 240,
         "description": "Has a chance to briefly stun targets already affected by the beacon's slow.",
+        "path": "b",
         "effects": [
           {
             "type": "add_conditional_effect",
@@ -108,6 +117,7 @@
         "name": "Absolute Zero",
         "cost": 420,
         "description": "The beam periodically releases a frost nova, slowing and damaging nearby enemies.",
+        "path": "b",
         "effects": [
           {
             "type": "add_area_effect_on_hit",

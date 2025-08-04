@@ -9,6 +9,7 @@
         "name": "Inspirational Tactics",
         "cost": 220,
         "description": "Significantly increases the potency of the Damage Boost aura.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -25,6 +26,7 @@
         "name": "Rallying Cry",
         "cost": 350,
         "description": "Unlocks and buffs a Fire Rate Boost aura.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -43,6 +45,7 @@
         "name": "Expanded Command",
         "cost": 480,
         "description": "Increases the aura's radius by 30.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -59,6 +62,7 @@
         "name": "Decisive Strategy",
         "cost": 800,
         "description": "Greatly increases the potency of the Damage and Fire Rate Boost auras.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -83,6 +87,7 @@
         "name": "Supreme Commander",
         "cost": 2500,
         "description": "Massively increases the potency of all offensive buffs and further extends the aura's range.",
+        "path": "a",
         "effects": [
           {
             "type": "modify_nested",
@@ -121,6 +126,7 @@
         "name": "Advanced Optics",
         "cost": 200,
         "description": "Unlocks and buffs a Range Boost aura.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_nested",
@@ -137,6 +143,7 @@
         "name": "Signal Flares",
         "cost": 300,
         "description": "Increases the aura's radius by 40.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_nested",
@@ -153,6 +160,7 @@
         "name": "Reinforced Positions",
         "cost": 550,
         "description": "Greatly increases the potency of the Range Boost aura.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_nested",
@@ -169,6 +177,7 @@
         "name": "Battlefield Control",
         "cost": 900,
         "description": "Dramatically increases the aura's radius.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_nested",
@@ -185,6 +194,7 @@
         "name": "Total War",
         "cost": 2800,
         "description": "The Commander's presence is felt across the battlefield, providing a significant boost to all stats for all towers in its massive radius.",
+        "path": "b",
         "effects": [
           {
             "type": "modify_nested",

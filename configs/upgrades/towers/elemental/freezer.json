@@ -8,6 +8,7 @@
         "name": "Permafrost",
         "cost": 60,
         "description": "Increases the duration of the slow effect by 1.5 seconds.",
+        "path": "a",
         "effects": [{ "type": "multiply_effect_duration", "value": 1.75 }]
       },
       {
@@ -15,6 +16,7 @@
         "name": "Cryo-Coolant",
         "cost": 80,
         "description": "Increases the potency of the slow effect.",
+        "path": "a",
         "effects": [{ "type": "multiply_effect_potency", "value": 1.25 }]
       },
       {
@@ -22,6 +24,7 @@
         "name": "Brittle Cold",
         "cost": 150,
         "description": "Frozen enemies take 40% more damage from all sources.",
+        "path": "a",
         "effects": [
           {
             "type": "add_effect",
@@ -38,6 +41,7 @@
         "name": "Flash Freeze",
         "cost": 200,
         "description": "Has a chance to briefly stun the target.",
+        "path": "a",
         "effects": [
           {
             "type": "add_effect",
@@ -55,6 +59,7 @@
         "name": "Shatter",
         "cost": 250,
         "description": "Enemies that die while slowed explode, applying a powerful vulnerability to nearby enemies.",
+        "path": "a",
         "effects": [
           {
             "type": "add_on_death_explosion",
@@ -77,6 +82,7 @@
         "name": "Sharpened Icicles",
         "cost": 50,
         "description": "Increases damage by 4.",
+        "path": "b",
         "effects": [{ "type": "add_damage", "value": 4 }]
       },
       {
@@ -84,6 +90,7 @@
         "name": "Rapid Condenser",
         "cost": 75,
         "description": "Increases fire rate by 30%.",
+        "path": "b",
         "effects": [{ "type": "multiply_fire_rate", "value": 1.3 }]
       },
       {
@@ -91,6 +98,7 @@
         "name": "Piercing Shards",
         "cost": 110,
         "description": "Projectiles now pierce through two enemies.",
+        "path": "b",
         "effects": [{ "type": "set_pierce", "value": 2 }]
       },
       {
@@ -98,6 +106,7 @@
         "name": "Jagged Ice",
         "cost": 150,
         "description": "Further increases damage by 8.",
+        "path": "b",
         "effects": [{ "type": "add_damage", "value": 8 }]
       },
       {
@@ -105,6 +114,7 @@
         "name": "Glacial Lance",
         "cost": 240,
         "description": "Final upgrade. Massively increases damage and range.",
+        "path": "b",
         "effects": [
           { "type": "add_damage", "value": 20 },
           { "type": "add_range", "value": 60 }

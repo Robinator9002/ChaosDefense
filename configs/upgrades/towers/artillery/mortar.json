@@ -9,6 +9,7 @@
         "name": "High-Explosive Payload",
         "cost": 110,
         "description": "Increases shell damage by 15.",
+        "path": "a",
         "effects": [{ "type": "add_damage", "value": 15 }]
       },
       {
@@ -16,6 +17,7 @@
         "name": "Improved Propellant",
         "cost": 150,
         "description": "Increases attack range by 50.",
+        "path": "a",
         "effects": [{ "type": "add_range", "value": 50 }]
       },
       {
@@ -23,6 +25,7 @@
         "name": "Shrapnel Shells",
         "cost": 220,
         "description": "Explosions cause enemies to bleed, taking significant damage over time.",
+        "path": "a",
         "effects": [
           {
             "type": "add_blast_effect",
@@ -35,6 +38,7 @@
         "name": "The Big One",
         "cost": 300,
         "description": "Massively increases shell damage by 50.",
+        "path": "a",
         "effects": [{ "type": "add_damage", "value": 50 }]
       },
       {
@@ -42,6 +46,7 @@
         "name": "Napalm Coating",
         "cost": 450,
         "description": "Explosions now also ignite enemies, dealing further damage over time.",
+        "path": "a",
         "effects": [
           {
             "type": "add_blast_effect",
@@ -60,6 +65,7 @@
         "name": "Improved Loading",
         "cost": 120,
         "description": "Increases fire rate by 10%.",
+        "path": "b",
         "effects": [{ "type": "multiply_fire_rate", "value": 1.1 }]
       },
       {
@@ -67,6 +73,7 @@
         "name": "Concussion Shells",
         "cost": 180,
         "description": "Explosions now briefly stun all enemies in the blast.",
+        "path": "b",
         "effects": [
           {
             "type": "add_blast_effect",
@@ -83,6 +90,7 @@
         "name": "Autoloader",
         "cost": 240,
         "description": "Increases fire rate by another 15%.",
+        "path": "b",
         "effects": [{ "type": "multiply_fire_rate", "value": 1.15 }]
       },
       {
@@ -90,6 +98,7 @@
         "name": "Vulnerability Payload",
         "cost": 320,
         "description": "Shells now make enemies vulnerable, causing them to take 20% increased damage from all sources.",
+        "path": "b",
         "effects": [
           {
             "type": "add_blast_effect",
@@ -106,6 +115,7 @@
         "cost": 480,
         "name": "Orbital Targeting",
         "description": "Final upgrade. Grants a significant boost to fire rate.",
+        "path": "b",
         "effects": [{ "type": "multiply_fire_rate", "value": 1.25 }]
       }
     ]
