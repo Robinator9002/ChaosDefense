@@ -22,11 +22,6 @@ class UpgradeManager:
         Initializes the UpgradeManager.
         """
         self.definitions: Dict[str, Dict[str, list[Upgrade]]] = {}
-        # --- MODIFIED: Registered the missing effect handler (Issue #13) ---
-        # By adding 'multiply_effect_duration' to this dictionary, we connect the
-        # upgrade data from the JSON files to the actual game logic that
-        # applies the effect. This fixes the bug where duration-modifying
-        # upgrades were having no effect.
         self._effect_handlers: Dict[str, Callable[["Tower", Any], None]] = {
             "modify_attack_data": effect_applicators.modify_attack_data,
             "modify_nested": effect_applicators.modify_nested_property,
@@ -81,8 +76,13 @@ class UpgradeManager:
             if 0 <= current_tier < len(path_upgrades):
                 return path_upgrades[current_tier]
         except KeyError:
-            logger.error(
-                f"Invalid tower_type_id '{tower.tower_type_id}' or path_id '{path_id}' for upgrade lookup."
+            # --- FIX: Elevated log level to CRITICAL for silent failures (Issue #7) ---
+            # If an upgrade path cannot be found, it's a critical data error
+            # that breaks gameplay for that tower. Logging this as CRITICAL
+            # makes it much more visible during development and testing,
+            # preventing these issues from going unnoticed.
+            logger.critical(
+                f"Invalid tower_type_id '{tower.tower_type_id}' or path_id '{path_id}' for upgrade lookup. This is likely a typo in a JSON config file."
             )
             return None
         return None
