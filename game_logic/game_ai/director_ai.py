@@ -10,8 +10,6 @@ if TYPE_CHECKING:
     from ..entities.enemies.enemy import Enemy
     from ..entities.tower import Tower
     from ..game_state import GameState
-    from ..waves.wave_state import WaveState
-    from .waves.wave_composer import WaveComposer, Squad
 
 # Get a logger instance for this module
 logger = logging.getLogger(__name__)
@@ -22,6 +20,10 @@ class DirectorAI:
     The master intelligence of the game, responsible for observing the player's
     strategy and dynamically composing enemy waves to create a challenging and
     reactive experience.
+
+    This class acts as a "Director" in a movie, deciding which "actors" (enemies)
+    to send, where to send them, and when, based on the unfolding "scene" of
+    the game.
     """
 
     def __init__(
@@ -29,16 +31,26 @@ class DirectorAI:
     ):
         """
         Initializes the Director AI.
+
+        Args:
+            difficulty_settings (Dict[str, Any]): The configuration for the
+                current player-selected difficulty (e.g., from difficulty_scaling.json).
+            wave_scaling_config (Dict[str, Any]): The configuration for how
+                waves scale over time (from wave_scaling.json).
         """
         self.difficulty_settings = difficulty_settings
         self.wave_scaling_config = wave_scaling_config
+
+        # --- Intelligence Data Stores ---
         self.enemy_performance_stats: Dict[str, Dict[str, int]] = {}
         self.path_threat_analysis: Dict[int, Dict[str, float]] = {}
+
         logger.info("Director AI initialized. The stage is set.")
 
     def record_enemy_death(self, enemy: "Enemy"):
         """
         Records that an enemy was successfully defeated by the player.
+        This is a key feedback metric indicating the player's strengths.
         """
         enemy_type = enemy.enemy_type_id
         if enemy_type not in self.enemy_performance_stats:
@@ -51,6 +63,7 @@ class DirectorAI:
     def record_enemy_leak(self, enemy: "Enemy"):
         """
         Records that an enemy successfully reached the end of the path.
+        This is a key feedback metric indicating the player's weaknesses.
         """
         enemy_type = enemy.enemy_type_id
         if enemy_type not in self.enemy_performance_stats:
@@ -71,28 +84,26 @@ class DirectorAI:
 
         for i, path in enumerate(paths):
             path_threat = 0.0
-            path_points = [pygame.Vector2(p[0] * 32 + 16, p[1] * 32 + 16) for p in path]
+            path_points = [pygame.Vector2(p[0], p[1]) for p in path]
 
             for tower in towers.values():
+                # Check if the tower can hit any part of this path
                 can_hit_path = False
-                for point in path_points[::5]:  # Check every 5th point for efficiency
+                # Sample points along the path for efficiency
+                for point in path_points[::5]:  # Check every 5th point
                     if tower.pos.distance_to(point) <= tower.range:
                         can_hit_path = True
                         break
 
                 if can_hit_path:
+                    # Calculate a heuristic threat score for the tower
                     dps = tower.damage * tower.fire_rate
+                    # Add value for AoE and special abilities
                     threat = dps * (1 + (tower.blast_radius / 100))
                     if tower.armor_shred > 0:
                         threat *= 1.2
-
-                    # --- FIX: Correctly check for crowd-control effects (Issue #15) ---
-                    # The original check was syntactically incorrect. This now properly
-                    # iterates through the keys of the tower's effects dictionary
-                    # to identify crowd-control towers and weigh them appropriately.
-                    if any("slow" in effect_id for effect_id in tower.effects):
+                    if any("slow" in effect for effect in tower.effects):
                         threat *= 1.1
-
                     path_threat += threat
 
             self.path_threat_analysis[i] = {"threat_score": path_threat}
@@ -100,18 +111,21 @@ class DirectorAI:
         logger.info(f"AI Defense Analysis complete: {self.path_threat_analysis}")
 
     def compose_next_wave(
-        self,
-        wave_state: "WaveState",
-        enemy_pool: Dict[str, Any],
-        wave_composer: "WaveComposer",
-    ) -> Optional[List[Squad]]:
+        self, game_state: "GameState", enemy_pool: Dict[str, Any]
+    ) -> Optional[List[Dict]]:
         """
         The core decision-making function of the AI. Based on all gathered
         intelligence, it composes the list of spawn jobs for the next wave.
         """
-        if wave_state.current_wave_number < 3:
+        # For now, we will let the AI "sleep" for the first few waves to let
+        # the player get established.
+        if game_state.current_wave_number < 3:
             return None
 
         # This is where the core heuristic logic will live.
-        # For now, we'll use the composer to create a balanced wave.
-        return wave_composer.compose_wave(wave_state, self)
+        # It will use self.enemy_performance_stats and self.path_threat_analysis
+        # to make intelligent decisions via the WaveComposer.
+
+        # For now, we return None to use the fallback generator.
+        # In the next phase, this will return a full wave plan.
+        return None
