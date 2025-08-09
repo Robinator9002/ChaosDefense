@@ -1,5 +1,5 @@
 // frontend/src/components/HUD/BuildBar.tsx
-import type { InitialStateData } from '../../api/types';
+import type { InitialStateData } from '../../../api/types';
 
 // --- Prop Types ---
 interface BuildBarProps {
