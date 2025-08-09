@@ -4,6 +4,11 @@ import { fileURLToPath } from 'url'; // Add this for __dirname
 // Check if we are in development mode (Vite Dev Server) or production mode (built files)
 import isDev from 'electron-is-dev';
 
+// --- Disable Hardware Acceleration ---
+// This is a critical fix for certain Linux/Nvidia driver configurations.
+// It prevents GPU-related crashes when rendering complex content like a canvas.
+app.disableHardwareAcceleration();
+
 // --- GTK Version Fix for Electron 36+ on GNOME ---
 // Sets GTK version to 3 to avoid conflicts because Electron 36+
 // uses GTK 4 by default on GNOME, which can cause problems

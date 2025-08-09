@@ -1,31 +1,38 @@
 // frontend/src/App.tsx
-import { useGameStore } from './state/gameStore';
+import { useGameStore, AppScreen } from './state/gameStore';
 import { useGameWebSocket } from './hooks/useGameWebSocket';
 
 // --- Local Imports ---
 import GameCanvas from './components/Canvas/GameCanvas';
 import HUD from './components/HUD/HUD';
+import MainMenu from './components/Menus/Screens/MainMenu';
 
 function App() {
-    // --- State Management ---
-    // We no longer manage state here. Instead, we select what we need from the global store.
-    // This subscription is efficient; the component only re-renders if these specific values change.
-    const { isConnected, initialState, entities } = useGameStore((state: any) => ({
-        isConnected: state.isConnected,
-        initialState: state.initialState,
-        entities: state.entities,
-    }));
-
-    // --- WebSocket Connection ---
-    // This single line initializes our custom hook. The hook will handle all
-    // WebSocket logic in the background and automatically update the gameStore.
-    useGameWebSocket();
+    // This selector is safe because it only selects a single primitive value.
+    const activeScreen = useGameStore((state) => state.activeScreen);
 
     // --- Rendering Logic ---
-    // The rendering logic is now much simpler. It just reads from the store
-    // and decides what to show. It doesn't need to pass any props down.
     return (
-        <main className="w-screen h-screen bg-gray-800 overflow-hidden relative">
+        <main className="w-screen h-screen bg-gray-900 text-white overflow-hidden relative font-mono">
+            {activeScreen === AppScreen.MainMenu && <MainMenu />}
+            {activeScreen === AppScreen.InGame && <GameUI />}
+        </main>
+    );
+}
+
+// --- GameUI Component ---
+const GameUI = () => {
+    // FIX: Select each piece of state individually. This prevents the infinite
+    // re-render loop because primitives (and stable objects) are compared correctly.
+    const isConnected = useGameStore((state) => state.isConnected);
+    const initialState = useGameStore((state) => state.initialState);
+    const entities = useGameStore((state) => state.entities);
+
+    // The WebSocket hook is only called when we are in-game.
+    useGameWebSocket();
+
+    return (
+        <>
             {initialState && entities ? (
                 <>
                     <GameCanvas />
@@ -40,8 +47,8 @@ function App() {
                     </p>
                 </div>
             )}
-        </main>
+        </>
     );
-}
+};
 
 export default App;
