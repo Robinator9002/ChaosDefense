@@ -83,14 +83,16 @@ const EntityShape = ({
 };
 
 const GameCanvas = () => {
-    const { initialState, entities, selectedEntityId, setSelectedEntityId, clearSelections } =
-        useGameStore((state) => ({
-            initialState: state.initialState,
-            entities: state.entities,
-            selectedEntityId: state.selectedEntityId,
-            setSelectedEntityId: state.setSelectedEntityId,
-            clearSelections: state.clearSelections,
-        }));
+    // --- STATE SELECTION FIX ---
+    // This is the definitive fix for the infinite loop. By selecting each
+    // piece of state individually, we provide stable values to React,
+    // preventing the component from re-rendering unless the data it
+    // actually depends on changes.
+    const initialState = useGameStore((state) => state.initialState);
+    const entities = useGameStore((state) => state.entities);
+    const selectedEntityId = useGameStore((state) => state.selectedEntityId);
+    const setSelectedEntityId = useGameStore((state) => state.setSelectedEntityId);
+    const clearSelections = useGameStore((state) => state.clearSelections);
 
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
     const [stageScale, setStageScale] = useState(1);
