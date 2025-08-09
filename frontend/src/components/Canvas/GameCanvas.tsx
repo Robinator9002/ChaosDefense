@@ -1,11 +1,6 @@
 // frontend/src/components/Canvas/GameCanvas.tsx
 import { Stage, Layer, Rect, Circle } from 'react-konva';
-import type { InitialStateData, EntitiesPayload } from '../../api/types'; // We'll move types to a dedicated file soon
-
-interface GameCanvasProps {
-    initialState: InitialStateData | null;
-    entities: EntitiesPayload | null;
-}
+import { useGameStore } from '../../state/gameStore';
 
 // A simple color map for different tile types. We can make this more robust later.
 const tileColorMap: { [key: string]: string } = {
@@ -21,21 +16,23 @@ const tileColorMap: { [key: string]: string } = {
 
 const TILE_SIZE = 32; // This should eventually come from config
 
-const GameCanvas = ({ initialState, entities }: GameCanvasProps) => {
+const GameCanvas = () => {
+    // Select the state needed for rendering directly from the store.
+    const { initialState, entities } = useGameStore((state) => ({
+        initialState: state.initialState,
+        entities: state.entities,
+    }));
+
+    // The parent App.tsx already ensures this component won't render if initialState is null,
+    // but this is a good safeguard.
     if (!initialState) {
-        // If we don't have the initial state yet, we can't render the map.
-        return (
-            <div className="w-full h-full bg-black flex items-center justify-center">
-                <p>Loading Map...</p>
-            </div>
-        );
+        return null;
     }
 
     const { grid } = initialState;
 
     return (
         <Stage width={window.innerWidth} height={window.innerHeight}>
-            {/* Layer for the static map grid */}
             <Layer>
                 {grid.tiles.map((tile) => (
                     <Rect
@@ -44,12 +41,11 @@ const GameCanvas = ({ initialState, entities }: GameCanvasProps) => {
                         y={tile.y * TILE_SIZE}
                         width={TILE_SIZE}
                         height={TILE_SIZE}
-                        fill={tileColorMap[tile.key] || '#ff00ff'} // Default to magenta for unknown tiles
+                        fill={tileColorMap[tile.key] || '#ff00ff'}
                     />
                 ))}
             </Layer>
 
-            {/* Layer for dynamic entities (towers, enemies, etc.) */}
             <Layer>
                 {entities?.towers.map((tower) => (
                     <Circle
