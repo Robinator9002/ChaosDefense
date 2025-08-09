@@ -10,7 +10,7 @@ function App() {
     // --- State Management ---
     // We no longer manage state here. Instead, we select what we need from the global store.
     // This subscription is efficient; the component only re-renders if these specific values change.
-    const { isConnected, initialState, entities } = useGameStore((state) => ({
+    const { isConnected, initialState, entities } = useGameStore((state: any) => ({
         isConnected: state.isConnected,
         initialState: state.initialState,
         entities: state.entities,

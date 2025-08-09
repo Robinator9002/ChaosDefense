@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "react-konva": "^19.0.7"
+    "concurrently": "^9.2.0"
   }
 }
