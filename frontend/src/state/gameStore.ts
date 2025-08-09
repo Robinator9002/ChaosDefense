@@ -2,9 +2,23 @@
 import { create } from 'zustand';
 import type { InitialStateData, GameStatePayload, EntitiesPayload } from '../api/types';
 
+// FIX: Replaced TypeScript enum with a plain object for better compatibility.
+// This resolves the 'erasableSyntaxOnly' error.
+export const AppScreen = {
+    MainMenu: 'MainMenu',
+    LevelSelect: 'LevelSelect',
+    Workshop: 'Workshop',
+    InGame: 'InGame',
+} as const;
+
+// Create a type from the object values for type safety.
+export type AppScreenType = (typeof AppScreen)[keyof typeof AppScreen];
+
 // --- State Interface ---
-// This defines the complete "shape" of our application's state.
 interface GameStoreState {
+    // App screen state
+    activeScreen: AppScreenType; // Use the new type
+
     // Data from the server
     initialState: InitialStateData | null;
     gameState: GameStatePayload | null;
@@ -12,21 +26,23 @@ interface GameStoreState {
     isConnected: boolean;
 
     // Client-side UI state
-    selectedTowerToBuild: string | null; // The ID of the tower type the player wants to build
-    selectedEntityId: string | null; // The ID of an entity (tower) already placed on the map
+    selectedTowerToBuild: string | null;
+    selectedEntityId: string | null;
 
-    // Actions (functions to modify the state)
+    // Actions
+    setActiveScreen: (screen: AppScreenType) => void; // Use the new type
     setConnectionStatus: (status: boolean) => void;
     setInitialState: (data: InitialStateData) => void;
     setGameTickState: (gameState: GameStatePayload, entities: EntitiesPayload) => void;
     selectTowerToBuild: (towerId: string | null) => void;
-    setSelectedEntityId: (entityId: string | null) => void; // New action
-    clearSelections: () => void; // New utility action
+    setSelectedEntityId: (entityId: string | null) => void;
+    clearSelections: () => void;
 }
 
 // --- Store Creation ---
 export const useGameStore = create<GameStoreState>((set) => ({
     // --- Initial Values ---
+    activeScreen: AppScreen.MainMenu, // Start on the main menu
     initialState: null,
     gameState: null,
     entities: null,
@@ -35,6 +51,8 @@ export const useGameStore = create<GameStoreState>((set) => ({
     selectedEntityId: null,
 
     // --- Actions Implementation ---
+    setActiveScreen: (screen) => set({ activeScreen: screen }),
+
     setConnectionStatus: (status) => set({ isConnected: status }),
 
     setInitialState: (data) => set({ initialState: data }),
@@ -43,17 +61,14 @@ export const useGameStore = create<GameStoreState>((set) => ({
 
     selectTowerToBuild: (towerId) =>
         set(() => {
-            // When selecting a tower to build, we must clear any selected entity.
             return { selectedTowerToBuild: towerId, selectedEntityId: null };
         }),
 
     setSelectedEntityId: (entityId) =>
         set((state) => {
-            // If the same entity is clicked again, deselect it.
             if (state.selectedEntityId === entityId) {
                 return { selectedEntityId: null };
             }
-            // When selecting an entity, we must clear any tower-to-build selection.
             return { selectedEntityId: entityId, selectedTowerToBuild: null };
         }),
 
