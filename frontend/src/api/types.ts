@@ -19,8 +19,18 @@ export interface Enemy extends GameEntity {
     max_hp: number;
 }
 
+// --- MODIFIED: Tower type is now correctly defined with all properties ---
 export interface Tower extends GameEntity {
+    name: string;
     range: number;
+    path_a_tier: number;
+    path_b_tier: number;
+    stats: {
+        damage: number;
+        fire_rate: number;
+        blast_radius: number;
+        pierce: number;
+    };
 }
 
 export interface Projectile extends GameEntity {}
@@ -53,6 +63,17 @@ interface BuildableTower {
     cost: number;
 }
 
+// NEW: Type definition for an upgrade from the config
+export interface UpgradeDefinition {
+    id: string;
+    name: string;
+    description: string;
+    cost: number;
+    path: 'a' | 'b';
+    effects: any[]; // Can be defined more strictly later if needed
+}
+
+// --- MODIFIED: InitialStateData now correctly includes upgrade_definitions ---
 export interface InitialStateData {
     grid: {
         width: number;
@@ -61,4 +82,5 @@ export interface InitialStateData {
     };
     paths: Vector2[][];
     buildable_towers: BuildableTower[];
+    upgrade_definitions: { [towerTypeId: string]: { [upgradeId: string]: UpgradeDefinition } };
 }
