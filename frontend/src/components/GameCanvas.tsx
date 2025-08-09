@@ -1,6 +1,6 @@
 // frontend/src/components/Canvas/GameCanvas.tsx
 import { Stage, Layer, Rect, Circle } from 'react-konva';
-import type { InitialStateData, EntitiesPayload } from '../../api/types'; // We'll move types to a dedicated file soon
+import type { InitialStateData, EntitiesPayload } from '../api/types'; // We'll move types to a dedicated file soon
 
 interface GameCanvasProps {
     initialState: InitialStateData | null;

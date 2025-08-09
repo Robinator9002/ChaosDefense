@@ -1,5 +1,5 @@
 // frontend/src/components/HUD/TopBar.tsx
-import type { GameStatePayload } from '../api/types';
+import type { GameStatePayload } from '../../api/types';
 
 // --- Prop Types ---
 interface TopBarProps {

@@ -1,5 +1,5 @@
 // frontend/src/components/HUD/HUD.tsx
-import type { GameStatePayload, InitialStateData } from '../api/types';
+import type { GameStatePayload, InitialStateData } from '../../api/types';
 
 // --- Prop Types ---
 interface HUDProps {
