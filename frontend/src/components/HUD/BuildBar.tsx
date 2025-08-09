@@ -24,7 +24,7 @@ const BuildBar = ({ initialState }: BuildBarProps) => {
             {/* TODO: Add tab buttons for tower categories */}
 
             {/* Map over the buildable towers received from the backend */}
-            {initialState.buildable_towers.map((tower: any) => (
+            {initialState.buildable_towers.map((tower) => (
                 <button
                     key={tower.id}
                     onClick={() => handleTowerSelect(tower.id)}
