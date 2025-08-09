@@ -18,18 +18,18 @@ const tileColorMap: { [key: string]: string } = {
 const TILE_SIZE = 32; // This should eventually come from config
 
 const GameCanvas = () => {
-    // Select the state needed for rendering directly from the store.
-    // We now also need the selectedEntityId to highlight the selected tower,
-    // and the action to update it.
-    const { initialState, entities, selectedEntityId, setSelectedEntityId, clearSelections } =
-        useGameStore((state) => ({
-            initialState: state.initialState,
-            entities: state.entities,
-            selectedEntityId: state.selectedEntityId,
-            setSelectedEntityId: state.setSelectedEntityId,
-            clearSelections: state.clearSelections,
-        }));
+    // --- State Selection ---
+    // FIX: Select each piece of state individually. This is the critical change
+    // that prevents the infinite re-render loop. By selecting primitive values
+    // or stable references, we ensure the component only re-renders when the
+    // data it actually uses has changed.
+    const initialState = useGameStore((state) => state.initialState);
+    const entities = useGameStore((state) => state.entities);
+    const selectedEntityId = useGameStore((state) => state.selectedEntityId);
+    const setSelectedEntityId = useGameStore((state) => state.setSelectedEntityId);
+    const clearSelections = useGameStore((state) => state.clearSelections);
 
+    // --- Event Handlers ---
     const handleStageClick = () => {
         // When the stage (background) is clicked, clear any selections.
         clearSelections();
@@ -51,8 +51,10 @@ const GameCanvas = () => {
         }
     };
 
+    // --- Render Logic ---
+    // If we don't have the initial grid data, we can't render the map.
     if (!initialState) {
-        return null;
+        return null; // Render nothing until the data is ready.
     }
 
     const { grid } = initialState;
@@ -64,6 +66,7 @@ const GameCanvas = () => {
             onClick={handleStageClick}
             onTap={handleStageClick}
         >
+            {/* Layer for the static map tiles */}
             <Layer>
                 {grid.tiles.map((tile) => (
                     <Rect
@@ -72,12 +75,14 @@ const GameCanvas = () => {
                         y={tile.y * TILE_SIZE}
                         width={TILE_SIZE}
                         height={TILE_SIZE}
-                        fill={tileColorMap[tile.key] || '#ff00ff'}
+                        fill={tileColorMap[tile.key] || '#ff00ff'} // Use a bright color for unknown tiles
                     />
                 ))}
             </Layer>
 
+            {/* Layer for all dynamic game entities (towers, enemies, etc.) */}
             <Layer>
+                {/* Render Towers */}
                 {entities?.towers.map((tower) => {
                     const isSelected = tower.id === selectedEntityId;
                     return (
@@ -105,6 +110,7 @@ const GameCanvas = () => {
                         />
                     );
                 })}
+                {/* Render Enemies */}
                 {entities?.enemies.map((enemy) => (
                     <Rect
                         key={enemy.id}
