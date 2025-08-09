@@ -1,4 +1,4 @@
-# backend/game_loop_handler.py
+# backend/websockets/handlers/game_loop_handler.py
 import asyncio
 import json
 import logging
@@ -8,8 +8,6 @@ from typing import Dict, Any, List
 from fastapi import WebSocket
 
 # --- Project-Specific Imports ---
-# These imports are necessary to access the game's core classes and data structures.
-# We need to know the 'shape' of these objects to serialize them correctly.
 from game_logic.game_manager import GameManager
 from game_logic.entities.tower import Tower
 from game_logic.entities.enemies.enemy import Enemy
@@ -18,19 +16,16 @@ from game_logic.entities.projectiles.persistent_ground_aura import PersistentGro
 from game_logic.entities.projectiles.persistent_attached_aura import (
     PersistentAttachedAura,
 )
+from ..connection_manager import ConnectionManager
+
 
 logger = logging.getLogger(__name__)
 
 # --- Serialization Functions ---
-# These functions are the core of the "translation" process. They take complex
-# Python objects from your game and turn them into simple dictionaries that can
-# be easily converted to JSON.
 
 
 def serialize_vector(vector) -> Dict[str, float]:
     """Serializes a pygame.Vector2 into a dictionary."""
-    # Pygame is not imported here, so we access x and y attributes directly.
-    # This works because your game logic uses Vector2-like objects.
     return {"x": vector.x, "y": vector.y}
 
 
@@ -47,13 +42,26 @@ def serialize_enemy(enemy: Enemy) -> Dict[str, Any]:
 
 
 def serialize_tower(tower: Tower) -> Dict[str, Any]:
-    """Serializes a Tower object into a JSON-friendly dictionary."""
+    """
+    --- MODIFIED ---
+    Serializes a Tower object with enriched data for the UpgradePanel.
+    """
     return {
         "id": str(tower.entity_id),
         "type_id": tower.tower_type_id,
+        "name": tower.name,  # NEW: Added for display
         "pos": serialize_vector(tower.pos),
-        "range": tower.range,  # For drawing range indicators on the frontend
+        "range": tower.range,
         "is_alive": tower.is_alive,
+        "path_a_tier": tower.path_a_tier,  # NEW: For upgrade logic
+        "path_b_tier": tower.path_b_tier,  # NEW: For upgrade logic
+        # NEW: Sending live stats for display
+        "stats": {
+            "damage": tower.damage,
+            "fire_rate": tower.fire_rate,
+            "blast_radius": tower.blast_radius,
+            "pierce": tower.pierce_count,
+        },
     }
 
 
@@ -61,8 +69,6 @@ def serialize_projectile(
     proj: Projectile | PersistentGroundAura | PersistentAttachedAura,
 ) -> Dict[str, Any]:
     """Serializes any projectile-like entity into a JSON-friendly dictionary."""
-    # This simple serialization works for most visual needs.
-    # We can add more specific fields if the frontend requires them.
     return {
         "id": str(proj.entity_id),
         "pos": serialize_vector(proj.pos),
@@ -71,13 +77,8 @@ def serialize_projectile(
 
 
 def serialize_full_game_state(game_manager: GameManager) -> str:
-    """
-    Creates the master 'game_tick' JSON payload by serializing all relevant
-    parts of the current game state.
-    """
+    """Creates the master 'game_tick' JSON payload."""
     gm_state = game_manager.game_state
-
-    # The main payload structure, as defined in our API contract.
     payload = {
         "type": "game_tick",
         "data": {
@@ -97,27 +98,23 @@ def serialize_full_game_state(game_manager: GameManager) -> str:
             },
         },
     }
-    # json.dumps converts the Python dictionary into a JSON string.
     return json.dumps(payload)
 
 
 def serialize_initial_state(game_manager: GameManager) -> str:
     """
-    Creates the 'initial_state' JSON payload sent once at the beginning
-    of a game session.
+    --- MODIFIED ---
+    Creates the 'initial_state' JSON payload, now including upgrade definitions.
     """
     grid = game_manager.grid
-
-    # Extract tile data into a simple list of dictionaries
     tiles_data = []
     if grid:
         for y in range(grid.height):
             for x in range(grid.width):
                 tile = grid.get_tile(x, y)
                 if tile:
-                    tiles_data.append({"x": tile.x, "y": tile.y, "key": tile.tile_key})
+                    tiles_data.append({"x": tile.x, "y": tile.y, "key": tile.key})
 
-    # Get buildable tower info (ID, name, cost) for the UI
     buildable_towers_info = []
     buildable_ids = game_manager.get_buildable_towers()
     all_tower_configs = game_manager.configs.get("tower_types", {})
@@ -142,6 +139,8 @@ def serialize_initial_state(game_manager: GameManager) -> str:
             },
             "paths": game_manager.paths,
             "buildable_towers": buildable_towers_info,
+            # NEW: Send all upgrade definitions so the frontend can display them.
+            "upgrade_definitions": game_manager.configs.get("upgrade_definitions", {}),
         },
     }
     return json.dumps(payload)
@@ -149,19 +148,12 @@ def serialize_initial_state(game_manager: GameManager) -> str:
 
 # --- Game Loop Handler ---
 async def game_loop(
-    websocket: WebSocket, game_manager: GameManager, client_id: str, manager
+    websocket: WebSocket,
+    game_manager: GameManager,
+    client_id: str,
+    manager: ConnectionManager,
 ):
-    """
-    The main loop for a single game instance. It runs the simulation,
-    serializes the state, and sends it to the client.
-
-    Args:
-        websocket (WebSocket): The client's WebSocket connection.
-        game_manager (GameManager): The instance of the game engine for this session.
-        client_id (str): The unique ID of the connected client.
-        manager: The ConnectionManager instance to send messages through.
-    """
-    # Send the initial state payload once.
+    """The main loop for a single game instance."""
     logger.info(f"Sending initial state to client {client_id}...")
     initial_state_json = serialize_initial_state(game_manager)
     await manager.send_personal_message(initial_state_json, client_id)
@@ -169,21 +161,13 @@ async def game_loop(
 
     last_time = time.perf_counter()
     while not game_manager.game_state.game_over and not game_manager.game_state.victory:
-        # Calculate delta time (dt) for smooth, frame-rate independent physics.
         current_time = time.perf_counter()
         dt = current_time - last_time
         last_time = current_time
 
-        # 1. Update the game simulation by one step.
         game_manager.update(dt)
-
-        # 2. Serialize the entire new game state into a JSON string.
         state_json = serialize_full_game_state(game_manager)
-
-        # 3. Send the new state to the client.
         await manager.send_personal_message(state_json, client_id)
-
-        # 4. Sleep to maintain a consistent update rate (~60 ticks per second).
         await asyncio.sleep(1 / 60)
 
     logger.info(f"Game over for client {client_id}. Loop terminated.")
