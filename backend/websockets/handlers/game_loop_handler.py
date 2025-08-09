@@ -42,20 +42,16 @@ def serialize_enemy(enemy: Enemy) -> Dict[str, Any]:
 
 
 def serialize_tower(tower: Tower) -> Dict[str, Any]:
-    """
-    --- MODIFIED ---
-    Serializes a Tower object with enriched data for the UpgradePanel.
-    """
+    """Serializes a Tower object with enriched data for the UpgradePanel."""
     return {
         "id": str(tower.entity_id),
         "type_id": tower.tower_type_id,
-        "name": tower.name,  # NEW: Added for display
+        "name": tower.name,
         "pos": serialize_vector(tower.pos),
         "range": tower.range,
         "is_alive": tower.is_alive,
-        "path_a_tier": tower.path_a_tier,  # NEW: For upgrade logic
-        "path_b_tier": tower.path_b_tier,  # NEW: For upgrade logic
-        # NEW: Sending live stats for display
+        "path_a_tier": tower.path_a_tier,
+        "path_b_tier": tower.path_b_tier,
         "stats": {
             "damage": tower.damage,
             "fire_rate": tower.fire_rate,
@@ -102,10 +98,7 @@ def serialize_full_game_state(game_manager: GameManager) -> str:
 
 
 def serialize_initial_state(game_manager: GameManager) -> str:
-    """
-    --- MODIFIED ---
-    Creates the 'initial_state' JSON payload, now including upgrade definitions.
-    """
+    """Creates the 'initial_state' JSON payload, now including upgrade definitions."""
     grid = game_manager.grid
     tiles_data = []
     if grid:
@@ -113,7 +106,8 @@ def serialize_initial_state(game_manager: GameManager) -> str:
             for x in range(grid.width):
                 tile = grid.get_tile(x, y)
                 if tile:
-                    tiles_data.append({"x": tile.x, "y": tile.y, "key": tile.key})
+                    # FIX: Changed 'tile.key' to 'tile.tile_key' to match the Tile class attribute.
+                    tiles_data.append({"x": tile.x, "y": tile.y, "key": tile.tile_key})
 
     buildable_towers_info = []
     buildable_ids = game_manager.get_buildable_towers()
@@ -139,7 +133,6 @@ def serialize_initial_state(game_manager: GameManager) -> str:
             },
             "paths": game_manager.paths,
             "buildable_towers": buildable_towers_info,
-            # NEW: Send all upgrade definitions so the frontend can display them.
             "upgrade_definitions": game_manager.configs.get("upgrade_definitions", {}),
         },
     }
