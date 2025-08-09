@@ -2,38 +2,42 @@
 import { useGameStore } from '../../../state/gameStore';
 
 // --- Main TowerInfoPanel Component ---
+// This panel's purpose is to display key information about a tower
+// that the player is considering building.
 const TowerInfoPanel = () => {
-    // Select the necessary state from the global store.
-    // The component will automatically re-render when these values change.
-    const { selectedTowerId, buildableTowers } = useGameStore((state) => ({
-        selectedTowerId: state.selectedTowerToBuild,
-        buildableTowers: state.initialState?.buildable_towers,
-    }));
+    // --- State Selection ---
+    // FIX: Select each piece of state individually to prevent infinite re-renders.
+    const selectedTowerId = useGameStore((state) => state.selectedTowerToBuild);
+    const buildableTowers = useGameStore((state) => state.initialState?.buildable_towers);
 
     // If no tower is selected to be built, or if we don't have tower data yet,
-    // render nothing.
+    // we render nothing. This is a clean way to handle the absence of data.
     if (!selectedTowerId || !buildableTowers) {
         return null;
     }
 
-    // Find the full data object for the selected tower.
+    // --- Data Retrieval ---
+    // Find the full data object for the selected tower from the list of all
+    // buildable towers provided in the initial game state.
     const towerData = buildableTowers.find((t) => t.id === selectedTowerId);
 
-    // This is a safety check in case the ID is invalid.
+    // This is a crucial safety check. If, for some reason, the selected ID
+    // doesn't match any tower in our data, we render nothing to prevent a crash.
     if (!towerData) {
         return null;
     }
 
     return (
-        // This panel will appear on the right side of the screen.
+        // This panel will appear on the right side of the screen, styled to match
+        // the game's aesthetic.
         <div className="absolute top-4 right-4 w-80 bg-gray-900 bg-opacity-85 border-2 border-gray-700 rounded-lg shadow-2xl p-4 text-white font-mono flex flex-col gap-4">
-            {/* Header Section */}
+            {/* Header Section: Displays the tower's name and cost. */}
             <div className="flex justify-between items-center border-b-2 border-gray-700 pb-2">
                 <h2 className="text-xl font-bold text-blue-300">{towerData.name}</h2>
                 <span className="text-xl font-bold text-yellow-400">{towerData.cost}G</span>
             </div>
 
-            {/* Description Section (placeholder) */}
+            {/* Description Section */}
             <div>
                 <h3 className="text-md font-semibold text-gray-400 mb-1">Description</h3>
                 <p className="text-sm text-gray-300">
@@ -42,11 +46,11 @@ const TowerInfoPanel = () => {
                 </p>
             </div>
 
-            {/* Stats Section (placeholder) */}
+            {/* Stats Section */}
             <div>
                 <h3 className="text-md font-semibold text-gray-400 mb-2">Statistics</h3>
                 <div className="flex flex-col gap-1 text-sm">
-                    {/* TODO: Stats should come from the backend config */}
+                    {/* TODO: Stats should come from the backend config's tower_types definitions */}
                     <div className="flex justify-between">
                         <span>Damage:</span> <span>10</span>
                     </div>
