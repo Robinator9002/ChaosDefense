@@ -111,3 +111,12 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             read_task.cancel()
         manager.disconnect(client_id)
         logger.info(f"Session cleaned up for client {client_id}")
+
+
+# --- Main Execution Block ---
+# This block allows the application to be run directly for development.
+if __name__ == "__main__":
+    import uvicorn
+
+    logger.info(f"Starting M.A.L. API server (v{app.version}) for development...")
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True, workers=1)
