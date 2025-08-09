@@ -2,7 +2,7 @@
 import { Stage, Layer, Rect, Circle } from 'react-konva';
 import { useGameStore } from '../../state/gameStore';
 import Konva from 'konva';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 // --- Constants ---
 const TILE_SIZE = 32; // This should eventually come from config
@@ -33,13 +33,10 @@ const GameCanvas = () => {
     // --- Camera State ---
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
     const [stageScale, setStageScale] = useState(1);
-    const [isPanning, setIsPanning] = useState(false);
     const lastMousePos = useRef({ x: 0, y: 0 });
     const stageRef = useRef<Konva.Stage>(null);
 
     // --- Initial Camera Centering ---
-    // This effect runs once when the component mounts and has initial data.
-    // It calculates the best initial zoom and centers the map on the screen.
     useEffect(() => {
         if (initialState && stageRef.current) {
             const stage = stageRef.current;
@@ -66,7 +63,6 @@ const GameCanvas = () => {
         const stage = stageRef.current;
         const oldScale = stage.scaleX();
         const pointer = stage.getPointerPosition();
-
         if (!pointer) return;
 
         const mousePointTo = {
@@ -79,8 +75,8 @@ const GameCanvas = () => {
             MIN_ZOOM,
             Math.min(oldScale - delta * ZOOM_SENSITIVITY, MAX_ZOOM),
         );
-
         setStageScale(newScale);
+
         const newPos = {
             x: pointer.x - mousePointTo.x * newScale,
             y: pointer.y - mousePointTo.y * newScale,
@@ -88,42 +84,42 @@ const GameCanvas = () => {
         setStagePos(newPos);
     };
 
+    // --- Panning Logic ---
+    // FIX: Panning logic is now more robust. Mouse move and up listeners are
+    // attached to the window during a pan operation, ensuring they are always
+    // captured, even if the cursor leaves the canvas area.
+
+    const handlePanMove = useCallback((e: MouseEvent) => {
+        const newMousePos = { x: e.clientX, y: e.clientY };
+        const dx = newMousePos.x - lastMousePos.current.x;
+        const dy = newMousePos.y - lastMousePos.current.y;
+        lastMousePos.current = newMousePos;
+        setStagePos((prevPos) => ({ x: prevPos.x + dx, y: prevPos.y + dy }));
+    }, []);
+
+    const handlePanEnd = useCallback(() => {
+        window.removeEventListener('mousemove', handlePanMove);
+        window.removeEventListener('mouseup', handlePanEnd);
+    }, [handlePanMove]);
+
     const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-        // Middle mouse button for panning
+        // Middle mouse button (button === 1) initiates panning
         if (e.evt.button === 1) {
-            setIsPanning(true);
-            lastMousePos.current = { x: e.evt.clientX, y: e.evt.clientY };
             e.evt.preventDefault();
-        }
-    };
-
-    const handleMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
-        if (e.evt.button === 1) {
-            setIsPanning(false);
-        }
-    };
-
-    const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-        if (isPanning) {
-            const newMousePos = { x: e.evt.clientX, y: e.evt.clientY };
-            const dx = newMousePos.x - lastMousePos.current.x;
-            const dy = newMousePos.y - lastMousePos.current.y;
-            lastMousePos.current = newMousePos;
-            setStagePos((prevPos) => ({ x: prevPos.x + dx, y: prevPos.y + dy }));
+            lastMousePos.current = { x: e.evt.clientX, y: e.evt.clientY };
+            window.addEventListener('mousemove', handlePanMove);
+            window.addEventListener('mouseup', handlePanEnd, { once: true });
         }
     };
 
     const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-        // Clear selections only if the click was on the stage itself
         if (e.target === e.target.getStage()) {
             clearSelections();
         }
     };
 
     // --- Render Logic ---
-    if (!initialState) {
-        return null;
-    }
+    if (!initialState) return null;
 
     const { grid } = initialState;
 
@@ -138,8 +134,6 @@ const GameCanvas = () => {
             scaleY={stageScale}
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
-            onMouseMove={handleMouseMove}
             onClick={handleStageClick}
             onTap={handleStageClick}
         >
