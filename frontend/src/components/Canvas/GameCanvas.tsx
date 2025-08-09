@@ -3,14 +3,14 @@ import { Stage, Layer, Rect, Circle } from 'react-konva';
 import { useGameStore } from '../../state/gameStore';
 import Konva from 'konva';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import type { GameEntity } from '../../api/types';
 
 // --- Constants ---
-const TILE_SIZE = 32; // This should eventually come from config
+const TILE_SIZE = 32;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 3.0;
 const ZOOM_SENSITIVITY = 0.001;
 
-// A simple color map for different tile types.
 const tileColorMap: { [key: string]: string } = {
     BUILDABLE: '#3a5a40',
     PATH: '#582f0e',
@@ -22,88 +22,130 @@ const tileColorMap: { [key: string]: string } = {
     TREE: '#9ef01a',
 };
 
-const GameCanvas = () => {
-    // --- State Selection ---
-    const initialState = useGameStore((state) => state.initialState);
-    const entities = useGameStore((state) => state.entities);
-    const selectedEntityId = useGameStore((state) => state.selectedEntityId);
-    const setSelectedEntityId = useGameStore((state) => state.setSelectedEntityId);
-    const clearSelections = useGameStore((state) => state.clearSelections);
+// --- Performance Refactor ---
+// This component is the core of the performance optimization. Instead of re-rendering
+// the component declaratively, we create a Konva shape once and then update its
+// properties imperatively. This avoids the massive overhead of React's diffing
+// algorithm on every game tick.
+const EntityShape = ({
+    entity,
+    type,
+    scale,
+    isSelected,
+    onClick,
+}: {
+    entity: GameEntity;
+    type: 'tower' | 'enemy';
+    scale: number;
+    isSelected: boolean;
+    onClick: () => void;
+}) => {
+    const shapeRef = useRef<Konva.Circle | Konva.Rect>(null);
 
-    // --- Camera State ---
+    // Update position imperatively when entity data changes
+    useEffect(() => {
+        shapeRef.current?.position({ x: entity.pos.x, y: entity.pos.y });
+    }, [entity.pos.x, entity.pos.y]);
+
+    if (type === 'tower') {
+        return (
+            <Circle
+                ref={shapeRef as React.Ref<Konva.Circle>}
+                key={entity.id}
+                x={entity.pos.x}
+                y={entity.pos.y}
+                radius={TILE_SIZE / 2 - 4}
+                fill="#e9ecef"
+                stroke={isSelected ? '#facc15' : '#495057'}
+                strokeWidth={isSelected ? 4 / scale : 2 / scale}
+                shadowColor={isSelected ? '#facc15' : undefined}
+                shadowBlur={isSelected ? 10 : 0}
+                onClick={onClick}
+                onTap={onClick}
+            />
+        );
+    }
+
+    return (
+        <Rect
+            ref={shapeRef as React.Ref<Konva.Rect>}
+            key={entity.id}
+            x={entity.pos.x}
+            y={entity.pos.y}
+            width={TILE_SIZE * 0.8}
+            height={TILE_SIZE * 0.8}
+            fill="#e5383b"
+            cornerRadius={4}
+            offsetX={(TILE_SIZE * 0.8) / 2}
+            offsetY={(TILE_SIZE * 0.8) / 2}
+        />
+    );
+};
+
+const GameCanvas = () => {
+    const { initialState, entities, selectedEntityId, setSelectedEntityId, clearSelections } =
+        useGameStore((state) => ({
+            initialState: state.initialState,
+            entities: state.entities,
+            selectedEntityId: state.selectedEntityId,
+            setSelectedEntityId: state.setSelectedEntityId,
+            clearSelections: state.clearSelections,
+        }));
+
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
     const [stageScale, setStageScale] = useState(1);
     const lastMousePos = useRef({ x: 0, y: 0 });
     const stageRef = useRef<Konva.Stage>(null);
 
-    // --- Initial Camera Centering ---
     useEffect(() => {
         if (initialState && stageRef.current) {
             const stage = stageRef.current;
             const { grid } = initialState;
             const mapWidth = grid.width * TILE_SIZE;
             const mapHeight = grid.height * TILE_SIZE;
-
-            const scaleX = stage.width() / mapWidth;
-            const scaleY = stage.height() / mapHeight;
-            const initialScale = Math.min(scaleX, scaleY, MAX_ZOOM);
-            setStageScale(initialScale);
-
-            const initialX = (stage.width() - mapWidth * initialScale) / 2;
-            const initialY = (stage.height() - mapHeight * initialScale) / 2;
-            setStagePos({ x: initialX, y: initialY });
+            const scale = Math.min(stage.width() / mapWidth, stage.height() / mapHeight, MAX_ZOOM);
+            setStageScale(scale);
+            setStagePos({
+                x: (stage.width() - mapWidth * scale) / 2,
+                y: (stage.height() - mapHeight * scale) / 2,
+            });
         }
     }, [initialState]);
 
-    // --- Event Handlers ---
     const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
         e.evt.preventDefault();
-        if (!stageRef.current) return;
-
         const stage = stageRef.current;
+        if (!stage) return;
         const oldScale = stage.scaleX();
         const pointer = stage.getPointerPosition();
         if (!pointer) return;
-
         const mousePointTo = {
             x: (pointer.x - stage.x()) / oldScale,
             y: (pointer.y - stage.y()) / oldScale,
         };
-
-        const delta = e.evt.deltaY;
         const newScale = Math.max(
             MIN_ZOOM,
-            Math.min(oldScale - delta * ZOOM_SENSITIVITY, MAX_ZOOM),
+            Math.min(oldScale - e.evt.deltaY * ZOOM_SENSITIVITY, MAX_ZOOM),
         );
         setStageScale(newScale);
-
-        const newPos = {
+        setStagePos({
             x: pointer.x - mousePointTo.x * newScale,
             y: pointer.y - mousePointTo.y * newScale,
-        };
-        setStagePos(newPos);
+        });
     };
 
-    // --- Panning Logic ---
-    // FIX: Panning logic is now more robust. Mouse move and up listeners are
-    // attached to the window during a pan operation, ensuring they are always
-    // captured, even if the cursor leaves the canvas area.
-
     const handlePanMove = useCallback((e: MouseEvent) => {
-        const newMousePos = { x: e.clientX, y: e.clientY };
-        const dx = newMousePos.x - lastMousePos.current.x;
-        const dy = newMousePos.y - lastMousePos.current.y;
-        lastMousePos.current = newMousePos;
-        setStagePos((prevPos) => ({ x: prevPos.x + dx, y: prevPos.y + dy }));
+        const dx = e.clientX - lastMousePos.current.x;
+        const dy = e.clientY - lastMousePos.current.y;
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+        setStagePos((p) => ({ x: p.x + dx, y: p.y + dy }));
     }, []);
 
     const handlePanEnd = useCallback(() => {
         window.removeEventListener('mousemove', handlePanMove);
-        window.removeEventListener('mouseup', handlePanEnd);
     }, [handlePanMove]);
 
     const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-        // Middle mouse button (button === 1) initiates panning
         if (e.evt.button === 1) {
             e.evt.preventDefault();
             lastMousePos.current = { x: e.evt.clientX, y: e.evt.clientY };
@@ -113,15 +155,10 @@ const GameCanvas = () => {
     };
 
     const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-        if (e.target === e.target.getStage()) {
-            clearSelections();
-        }
+        if (e.target === e.target.getStage()) clearSelections();
     };
 
-    // --- Render Logic ---
     if (!initialState) return null;
-
-    const { grid } = initialState;
 
     return (
         <Stage
@@ -135,11 +172,9 @@ const GameCanvas = () => {
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
             onClick={handleStageClick}
-            onTap={handleStageClick}
         >
-            {/* Layer for the static map tiles */}
             <Layer>
-                {grid.tiles.map((tile) => (
+                {initialState.grid.tiles.map((tile) => (
                     <Rect
                         key={`${tile.x}-${tile.y}`}
                         x={tile.x * TILE_SIZE}
@@ -150,44 +185,27 @@ const GameCanvas = () => {
                     />
                 ))}
             </Layer>
-
-            {/* Layer for all dynamic game entities */}
             <Layer>
-                {/* Render Towers */}
-                {entities?.towers.map((tower) => {
-                    const isSelected = tower.id === selectedEntityId;
-                    return (
-                        <Circle
-                            key={tower.id}
-                            x={tower.pos.x}
-                            y={tower.pos.y}
-                            radius={TILE_SIZE / 2 - 4}
-                            fill="#e9ecef"
-                            stroke={isSelected ? '#fca311' : '#495057'}
-                            strokeWidth={isSelected ? 4 / stageScale : 2 / stageScale}
-                            shadowColor={isSelected ? '#fca311' : undefined}
-                            shadowBlur={isSelected ? 10 : 0}
-                            onClick={(e) => {
-                                e.cancelBubble = true;
-                                setSelectedEntityId(tower.id);
-                            }}
-                            onTap={(e) => {
-                                e.cancelBubble = true;
-                                setSelectedEntityId(tower.id);
-                            }}
-                        />
-                    );
-                })}
-                {/* Render Enemies */}
+                {entities?.towers.map((tower) => (
+                    <EntityShape
+                        key={tower.id}
+                        entity={tower}
+                        type="tower"
+                        scale={stageScale}
+                        isSelected={tower.id === selectedEntityId}
+                        onClick={() => {
+                            setSelectedEntityId(tower.id);
+                        }}
+                    />
+                ))}
                 {entities?.enemies.map((enemy) => (
-                    <Rect
+                    <EntityShape
                         key={enemy.id}
-                        x={enemy.pos.x - TILE_SIZE * 0.4}
-                        y={enemy.pos.y - TILE_SIZE * 0.4}
-                        width={TILE_SIZE * 0.8}
-                        height={TILE_SIZE * 0.8}
-                        fill="#e5383b"
-                        cornerRadius={4}
+                        entity={enemy}
+                        type="enemy"
+                        scale={stageScale}
+                        isSelected={false}
+                        onClick={() => {}}
                     />
                 ))}
             </Layer>
