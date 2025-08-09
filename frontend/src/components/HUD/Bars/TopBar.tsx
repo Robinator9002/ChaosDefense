@@ -1,10 +1,5 @@
-// frontend/src/components/HUD/TopBar.tsx
-import type { GameStatePayload } from '../../../api/types';
-
-// --- Prop Types ---
-interface TopBarProps {
-    gameState: GameStatePayload | null;
-}
+// frontend/src/components/HUD/Bars/TopBar.tsx
+import { useGameStore } from '../../../state/gameStore';
 
 // --- SVG Icon Components ---
 // Creating simple, reusable SVG components for our icons is cleaner
@@ -48,7 +43,13 @@ const WaveIcon = ({ className }: { className?: string }) => (
 );
 
 // --- Main TopBar Component ---
-const TopBar = ({ gameState }: TopBarProps) => {
+// This component no longer accepts props. It gets its data directly from the store.
+const TopBar = () => {
+    // We 'select' only the piece of state this component needs from the global store.
+    // The component will only re-render if this specific piece of state changes,
+    // which is very efficient.
+    const gameState = useGameStore((state) => state.gameState);
+
     if (!gameState) {
         // Don't render anything if we don't have state data yet.
         return null;
