@@ -1,131 +1,70 @@
 # backend/main.py
 import asyncio
-import json
 import logging
 import sys
-import uuid
 from pathlib import Path
-from typing import Dict, List, Any
+import uuid
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from starlette.websockets import WebSocketState
 
 # --- Path Setup ---
-# This is a crucial step to ensure that the backend application can find and
-# import modules from the 'game_logic' directory. We add the project's root
-# directory to Python's system path.
+# This ensures the backend can find the 'game_logic' module.
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
-# --- Project-Specific Imports ---
-# Now that the path is set up, we can import the core components from your game logic.
-# We are effectively treating the 'game_logic' directory as a library.
-# Note: We remove pygame imports as the backend is headless.
+# --- Local Module Imports ---
+# Imports from our new, structured backend directory.
+from backend.core.config import load_all_game_configs
+from backend.websockets.connection_manager import ConnectionManager
+from backend.websockets.handlers.game_loop_handler import game_loop
+from backend.websockets.handlers.command_parser import handle_message
+
+# --- Game Logic Imports ---
+# Imports from your existing, core game logic.
 from game_logic.game_manager import GameManager
 from game_logic.progression.player_data_manager import PlayerDataManager
 from game_logic.progression.progression_manager import ProgressionManager
-from game_logic.upgrades.upgrade_loader import load_all_upgrades
 
-# --- Logging Setup ---
+# --- Basic Logging Setup ---
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-
-# --- Configuration Loading ---
-# This utility function and the subsequent loading logic are adapted from your
-# original main.py to ensure the backend starts with the same configuration data.
-def load_config(path: Path) -> dict:
-    """Loads a single JSON configuration file."""
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        logger.error(f"Failed to load config file at {path}: {e}")
-        raise
-
-
-def load_all_game_configs() -> Dict[str, Any]:
-    """Loads all necessary game configurations from the disk."""
-    logger.info("--- Loading All Game Configurations for Backend ---")
-    config_path = PROJECT_ROOT / "configs"
-    tower_upgrade_dir = config_path / "upgrades" / "towers"
-
-    all_configs = {
-        "game_settings": load_config(config_path / "gameplay/game_settings.json"),
-        "level_styles": load_config(config_path / "levels/level_styles.json"),
-        "enemy_types": load_config(config_path / "entities/enemies/enemy_types.json"),
-        "boss_types": load_config(config_path / "entities/enemies/boss_types.json"),
-        "buffer_types": load_config(config_path / "entities/enemies/buffer_types.json"),
-        "tower_types": load_config(config_path / "entities/tower_types.json"),
-        "targeting_ai": load_config(config_path / "targeting/targeting_ai.json"),
-        "formations": load_config(config_path / "ai/formations.json"),
-        "upgrade_definitions": load_all_upgrades([tower_upgrade_dir]),
-        "difficulty_scaling": load_config(
-            config_path / "scaling/difficulty_scaling.json"
-        ),
-        "wave_scaling": load_config(config_path / "scaling/wave_scaling.json"),
-        "status_effects": load_config(config_path / "gameplay/status_effects.json"),
-        "global_upgrades": load_config(config_path / "upgrades/global_upgrades.json"),
-    }
-    logger.info("--- All configurations loaded successfully. ---")
-    return all_configs
-
-
-# --- WebSocket Connection Management ---
-class ConnectionManager:
-    """
-    Manages active WebSocket connections. This simple class allows us to keep
-    track of connected clients, although for this game, we'll typically have
-    only one client per game instance.
-    """
-
-    def __init__(self):
-        self.active_connections: Dict[str, WebSocket] = {}
-
-    async def connect(self, websocket: WebSocket, client_id: str):
-        """Accepts a new WebSocket connection and stores it."""
-        await websocket.accept()
-        self.active_connections[client_id] = websocket
-        logger.info(f"New connection accepted: {client_id}")
-
-    def disconnect(self, client_id: str):
-        """Removes a WebSocket connection."""
-        if client_id in self.active_connections:
-            del self.active_connections[client_id]
-            logger.info(f"Connection closed: {client_id}")
-
-    async def send_personal_message(self, message: str, client_id: str):
-        """Sends a message to a specific client."""
-        if client_id in self.active_connections:
-            websocket = self.active_connections[client_id]
-            if websocket.client_state == WebSocketState.CONNECTED:
-                await websocket.send_text(message)
-
-
-# --- FastAPI Application Setup ---
+# --- FastAPI Application Initialization ---
 app = FastAPI()
 manager = ConnectionManager()
 ALL_CONFIGS = load_all_game_configs()
 
 
-# --- WebSocket Endpoint ---
+async def read_messages_loop(websocket: WebSocket, game_manager: GameManager):
+    """
+    Listens for incoming commands from the client and passes them to the parser.
+    """
+    try:
+        while True:
+            raw_data = await websocket.receive_text()
+            # The handle_message function from our parser module does all the work.
+            await handle_message(game_manager, raw_data)
+    except WebSocketDisconnect:
+        logger.info("Client disconnected. Read loop terminated.")
+    except Exception as e:
+        logger.error(f"Error in read_messages_loop: {e}", exc_info=True)
+
+
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     """
-    This is the main entry point for a client connecting to the game server.
-    It establishes a WebSocket connection and manages the lifecycle of a
-    single game session.
+    The main entry point for a client connecting to the game server.
+    It orchestrates the setup and teardown of a full game session.
     """
     await manager.connect(websocket, client_id)
+    game_task = None
+    read_task = None
 
     try:
-        # --- Initialize Game Instance ---
-        # For each new connection, we create a fresh, independent instance of the game.
+        # --- Initialize Game Instance for this Session ---
         logger.info(f"Initializing game instance for client: {client_id}")
-
-        # Initialize progression systems (same as in your original main.py)
         saves_path = PROJECT_ROOT / "configs" / "saves"
         player_data_manager = PlayerDataManager(
             save_path=saves_path / "player_data.json",
@@ -136,43 +75,39 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             all_tower_configs=ALL_CONFIGS["tower_types"],
             global_upgrades_config=ALL_CONFIGS["global_upgrades"],
         )
-
-        # Instantiate the core game engine.
-        # TODO: The level_id will eventually be sent by the client from the menu.
-        # For now, we hardcode it to start a specific level for testing.
+        # TODO: The level_id will be sent by the client. Hardcoded for now.
         game_manager = GameManager(
             all_configs=ALL_CONFIGS,
             progression_manager=progression_manager,
-            level_id="Forest",  # Hardcoded for now
+            level_id="Forest",
         )
 
-        # --- Concurrently Run Game Logic and Listen for Client Commands ---
-        # We use asyncio.gather to run two coroutines at the same time:
-        # 1. game_loop: Runs the game simulation and sends state updates to the client.
-        # 2. read_messages: Listens for incoming commands from the client.
-        # These will be fleshed out in the next steps of our plan.
+        # --- Create and run concurrent tasks for game loop and message reading ---
+        game_task = asyncio.create_task(
+            game_loop(websocket, game_manager, client_id, manager)
+        )
+        read_task = asyncio.create_task(read_messages_loop(websocket, game_manager))
 
-        # Placeholder for the game loop logic (to be moved to game_loop_handler.py)
-        async def game_loop(ws: WebSocket, gm: GameManager):
-            while True:
-                # In the next step, this will call gm.update() and send serialized state.
-                await asyncio.sleep(1 / 60)  # ~60 FPS
-
-        # Placeholder for the command reading logic (to be moved to command_parser.py)
-        async def read_messages(ws: WebSocket, gm: GameManager):
-            while True:
-                data = await ws.receive_text()
-                # In the next step, this will parse the data and call gm methods.
-                logger.info(f"Received command: {data}")
-
-        await asyncio.gather(
-            game_loop(websocket, game_manager), read_messages(websocket, game_manager)
+        # Wait for either task to complete (e.g., game over or disconnect).
+        done, pending = await asyncio.wait(
+            [game_task, read_task], return_when=asyncio.FIRST_COMPLETED
         )
 
-    except WebSocketDisconnect:
-        logger.warning(f"Client {client_id} disconnected unexpectedly.")
+        # Clean up any pending tasks to prevent them from running forever.
+        for task in pending:
+            task.cancel()
+
+    except Exception as e:
+        logger.critical(
+            f"An unhandled error occurred in the main WebSocket endpoint for {client_id}: {e}",
+            exc_info=True,
+        )
     finally:
-        # --- Cleanup ---
-        # Ensures that the client is properly disconnected from the manager
-        # when the game session ends, for any reason.
+        # --- Final Cleanup ---
+        # Ensure the client is disconnected and all tasks are cancelled.
+        if game_task and not game_task.done():
+            game_task.cancel()
+        if read_task and not read_task.done():
+            read_task.cancel()
         manager.disconnect(client_id)
+        logger.info(f"Session cleaned up for client {client_id}")
