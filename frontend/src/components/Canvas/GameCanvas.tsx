@@ -1,6 +1,7 @@
 // frontend/src/components/Canvas/GameCanvas.tsx
 import { Stage, Layer, Rect, Circle } from 'react-konva';
 import { useGameStore } from '../../state/gameStore';
+import Konva from 'konva';
 
 // A simple color map for different tile types. We can make this more robust later.
 const tileColorMap: { [key: string]: string } = {
@@ -18,13 +19,38 @@ const TILE_SIZE = 32; // This should eventually come from config
 
 const GameCanvas = () => {
     // Select the state needed for rendering directly from the store.
-    const { initialState, entities } = useGameStore((state) => ({
-        initialState: state.initialState,
-        entities: state.entities,
-    }));
+    // We now also need the selectedEntityId to highlight the selected tower,
+    // and the action to update it.
+    const { initialState, entities, selectedEntityId, setSelectedEntityId, clearSelections } =
+        useGameStore((state) => ({
+            initialState: state.initialState,
+            entities: state.entities,
+            selectedEntityId: state.selectedEntityId,
+            setSelectedEntityId: state.setSelectedEntityId,
+            clearSelections: state.clearSelections,
+        }));
 
-    // The parent App.tsx already ensures this component won't render if initialState is null,
-    // but this is a good safeguard.
+    const handleStageClick = () => {
+        // When the stage (background) is clicked, clear any selections.
+        clearSelections();
+    };
+
+    const handleMouseEnter = (e: Konva.KonvaEventObject<MouseEvent>) => {
+        // Change cursor to a pointer to indicate an item is clickable.
+        const stage = e.target.getStage();
+        if (stage) {
+            stage.container().style.cursor = 'pointer';
+        }
+    };
+
+    const handleMouseLeave = (e: Konva.KonvaEventObject<MouseEvent>) => {
+        // Change cursor back to default when not hovering over a clickable item.
+        const stage = e.target.getStage();
+        if (stage) {
+            stage.container().style.cursor = 'default';
+        }
+    };
+
     if (!initialState) {
         return null;
     }
@@ -32,7 +58,12 @@ const GameCanvas = () => {
     const { grid } = initialState;
 
     return (
-        <Stage width={window.innerWidth} height={window.innerHeight}>
+        <Stage
+            width={window.innerWidth}
+            height={window.innerHeight}
+            onClick={handleStageClick}
+            onTap={handleStageClick}
+        >
             <Layer>
                 {grid.tiles.map((tile) => (
                     <Rect
@@ -47,17 +78,33 @@ const GameCanvas = () => {
             </Layer>
 
             <Layer>
-                {entities?.towers.map((tower) => (
-                    <Circle
-                        key={tower.id}
-                        x={tower.pos.x}
-                        y={tower.pos.y}
-                        radius={TILE_SIZE / 2 - 4}
-                        fill="#e9ecef"
-                        stroke="#495057"
-                        strokeWidth={2}
-                    />
-                ))}
+                {entities?.towers.map((tower) => {
+                    const isSelected = tower.id === selectedEntityId;
+                    return (
+                        <Circle
+                            key={tower.id}
+                            x={tower.pos.x}
+                            y={tower.pos.y}
+                            radius={TILE_SIZE / 2 - 4}
+                            fill="#e9ecef"
+                            stroke={isSelected ? '#fca311' : '#495057'} // Highlight with orange stroke if selected
+                            strokeWidth={isSelected ? 4 : 2}
+                            shadowColor={isSelected ? '#fca311' : undefined}
+                            shadowBlur={isSelected ? 10 : 0}
+                            // Stop click event from bubbling up to the stage, which would clear the selection.
+                            onClick={(e) => {
+                                e.cancelBubble = true;
+                                setSelectedEntityId(tower.id);
+                            }}
+                            onTap={(e) => {
+                                e.cancelBubble = true;
+                                setSelectedEntityId(tower.id);
+                            }}
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                        />
+                    );
+                })}
                 {entities?.enemies.map((enemy) => (
                     <Rect
                         key={enemy.id}
