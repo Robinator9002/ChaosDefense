@@ -10,6 +10,7 @@ __pycache__/
 # Virtual environment folder
 # Maybe relevant later on
 .venv/
+node_modules
 # Or other common names
 venv/
 env/
